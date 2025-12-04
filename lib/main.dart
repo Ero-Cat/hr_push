@@ -2,14 +2,21 @@ import 'dart:io' show Platform;
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:flutter_blue_plus/flutter_blue_plus.dart';
+import 'package:flutter_blue_plus_windows/flutter_blue_plus_windows.dart';
 import 'package:window_manager/window_manager.dart';
 
 import 'heart_rate_manager.dart';
 
+bool get _blePluginSupported {
+  if (kIsWeb) return false;
+  return Platform.isAndroid || Platform.isIOS || Platform.isMacOS || Platform.isLinux || Platform.isWindows;
+}
+
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  FlutterBluePlus.setLogLevel(LogLevel.verbose, color: true);
+  if (_blePluginSupported) {
+    FlutterBluePlus.setLogLevel(LogLevel.verbose, color: true);
+  }
 
   // Desktop: lock a consistent window size to keep layout consistent.
   if (!kIsWeb && (Platform.isWindows || Platform.isMacOS || Platform.isLinux)) {

@@ -3,7 +3,7 @@ import 'dart:collection';
 import 'dart:io' show Platform;
 
 import 'package:flutter/foundation.dart';
-import 'package:flutter_blue_plus/flutter_blue_plus.dart';
+import 'package:flutter_blue_plus_windows/flutter_blue_plus_windows.dart';
 import 'package:flutter/services.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -85,9 +85,25 @@ class HeartRateManager extends ChangeNotifier {
   BluetoothConnectionState get connectionState => _connectionState;
   BluetoothAdapterState get adapterState => _adapterState;
 
+  bool get _isBleSupportedPlatform {
+    if (kIsWeb) return false;
+    return Platform.isAndroid ||
+        Platform.isIOS ||
+        Platform.isMacOS ||
+        Platform.isLinux ||
+        Platform.isWindows;
+  }
+
   Future<void> start() async {
     _isTestEnv = !kIsWeb && Platform.environment['FLUTTER_TEST'] == 'true';
     if (_isTestEnv) return;
+
+    if (!_isBleSupportedPlatform) {
+      _status = '当前平台暂不支持蓝牙扫描';
+      _adapterState = BluetoothAdapterState.off;
+      notifyListeners();
+      return;
+    }
 
     final ready = await _ensurePermissionsAndBluetooth();
     if (!ready) return;
@@ -118,6 +134,12 @@ class HeartRateManager extends ChangeNotifier {
   }
 
   Future<bool> _ensurePermissionsAndBluetooth() async {
+    if (!_isBleSupportedPlatform) {
+      _status = '当前平台暂不支持蓝牙';
+      notifyListeners();
+      return false;
+    }
+
     if (!await FlutterBluePlus.isSupported) {
       _status = '此设备不支持蓝牙';
       notifyListeners();
@@ -159,6 +181,7 @@ class HeartRateManager extends ChangeNotifier {
 
   Future<void> _tryStartScan() async {
     if (_isTestEnv || _scanLoopStarting) return;
+    if (!_isBleSupportedPlatform) return;
     if (_isScanning) return;
     if (_connectionState == BluetoothConnectionState.connected ||
         _connectionState == BluetoothConnectionState.connecting) {
@@ -175,6 +198,7 @@ class HeartRateManager extends ChangeNotifier {
 
   Future<void> _startScan() async {
     if (_isTestEnv) return;
+    if (!_isBleSupportedPlatform) return;
     try {
       _status = '扫描附近设备...';
       _setUiScanning(true);
@@ -183,8 +207,6 @@ class HeartRateManager extends ChangeNotifier {
         timeout: _scanInterval,
         // 一些腕表并不会在广播里声明心率服务, 所以不加 withServices 过滤
         continuousUpdates: true,
-        // 已显式申请定位权限，这里就不重复向系统弹窗
-        androidCheckLocationServices: false,
       );
     } catch (e) {
       _status = '未连接';
@@ -195,6 +217,11 @@ class HeartRateManager extends ChangeNotifier {
 
   Future<void> restartScan() async {
     if (_isTestEnv) return;
+    if (!_isBleSupportedPlatform) {
+      _status = '当前平台不支持蓝牙扫描';
+      notifyListeners();
+      return;
+    }
     await FlutterBluePlus.stopScan();
     _nearby.clear();
     notifyListeners();
@@ -335,6 +362,11 @@ class HeartRateManager extends ChangeNotifier {
 
   Future<void> _connectTo(BluetoothDevice device) async {
     if (_isTestEnv) return;
+    if (!_isBleSupportedPlatform) {
+      _status = '当前平台不支持蓝牙连接';
+      notifyListeners();
+      return;
+    }
     _connectedDevice = device;
     _userInitiatedDisconnect = false;
     _status = '正在连接 ${device.platformName}...';
@@ -359,8 +391,8 @@ class HeartRateManager extends ChangeNotifier {
 
     try {
       await device.connect(
-        license: License.free,
         timeout: const Duration(seconds: 10),
+        autoConnect: false,
       );
       _status = '已连接 ${device.platformName}';
       _rssi = await device.readRssi();
@@ -375,6 +407,11 @@ class HeartRateManager extends ChangeNotifier {
   }
 
   Future<void> manualConnect(NearbyDevice target) async {
+    if (!_isBleSupportedPlatform) {
+      _status = '当前平台不支持蓝牙连接';
+      notifyListeners();
+      return;
+    }
     _autoReconnect = true; // 用户重新连接后恢复自动重连
     _autoConnectEnabled = true; // 用户主动操作后再允许自动连接
     await _connectTo(target.device);
@@ -384,6 +421,7 @@ class HeartRateManager extends ChangeNotifier {
     BluetoothDevice device, {
     int attempt = 0,
   }) async {
+    if (!_isBleSupportedPlatform) return;
     await _heartRateSub?.cancel();
     _heartRate = null;
     _lastUpdated = null;
@@ -456,6 +494,11 @@ class HeartRateManager extends ChangeNotifier {
   }
 
   Future<void> disconnect() async {
+    if (!_isBleSupportedPlatform) {
+      _status = '当前平台不支持蓝牙连接';
+      notifyListeners();
+      return;
+    }
     _userInitiatedDisconnect = true;
     _reconnectTimer?.cancel();
     _autoReconnect = false; // 手动断开后不再自动重连
@@ -471,6 +514,7 @@ class HeartRateManager extends ChangeNotifier {
   }
 
   void _scheduleReconnect() {
+    if (!_isBleSupportedPlatform) return;
     if (!_autoReconnect || _connectedDevice == null) return;
     _reconnectTimer?.cancel();
     _reconnectTimer = Timer(const Duration(seconds: 3), () async {
