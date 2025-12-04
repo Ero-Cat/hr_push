@@ -9,7 +9,11 @@ import 'heart_rate_manager.dart';
 
 bool get _blePluginSupported {
   if (kIsWeb) return false;
-  return Platform.isAndroid || Platform.isIOS || Platform.isMacOS || Platform.isLinux || Platform.isWindows;
+  return Platform.isAndroid ||
+      Platform.isIOS ||
+      Platform.isMacOS ||
+      Platform.isLinux ||
+      Platform.isWindows;
 }
 
 Future<void> main() async {
@@ -69,11 +73,16 @@ class HeartDashboard extends StatelessWidget {
 
     return Scaffold(
       backgroundColor: const Color(0xFF0B1220),
+      floatingActionButtonLocation: FloatingActionButtonLocation.centerFloat,
+      floatingActionButton: _SettingsFab(mgr: mgr),
       body: SafeArea(
         child: LayoutBuilder(
           builder: (context, constraints) {
             return SingleChildScrollView(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+              padding: const EdgeInsets.symmetric(
+                horizontal: 16,
+                vertical: 14,
+              ).copyWith(bottom: 96),
               child: ConstrainedBox(
                 constraints: BoxConstraints(
                   minHeight: constraints.maxHeight - 32,
@@ -106,6 +115,32 @@ class HeartDashboard extends StatelessWidget {
           },
         ),
       ),
+    );
+  }
+}
+
+class _SettingsFab extends StatelessWidget {
+  const _SettingsFab({required this.mgr});
+
+  final HeartRateManager mgr;
+
+  @override
+  Widget build(BuildContext context) {
+    return FloatingActionButton.extended(
+      backgroundColor: const Color(0xFF111827),
+      foregroundColor: Colors.white,
+      icon: const Icon(Icons.settings),
+      label: const Text('配置'),
+      onPressed: () async {
+        final updated = await Navigator.of(context).push<HeartRateSettings>(
+          MaterialPageRoute(
+            builder: (_) => SettingsPage(initial: mgr.settings),
+          ),
+        );
+        if (updated != null) {
+          await mgr.updateSettings(updated);
+        }
+      },
     );
   }
 }
@@ -540,5 +575,210 @@ class _DebugList extends StatelessWidget {
         ],
       ),
     );
+  }
+}
+
+class SettingsPage extends StatefulWidget {
+  const SettingsPage({super.key, required this.initial});
+
+  final HeartRateSettings initial;
+
+  @override
+  State<SettingsPage> createState() => _SettingsPageState();
+}
+
+class _SettingsPageState extends State<SettingsPage> {
+  late final TextEditingController _pushCtrl;
+  late final TextEditingController _oscCtrl;
+  late final TextEditingController _oscConnectedCtrl;
+  late final TextEditingController _oscValueCtrl;
+  late final TextEditingController _oscPercentCtrl;
+  late final TextEditingController _maxHrCtrl;
+  late final TextEditingController _intervalCtrl;
+
+  @override
+  void initState() {
+    super.initState();
+    _pushCtrl = TextEditingController(text: widget.initial.pushEndpoint);
+    _oscCtrl = TextEditingController(text: widget.initial.oscAddress);
+    _oscConnectedCtrl = TextEditingController(
+      text: widget.initial.oscHrConnectedPath,
+    );
+    _oscValueCtrl = TextEditingController(text: widget.initial.oscHrValuePath);
+    _oscPercentCtrl = TextEditingController(
+      text: widget.initial.oscHrPercentPath,
+    );
+    _maxHrCtrl = TextEditingController(
+      text: widget.initial.maxHeartRate.toString(),
+    );
+    _intervalCtrl = TextEditingController(
+      text: widget.initial.updateIntervalMs.toString(),
+    );
+  }
+
+  @override
+  void dispose() {
+    _pushCtrl.dispose();
+    _oscCtrl.dispose();
+    _oscConnectedCtrl.dispose();
+    _oscValueCtrl.dispose();
+    _oscPercentCtrl.dispose();
+    _maxHrCtrl.dispose();
+    _intervalCtrl.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: const Color(0xFF0B1220),
+      appBar: AppBar(
+        backgroundColor: const Color(0xFF0B1220),
+        foregroundColor: Colors.white,
+        title: const Text('配置'),
+        elevation: 0,
+      ),
+      body: SafeArea(
+        child: ListView(
+          padding: const EdgeInsets.all(16),
+          children: [
+            _sectionTitle('推送地址'),
+            _buildTextField(
+              controller: _pushCtrl,
+              hint: 'http:// 或 ws:// 开头',
+              helper: '用于 HTTP / WebSocket 推送',
+            ),
+            const SizedBox(height: 18),
+            _sectionTitle('OSC 地址'),
+            _buildTextField(
+              controller: _oscCtrl,
+              hint: '例如 127.0.0.1:9000',
+              helper: '目标主机与端口',
+            ),
+            const SizedBox(height: 18),
+            _sectionTitle('OSC 参数路径'),
+            _buildTextField(
+              controller: _oscConnectedCtrl,
+              label: '心率在线状态',
+              hint: '/avatar/parameters/hr_connected',
+            ),
+            const SizedBox(height: 10),
+            _buildTextField(
+              controller: _oscValueCtrl,
+              label: '当前心率数值',
+              hint: '/avatar/parameters/hr_val',
+            ),
+            const SizedBox(height: 10),
+            _buildTextField(
+              controller: _oscPercentCtrl,
+              label: '心率百分比',
+              hint: '/avatar/parameters/hr_percent',
+            ),
+            const SizedBox(height: 18),
+            _sectionTitle('最大心率'),
+            _buildTextField(
+              controller: _maxHrCtrl,
+              hint: '用于百分比计算，默认 200',
+              keyboardType: TextInputType.number,
+            ),
+            const SizedBox(height: 14),
+            _sectionTitle('推送/刷新间隔 (ms)'),
+            _buildTextField(
+              controller: _intervalCtrl,
+              hint: '默认 1000ms，过低可能影响性能',
+              keyboardType: TextInputType.number,
+            ),
+            const SizedBox(height: 28),
+            FilledButton.icon(
+              icon: const Icon(Icons.save_alt),
+              label: const Text('保存'),
+              onPressed: _onSave,
+              style: FilledButton.styleFrom(
+                minimumSize: const Size.fromHeight(48),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _sectionTitle(String text) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: Text(
+        text,
+        style: const TextStyle(
+          color: Colors.white70,
+          fontSize: 13,
+          fontWeight: FontWeight.w700,
+          letterSpacing: -0.1,
+        ),
+      ),
+    );
+  }
+
+  Widget _buildTextField({
+    required TextEditingController controller,
+    String? label,
+    String? hint,
+    String? helper,
+    TextInputType? keyboardType,
+  }) {
+    return TextField(
+      controller: controller,
+      keyboardType: keyboardType,
+      style: const TextStyle(color: Colors.white),
+      decoration: InputDecoration(
+        labelText: label,
+        hintText: hint,
+        helperText: helper,
+        labelStyle: const TextStyle(color: Colors.white70),
+        hintStyle: const TextStyle(color: Colors.white38),
+        helperStyle: const TextStyle(color: Colors.white38),
+        filled: true,
+        fillColor: const Color(0xFF111827),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: const BorderSide(color: Colors.white12),
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: const BorderSide(color: Color(0xFF0FA3B1)),
+        ),
+        contentPadding: const EdgeInsets.symmetric(
+          horizontal: 14,
+          vertical: 12,
+        ),
+      ),
+    );
+  }
+
+  void _onSave() {
+    final cleanedPush = _pushCtrl.text.trim();
+    final cleanedOsc = _oscCtrl.text.trim().isEmpty
+        ? HeartRateSettings.defaults().oscAddress
+        : _oscCtrl.text.trim();
+    final maxHr = int.tryParse(_maxHrCtrl.text.trim());
+
+    final updated = widget.initial.copyWith(
+      pushEndpoint: cleanedPush,
+      oscAddress: cleanedOsc,
+      oscHrConnectedPath: _oscConnectedCtrl.text.trim().isEmpty
+          ? HeartRateSettings.defaults().oscHrConnectedPath
+          : _oscConnectedCtrl.text.trim(),
+      oscHrValuePath: _oscValueCtrl.text.trim().isEmpty
+          ? HeartRateSettings.defaults().oscHrValuePath
+          : _oscValueCtrl.text.trim(),
+      oscHrPercentPath: _oscPercentCtrl.text.trim().isEmpty
+          ? HeartRateSettings.defaults().oscHrPercentPath
+          : _oscPercentCtrl.text.trim(),
+      maxHeartRate: maxHr ?? widget.initial.maxHeartRate,
+      updateIntervalMs:
+          int.tryParse(_intervalCtrl.text.trim()) ??
+          widget.initial.updateIntervalMs,
+    );
+
+    Navigator.of(context).pop(updated);
   }
 }

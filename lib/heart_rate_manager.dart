@@ -1,12 +1,16 @@
 import 'dart:async';
 import 'dart:collection';
-import 'dart:io' show Platform;
+import 'dart:convert';
+import 'dart:io' show Platform, RawDatagramSocket, InternetAddress;
+import 'dart:typed_data';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter_blue_plus_windows/flutter_blue_plus_windows.dart';
 import 'package:flutter/services.dart';
+import 'package:http/http.dart' as http;
 import 'package:permission_handler/permission_handler.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:web_socket_channel/io.dart';
 
 final Guid _heartRateService = Guid('0000180d-0000-1000-8000-00805f9b34fb');
 final Guid _heartRateMeasurement = Guid('00002a37-0000-1000-8000-00805f9b34fb');
@@ -27,6 +31,102 @@ class NearbyDevice {
   final BluetoothDevice device;
 }
 
+class HeartRateSettings {
+  const HeartRateSettings({
+    required this.pushEndpoint,
+    required this.oscAddress,
+    required this.oscHrConnectedPath,
+    required this.oscHrValuePath,
+    required this.oscHrPercentPath,
+    required this.maxHeartRate,
+    required this.updateIntervalMs,
+  });
+
+  final String pushEndpoint;
+  final String oscAddress;
+  final String oscHrConnectedPath;
+  final String oscHrValuePath;
+  final String oscHrPercentPath;
+  final int maxHeartRate;
+  final int updateIntervalMs;
+
+  static const _defaultPushEndpoint = '';
+  static const _defaultOscAddress = '127.0.0.1:9000';
+  static const _defaultHrConnectedPath = '/avatar/parameters/hr_connected';
+  static const _defaultHrValuePath = '/avatar/parameters/hr_val';
+  static const _defaultHrPercentPath = '/avatar/parameters/hr_percent';
+  static const _defaultMaxHeartRate = 200;
+  static const _defaultUpdateIntervalMs = 1000;
+
+  static const _kPushEndpointKey = 'cfg_push_endpoint';
+  static const _kOscAddressKey = 'cfg_osc_address';
+  static const _kOscConnectedKey = 'cfg_osc_connected_path';
+  static const _kOscValueKey = 'cfg_osc_value_path';
+  static const _kOscPercentKey = 'cfg_osc_percent_path';
+  static const _kMaxHeartRateKey = 'cfg_max_heart_rate';
+  static const _kUpdateIntervalKey = 'cfg_update_interval_ms';
+
+  factory HeartRateSettings.defaults() {
+    return const HeartRateSettings(
+      pushEndpoint: _defaultPushEndpoint,
+      oscAddress: _defaultOscAddress,
+      oscHrConnectedPath: _defaultHrConnectedPath,
+      oscHrValuePath: _defaultHrValuePath,
+      oscHrPercentPath: _defaultHrPercentPath,
+      maxHeartRate: _defaultMaxHeartRate,
+      updateIntervalMs: _defaultUpdateIntervalMs,
+    );
+  }
+
+  factory HeartRateSettings.fromPrefs(SharedPreferences? prefs) {
+    if (prefs == null) return HeartRateSettings.defaults();
+
+    return HeartRateSettings(
+      pushEndpoint: prefs.getString(_kPushEndpointKey) ?? _defaultPushEndpoint,
+      oscAddress: prefs.getString(_kOscAddressKey) ?? _defaultOscAddress,
+      oscHrConnectedPath:
+          prefs.getString(_kOscConnectedKey) ?? _defaultHrConnectedPath,
+      oscHrValuePath: prefs.getString(_kOscValueKey) ?? _defaultHrValuePath,
+      oscHrPercentPath:
+          prefs.getString(_kOscPercentKey) ?? _defaultHrPercentPath,
+      maxHeartRate: prefs.getInt(_kMaxHeartRateKey) ?? _defaultMaxHeartRate,
+      updateIntervalMs:
+          prefs.getInt(_kUpdateIntervalKey) ?? _defaultUpdateIntervalMs,
+    );
+  }
+
+  Future<void> save(SharedPreferences? prefs) async {
+    if (prefs == null) return;
+    await prefs.setString(_kPushEndpointKey, pushEndpoint);
+    await prefs.setString(_kOscAddressKey, oscAddress);
+    await prefs.setString(_kOscConnectedKey, oscHrConnectedPath);
+    await prefs.setString(_kOscValueKey, oscHrValuePath);
+    await prefs.setString(_kOscPercentKey, oscHrPercentPath);
+    await prefs.setInt(_kMaxHeartRateKey, maxHeartRate);
+    await prefs.setInt(_kUpdateIntervalKey, updateIntervalMs);
+  }
+
+  HeartRateSettings copyWith({
+    String? pushEndpoint,
+    String? oscAddress,
+    String? oscHrConnectedPath,
+    String? oscHrValuePath,
+    String? oscHrPercentPath,
+    int? maxHeartRate,
+    int? updateIntervalMs,
+  }) {
+    return HeartRateSettings(
+      pushEndpoint: pushEndpoint ?? this.pushEndpoint,
+      oscAddress: oscAddress ?? this.oscAddress,
+      oscHrConnectedPath: oscHrConnectedPath ?? this.oscHrConnectedPath,
+      oscHrValuePath: oscHrValuePath ?? this.oscHrValuePath,
+      oscHrPercentPath: oscHrPercentPath ?? this.oscHrPercentPath,
+      maxHeartRate: maxHeartRate ?? this.maxHeartRate,
+      updateIntervalMs: updateIntervalMs ?? this.updateIntervalMs,
+    );
+  }
+}
+
 class HeartRateManager extends ChangeNotifier {
   HeartRateManager();
 
@@ -42,8 +142,14 @@ class HeartRateManager extends ChangeNotifier {
   StreamSubscription<List<int>>? _heartRateSub;
   StreamSubscription<BluetoothAdapterState>? _adapterStateSub;
 
+  IOWebSocketChannel? _wsChannel;
+  bool _wsConnecting = false;
+  RawDatagramSocket? _oscSocket;
+
   Timer? _reconnectTimer;
   Timer? _scanUiHoldTimer;
+  DateTime? _lastPublished;
+  bool _connecting = false;
 
   bool _autoReconnect = true;
   bool _userInitiatedDisconnect = false;
@@ -53,6 +159,8 @@ class HeartRateManager extends ChangeNotifier {
   bool _autoConnectEnabled = false; // 首次启动不自动连接，等待用户操作
   String? _savedDeviceId;
   SharedPreferences? _prefs;
+
+  HeartRateSettings _settings = HeartRateSettings.defaults();
 
   int? _heartRate;
   int? _rssi;
@@ -66,6 +174,8 @@ class HeartRateManager extends ChangeNotifier {
   static const Duration _scanInterval = Duration(milliseconds: 1000);
   // 为避免按钮闪烁，至少保持 3s 的“扫描中”显示
   static const Duration _scanUiMinVisible = Duration(seconds: 3);
+  static const Duration _nearbyTtl = Duration(seconds: 8);
+  static const Duration _reconnectDelay = Duration(seconds: 3);
   Timer? _scanLoopTimer;
   bool _scanLoopStarting = false;
 
@@ -84,6 +194,20 @@ class HeartRateManager extends ChangeNotifier {
   String get connectedName => _connectedDevice?.platformName ?? '';
   BluetoothConnectionState get connectionState => _connectionState;
   BluetoothAdapterState get adapterState => _adapterState;
+  HeartRateSettings get settings => _settings;
+  bool get isConnected =>
+      _connectionState == BluetoothConnectionState.connected;
+  double? get _heartRatePercent {
+    if (_heartRate == null || _settings.maxHeartRate <= 0) return null;
+    final percent = _heartRate! / _settings.maxHeartRate;
+    return percent.clamp(0, 1).toDouble();
+  }
+
+  bool _shouldPublishNow(DateTime now) {
+    final interval = Duration(milliseconds: _settings.updateIntervalMs);
+    if (_lastPublished == null) return true;
+    return now.difference(_lastPublished!) >= interval;
+  }
 
   bool get _isBleSupportedPlatform {
     if (kIsWeb) return false;
@@ -109,6 +233,7 @@ class HeartRateManager extends ChangeNotifier {
     if (!ready) return;
 
     _prefs = await SharedPreferences.getInstance();
+    _settings = HeartRateSettings.fromPrefs(_prefs);
     _savedDeviceId = _prefs?.getString('last_device_id');
     if (_savedDeviceId != null) {
       _autoConnectEnabled = true; // 曾连接过，自动尝试重连
@@ -176,7 +301,10 @@ class HeartRateManager extends ChangeNotifier {
 
   void _startScanLoopTimer() {
     _scanLoopTimer?.cancel();
-    _scanLoopTimer = Timer.periodic(_scanInterval, (_) => _tryStartScan());
+    _scanLoopTimer = Timer.periodic(_scanInterval, (_) {
+      _pruneNearby(DateTime.now());
+      _tryStartScan();
+    });
   }
 
   Future<void> _tryStartScan() async {
@@ -229,6 +357,7 @@ class HeartRateManager extends ChangeNotifier {
   }
 
   void _handleScanResults(List<ScanResult> results) {
+    final now = DateTime.now();
     for (final r in results) {
       if (_isLikelyPhoneOrPc(r)) continue;
       if (!_isWearableHeartRateCandidate(r)) continue;
@@ -240,7 +369,6 @@ class HeartRateManager extends ChangeNotifier {
                 : '未命名设备');
 
       final id = r.device.remoteId.str;
-      final now = DateTime.now();
       final existingIndex = _nearby.indexWhere((d) => d.id == id);
       if (existingIndex >= 0) {
         _nearby[existingIndex]
@@ -270,8 +398,13 @@ class HeartRateManager extends ChangeNotifier {
       }
     }
 
+    _pruneNearby(now);
     _nearby.sort((a, b) => b.rssi.compareTo(a.rssi));
     notifyListeners();
+  }
+
+  void _pruneNearby(DateTime now) {
+    _nearby.removeWhere((d) => now.difference(d.lastSeen) > _nearbyTtl);
   }
 
   void _updateBroadcastHeartRate(ScanResult r) {
@@ -281,10 +414,15 @@ class HeartRateManager extends ChangeNotifier {
     final bpm = _parseHeartRateValue(data);
     if (bpm == null) return;
 
+    final now = DateTime.now();
+    if (!_shouldPublishNow(now)) return;
+
     _heartRate = bpm;
     _rssi = r.rssi;
-    _lastUpdated = DateTime.now();
+    _lastUpdated = now;
+    _lastPublished = now;
     _status = '广播心率';
+    _notifyHeartRateUpdate();
     // Live Activity removed; no island update.
   }
 
@@ -367,6 +505,10 @@ class HeartRateManager extends ChangeNotifier {
       notifyListeners();
       return;
     }
+    if (_connecting) {
+      return;
+    }
+    _connecting = true;
     _connectedDevice = device;
     _userInitiatedDisconnect = false;
     _status = '正在连接 ${device.platformName}...';
@@ -382,6 +524,7 @@ class HeartRateManager extends ChangeNotifier {
         _heartRateSub?.cancel();
         _heartRate = null;
       }
+      _notifyConnectionState();
       notifyListeners();
       if (state == BluetoothConnectionState.disconnected &&
           !_userInitiatedDisconnect) {
@@ -402,7 +545,10 @@ class HeartRateManager extends ChangeNotifier {
     } catch (e) {
       _status = '连接失败: $e';
       notifyListeners();
+      await restartScan();
       _scheduleReconnect();
+    } finally {
+      _connecting = false;
     }
   }
 
@@ -487,9 +633,14 @@ class HeartRateManager extends ChangeNotifier {
   void _handleHeartRateData(List<int> data) {
     final bpm = _parseHeartRateValue(data);
     if (bpm == null) return;
+    final now = DateTime.now();
+    if (!_shouldPublishNow(now)) return;
+
     _heartRate = bpm;
-    _lastUpdated = DateTime.now();
+    _lastUpdated = now;
+    _lastPublished = now;
     _status = '实时更新';
+    _notifyHeartRateUpdate();
     notifyListeners();
   }
 
@@ -508,6 +659,7 @@ class HeartRateManager extends ChangeNotifier {
     } finally {
       _connectionState = BluetoothConnectionState.disconnected;
       _status = '已断开';
+      _notifyConnectionState();
       notifyListeners();
       await restartScan();
     }
@@ -517,9 +669,31 @@ class HeartRateManager extends ChangeNotifier {
     if (!_isBleSupportedPlatform) return;
     if (!_autoReconnect || _connectedDevice == null) return;
     _reconnectTimer?.cancel();
-    _reconnectTimer = Timer(const Duration(seconds: 3), () async {
-      if (_connectedDevice == null) return;
-      await _connectTo(_connectedDevice!);
+    _reconnectTimer = Timer(_reconnectDelay, () async {
+      final target = _connectedDevice;
+      if (target == null) return;
+
+      final lastSeen = _nearby
+          .firstWhere(
+            (d) => d.id == target.remoteId.str,
+            orElse: () => NearbyDevice(
+              id: '',
+              name: '',
+              rssi: 0,
+              device: target,
+              lastSeen: DateTime.fromMillisecondsSinceEpoch(0),
+            ),
+          )
+          .lastSeen;
+
+      final fresh = DateTime.now().difference(lastSeen) <= _nearbyTtl * 2;
+      if (!fresh) {
+        _status = '等待设备重新广播...';
+        notifyListeners();
+        return;
+      }
+
+      await _connectTo(target);
     });
   }
 
@@ -552,6 +726,211 @@ class HeartRateManager extends ChangeNotifier {
     _prefs?.setString('last_device_id', id);
   }
 
+  void _notifyHeartRateUpdate() {
+    final bpm = _heartRate;
+    if (bpm == null) return;
+    final percent = _heartRatePercent;
+    final connected = isConnected;
+
+    final payload = <String, dynamic>{
+      'event': 'heartRate',
+      'heartRate': bpm,
+      'percent': percent,
+      'connected': connected,
+      'device': _connectedDevice?.platformName,
+      'timestamp': DateTime.now().toIso8601String(),
+    };
+
+    unawaited(_sendPushPayload(payload));
+    unawaited(_sendOscHeartRate(bpm, percent));
+  }
+
+  void _notifyConnectionState() {
+    final connected = isConnected;
+    final payload = <String, dynamic>{
+      'event': 'connection',
+      'connected': connected,
+      'device': _connectedDevice?.platformName,
+      'timestamp': DateTime.now().toIso8601String(),
+    };
+
+    unawaited(_sendPushPayload(payload));
+    unawaited(_sendOscConnected(connected));
+  }
+
+  Future<void> _sendPushPayload(Map<String, dynamic> payload) async {
+    final endpoint = _settings.pushEndpoint.trim();
+    if (endpoint.isEmpty) return;
+    final uri = Uri.tryParse(endpoint);
+    if (uri == null) return;
+
+    if (uri.scheme.startsWith('ws')) {
+      await _sendWs(uri, payload);
+    } else if (uri.scheme.startsWith('http')) {
+      await _sendHttp(uri, payload);
+    }
+  }
+
+  Future<void> _sendHttp(Uri uri, Map<String, dynamic> payload) async {
+    try {
+      await http
+          .post(
+            uri,
+            headers: {'content-type': 'application/json'},
+            body: jsonEncode(payload),
+          )
+          .timeout(const Duration(seconds: 3));
+    } catch (_) {
+      // 发送失败静默忽略，避免打断主流程
+    }
+  }
+
+  Future<void> _sendWs(Uri uri, Map<String, dynamic> payload) async {
+    if (_wsChannel == null || _wsChannel!.closeCode != null) {
+      if (_wsConnecting) return;
+      _wsConnecting = true;
+      try {
+        _wsChannel = IOWebSocketChannel.connect(
+          uri,
+          pingInterval: const Duration(seconds: 10),
+        );
+        _wsChannel!.stream.listen(
+          (_) {},
+          onError: (_) {
+            _wsChannel = null;
+          },
+          onDone: () {
+            _wsChannel = null;
+          },
+        );
+      } catch (_) {
+        _wsChannel = null;
+      } finally {
+        _wsConnecting = false;
+      }
+    }
+
+    if (_wsChannel != null) {
+      try {
+        _wsChannel!.sink.add(jsonEncode(payload));
+      } catch (_) {}
+    }
+  }
+
+  Future<void> _sendOscConnected(bool connected) async {
+    await _sendOscMessage(_settings.oscHrConnectedPath, connected);
+  }
+
+  Future<void> _sendOscHeartRate(int bpm, double? percent) async {
+    await _sendOscMessage(_settings.oscHrValuePath, bpm);
+    if (percent != null) {
+      await _sendOscMessage(_settings.oscHrPercentPath, percent);
+    }
+  }
+
+  Future<void> _sendOscMessage(String address, Object value) async {
+    final target = await _resolveOscTarget();
+    if (target == null) return;
+    final socket = await _ensureOscSocket();
+    if (socket == null) return;
+
+    final msg = _encodeOscMessage(address, [_oscArgFromValue(value)]);
+    try {
+      socket.send(msg, target.address, target.port);
+    } catch (_) {}
+  }
+
+  Future<_OscTarget?> _resolveOscTarget() async {
+    final raw = _settings.oscAddress.trim().isEmpty
+        ? HeartRateSettings.defaults().oscAddress
+        : _settings.oscAddress.trim();
+
+    final parts = raw.split(':');
+    if (parts.length < 2) return null;
+
+    final port = int.tryParse(parts.last);
+    final hostStr = parts.sublist(0, parts.length - 1).join(':');
+    final host = hostStr.isEmpty ? '127.0.0.1' : hostStr;
+
+    InternetAddress? ip = InternetAddress.tryParse(host);
+    if (ip == null) {
+      try {
+        final res = await InternetAddress.lookup(host);
+        if (res.isNotEmpty) ip = res.first;
+      } catch (_) {
+        return null;
+      }
+    }
+
+    if (ip == null || port == null) return null;
+    return _OscTarget(ip, port);
+  }
+
+  Future<RawDatagramSocket?> _ensureOscSocket() async {
+    if (_oscSocket != null) return _oscSocket;
+    try {
+      _oscSocket = await RawDatagramSocket.bind(InternetAddress.anyIPv4, 0);
+      return _oscSocket;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  List<int> _encodeOscMessage(String address, List<_OscArg> args) {
+    final data = <int>[];
+    data.addAll(_oscString(address));
+
+    final typeTags = StringBuffer(',');
+    for (final a in args) {
+      typeTags.write(a.tag);
+    }
+    data.addAll(_oscString(typeTags.toString()));
+
+    for (final a in args) {
+      if (a.data != null) {
+        data.addAll(a.data!);
+      }
+    }
+    return data;
+  }
+
+  List<int> _oscString(String value) {
+    final bytes = utf8.encode(value);
+    final out = <int>[...bytes, 0];
+    while (out.length % 4 != 0) {
+      out.add(0);
+    }
+    return out;
+  }
+
+  _OscArg _oscArgFromValue(Object value) {
+    if (value is bool) {
+      return _OscArg(value ? 'T' : 'F', null);
+    }
+
+    final data = ByteData(4)
+      ..setFloat32(0, (value as num).toDouble(), Endian.big);
+    return _OscArg('f', data.buffer.asUint8List());
+  }
+
+  Future<void> updateSettings(HeartRateSettings value) async {
+    final old = _settings;
+    _settings = value;
+    notifyListeners();
+    await _settings.save(_prefs);
+
+    if (old.pushEndpoint != value.pushEndpoint) {
+      _wsChannel?.sink.close();
+      _wsChannel = null;
+      _wsConnecting = false;
+    }
+
+    if (old.oscAddress != value.oscAddress) {
+      _oscSocket?.close();
+      _oscSocket = null;
+    }
+  }
+
   @override
   void dispose() {
     _scanResultsSub?.cancel();
@@ -562,6 +941,8 @@ class HeartRateManager extends ChangeNotifier {
     _reconnectTimer?.cancel();
     _scanUiHoldTimer?.cancel();
     _scanLoopTimer?.cancel();
+    _wsChannel?.sink.close();
+    _oscSocket?.close();
     super.dispose();
   }
 
@@ -572,4 +953,18 @@ class HeartRateManager extends ChangeNotifier {
     if (match == null) return null;
     return int.tryParse(match.group(1)!);
   }
+}
+
+class _OscArg {
+  _OscArg(this.tag, this.data);
+
+  final String tag;
+  final List<int>? data;
+}
+
+class _OscTarget {
+  _OscTarget(this.address, this.port);
+
+  final InternetAddress address;
+  final int port;
 }
