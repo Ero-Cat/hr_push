@@ -2,7 +2,9 @@
 
 使用 Flutter 构建的跨平台心率推送 / 监控工具，面向直播、舞台、运动监测等需要实时心率数据的场景。
 
-![产品 Logo](logo.png)
+<div align="center">
+  <img src="logo.png" alt="HR PUSH logo" width="140" />
+</div>
 
 ## 效果预览
 
