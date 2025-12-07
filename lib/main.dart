@@ -25,13 +25,13 @@ Future<void> main() async {
   // Desktop: lock a consistent window size to keep layout consistent.
   if (!kIsWeb && (Platform.isWindows || Platform.isMacOS || Platform.isLinux)) {
     await windowManager.ensureInitialized();
-    const size = Size(430, 820); // 紧凑桌面尺寸，接近手机竖屏
+    const size = Size(430, 720); // 紧凑桌面尺寸，接近手机竖屏
     final options = const WindowOptions(
       size: size,
       minimumSize: size,
       maximumSize: size,
       center: true,
-      title: 'HR PUSH',
+      title: 'OSC/HTTP心率监控推送',
       backgroundColor: Color(0xFF0B1220),
     );
     windowManager.waitUntilReadyToShow(options, () async {
@@ -52,7 +52,7 @@ class HrOscApp extends StatelessWidget {
       create: (_) => HeartRateManager()..start(),
       child: MaterialApp(
         debugShowCheckedModeBanner: false,
-        title: 'HR PUSH',
+        title: '心率监控推送',
         theme: ThemeData(
           colorScheme: ColorScheme.fromSeed(seedColor: const Color(0xFF0FA3B1)),
           useMaterial3: true,
@@ -161,11 +161,19 @@ class _Header extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Row(
-          children: const [
-            Icon(Icons.favorite, color: Color(0xFF5EEAD4)),
-            SizedBox(width: 8),
-            Text(
-              'HR PUSH',
+          children: [
+            ClipRRect(
+              borderRadius: BorderRadius.circular(6),
+              child: Image.asset(
+                'logo.png',
+                width: 30,
+                height: 30,
+                fit: BoxFit.cover,
+              ),
+            ),
+            const SizedBox(width: 8),
+            const Text(
+              '心率监控推送',
               style: TextStyle(
                 color: Colors.white,
                 fontSize: 22,
@@ -637,6 +645,26 @@ class _SettingsPageState extends State<SettingsPage> {
         foregroundColor: Colors.white,
         title: const Text('配置'),
         elevation: 0,
+        actions: [
+          Padding(
+            padding: const EdgeInsets.only(right: 8),
+            child: TextButton(
+              onPressed: _onSave,
+              style: TextButton.styleFrom(
+                foregroundColor: const Color(0xFF0FA3B1),
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                minimumSize: Size.zero,
+                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                textStyle: const TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w600,
+                  letterSpacing: -0.1,
+                ),
+              ),
+              child: const Text('保存'),
+            ),
+          ),
+        ],
       ),
       body: SafeArea(
         child: ListView(
@@ -687,15 +715,6 @@ class _SettingsPageState extends State<SettingsPage> {
               controller: _intervalCtrl,
               hint: '默认 1000ms，过低可能影响性能',
               keyboardType: TextInputType.number,
-            ),
-            const SizedBox(height: 28),
-            FilledButton.icon(
-              icon: const Icon(Icons.save_alt),
-              label: const Text('保存'),
-              onPressed: _onSave,
-              style: FilledButton.styleFrom(
-                minimumSize: const Size.fromHeight(48),
-              ),
             ),
           ],
         ),
