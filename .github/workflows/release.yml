@@ -1,0 +1,139 @@
+name: Build and Release
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+env:
+  FLUTTER_CHANNEL: stable
+
+jobs:
+  create_release:
+    name: Ensure GitHub Release Exists
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Create or update release
+        uses: ncipollo/release-action@v1
+        with:
+          tag: ${{ github.ref_name }}
+          name: ${{ github.ref_name }}
+          allowUpdates: true
+          draft: false
+          prerelease: false
+          generateReleaseNotes: true
+
+  build_android:
+    name: Android APK
+    runs-on: ubuntu-latest
+    needs: create_release
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+      - name: Set up Flutter (${{ env.FLUTTER_CHANNEL }})
+        uses: subosito/flutter-action@v2
+        with:
+          channel: ${{ env.FLUTTER_CHANNEL }}
+          cache: true
+      - name: Install dependencies
+        run: flutter pub get
+      - name: Build release APK
+        run: flutter build apk --release
+      - name: Upload APK to release
+        uses: softprops/action-gh-release@v1
+        with:
+          files: build/app/outputs/flutter-apk/app-release.apk
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  build_macos:
+    name: macOS App Bundle
+    runs-on: macos-latest
+    needs: create_release
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Flutter (${{ env.FLUTTER_CHANNEL }})
+        uses: subosito/flutter-action@v2
+        with:
+          channel: ${{ env.FLUTTER_CHANNEL }}
+          cache: true
+      - name: Install dependencies
+        run: flutter pub get
+      - name: Build macOS app
+        run: flutter build macos --release
+      - name: Archive macOS app
+        run: |
+          APP_PATH="build/macos/Build/Products/Release/hr_osc.app"
+          ditto -c -k --sequesterRsrc --keepParent "$APP_PATH" hr_osc-macos.zip
+      - name: Upload macOS zip to release
+        uses: softprops/action-gh-release@v1
+        with:
+          files: hr_osc-macos.zip
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  build_ios:
+    name: iOS (unsigned app bundle)
+    runs-on: macos-latest
+    needs: create_release
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Flutter (${{ env.FLUTTER_CHANNEL }})
+        uses: subosito/flutter-action@v2
+        with:
+          channel: ${{ env.FLUTTER_CHANNEL }}
+          cache: true
+      - name: Install dependencies
+        run: flutter pub get
+      - name: Build iOS app (no codesign)
+        run: flutter build ios --no-codesign
+      - name: Archive iOS app bundle
+        run: |
+          APP_PATH="build/ios/iphoneos/Runner.app"
+          ditto -c -k --keepParent "$APP_PATH" hr_osc-ios-app.zip
+      - name: Upload iOS zip to release
+        uses: softprops/action-gh-release@v1
+        with:
+          files: hr_osc-ios-app.zip
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  build_windows:
+    name: Windows ZIP
+    runs-on: windows-latest
+    needs: create_release
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Flutter (${{ env.FLUTTER_CHANNEL }})
+        uses: subosito/flutter-action@v2
+        with:
+          channel: ${{ env.FLUTTER_CHANNEL }}
+          cache: true
+      - name: Enable Windows desktop
+        run: flutter config --enable-windows-desktop
+        shell: pwsh
+      - name: Install dependencies
+        run: flutter pub get
+        shell: pwsh
+      - name: Build Windows release
+        run: flutter build windows --release
+        shell: pwsh
+      - name: Archive Windows build
+        run: |
+          Compress-Archive -Path "build\windows\x64\runner\Release\*" -DestinationPath "hr_osc-windows.zip"
+        shell: pwsh
+      - name: Upload Windows zip to release
+        uses: softprops/action-gh-release@v1
+        with:
+          files: hr_osc-windows.zip
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
