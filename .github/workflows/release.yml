@@ -72,7 +72,7 @@ jobs:
         run: flutter build macos --release
       - name: Archive macOS app
         run: |
-          APP_PATH="build/macos/Build/Products/Release/hr_osc.app"
+          APP_PATH="build/macos/Build/Products/Release/hr_push.app"
           ditto -c -k --sequesterRsrc --keepParent "$APP_PATH" hr_osc-macos.zip
       - name: Upload macOS zip to release
         uses: softprops/action-gh-release@v1
