@@ -147,6 +147,7 @@ class HeartRateManager extends ChangeNotifier {
 
   Timer? _reconnectTimer;
   Timer? _scanUiHoldTimer;
+  Timer? _resubscribeTimer;
   DateTime? _lastPublished;
   bool _connecting = false;
 
@@ -156,6 +157,8 @@ class HeartRateManager extends ChangeNotifier {
   bool _uiScanning = false;
   bool _isTestEnv = false;
   bool _autoConnectEnabled = false; // 首次启动不自动连接，等待用户操作
+  bool _hrSubscribed = false;
+  bool _missingHrNotified = false;
   String? _savedDeviceId;
   SharedPreferences? _prefs;
 
@@ -168,15 +171,22 @@ class HeartRateManager extends ChangeNotifier {
   BluetoothAdapterState _adapterState = BluetoothAdapterState.unknown;
 
   final List<NearbyDevice> _nearby = [];
+  DateTime? _lastStatusChange;
 
   // 扫描周期 1000ms
   static const Duration _scanInterval = Duration(milliseconds: 1000);
   // 为避免按钮闪烁，至少保持 3s 的“扫描中”显示
   static const Duration _scanUiMinVisible = Duration(seconds: 3);
   static const Duration _nearbyTtl = Duration(seconds: 8);
-  static const Duration _reconnectDelay = Duration(seconds: 3);
+  static const Duration _reconnectBaseDelay = Duration(seconds: 2);
+  static const Duration _reconnectMaxDelay = Duration(seconds: 30);
+  static const Duration _hrStaleThreshold = Duration(seconds: 6);
+  DateTime? _prevHeartRateAt;
+  DateTime? _lastActionAt;
+  static const Duration _actionCooldown = Duration(seconds: 2);
   Timer? _scanLoopTimer;
   bool _scanLoopStarting = false;
+  int _reconnectAttempts = 0;
 
   UnmodifiableListView<NearbyDevice> get nearbyDevices =>
       UnmodifiableListView(_nearby);
@@ -186,11 +196,31 @@ class HeartRateManager extends ChangeNotifier {
 
   bool get isScanning => _isScanning;
   bool get uiScanning => _uiScanning;
-  int? get heartRate => _heartRate;
-  int? get rssi => _rssi;
+  bool get isHeartRateFresh =>
+      _lastUpdated != null &&
+      DateTime.now().difference(_lastUpdated!) <= _hrStaleThreshold;
+  bool get isConnecting => _connecting;
+  bool get isSubscribed => _hrSubscribed;
+  bool get canToggleConnection {
+    if (_lastActionAt == null) return true;
+    return DateTime.now().difference(_lastActionAt!) >= _actionCooldown;
+  }
+
+  int? get heartRate => isHeartRateFresh ? _heartRate : null;
+  int? get rssi =>
+      _connectionState == BluetoothConnectionState.connected && isHeartRateFresh
+      ? _rssi
+      : null;
+  int? get lastIntervalMs => _lastUpdated != null && _prevHeartRateAt != null
+      ? _lastUpdated!.difference(_prevHeartRateAt!).inMilliseconds
+      : null;
   String get status => _status;
   DateTime? get lastUpdated => _lastUpdated;
-  String get connectedName => _connectedDevice?.platformName ?? '';
+  String get connectedName {
+    if (_connectionState != BluetoothConnectionState.connected) return '';
+    return _connectedDevice?.platformName ?? '';
+  }
+
   BluetoothConnectionState get connectionState => _connectionState;
   BluetoothAdapterState get adapterState => _adapterState;
   HeartRateSettings get settings => _settings;
@@ -200,6 +230,18 @@ class HeartRateManager extends ChangeNotifier {
     if (_heartRate == null || _settings.maxHeartRate <= 0) return null;
     final percent = _heartRate! / _settings.maxHeartRate;
     return percent.clamp(0, 1).toDouble();
+  }
+
+  void _setStatus(String value, {bool force = false}) {
+    if (!force && _status == value) return;
+    final now = DateTime.now();
+    // 避免 UI 闪烁，状态更新至少间隔 500ms
+    if (!force && _lastStatusChange != null) {
+      final delta = now.difference(_lastStatusChange!);
+      if (delta.inMilliseconds < 500) return;
+    }
+    _status = value;
+    _lastStatusChange = now;
   }
 
   bool _shouldPublishNow(DateTime now) {
@@ -222,7 +264,7 @@ class HeartRateManager extends ChangeNotifier {
     if (_isTestEnv) return;
 
     if (!_isBleSupportedPlatform) {
-      _status = '当前平台暂不支持蓝牙扫描';
+      _setStatus('当前平台暂不支持蓝牙扫描');
       _adapterState = BluetoothAdapterState.off;
       notifyListeners();
       return;
@@ -241,7 +283,7 @@ class HeartRateManager extends ChangeNotifier {
     _adapterStateSub = FlutterBluePlus.adapterState.listen((state) {
       _adapterState = state;
       if (state != BluetoothAdapterState.on) {
-        _status = '请开启蓝牙';
+        _setStatus('请开启蓝牙');
       }
       notifyListeners();
     });
@@ -259,13 +301,13 @@ class HeartRateManager extends ChangeNotifier {
 
   Future<bool> _ensurePermissionsAndBluetooth() async {
     if (!_isBleSupportedPlatform) {
-      _status = '当前平台暂不支持蓝牙';
+      _setStatus('当前平台暂不支持蓝牙');
       notifyListeners();
       return false;
     }
 
     if (!await FlutterBluePlus.isSupported) {
-      _status = '此设备不支持蓝牙';
+      _setStatus('此设备不支持蓝牙');
       notifyListeners();
       return false;
     }
@@ -286,7 +328,7 @@ class HeartRateManager extends ChangeNotifier {
         (s) => s.isDenied || s.isPermanentlyDenied || s.isRestricted,
       );
       if (denied) {
-        _status = '蓝牙/定位权限未授予';
+        _setStatus('蓝牙/定位权限未授予');
         notifyListeners();
         return false;
       }
@@ -310,8 +352,7 @@ class HeartRateManager extends ChangeNotifier {
     if (_isTestEnv || _scanLoopStarting) return;
     if (!_isBleSupportedPlatform) return;
     if (_isScanning) return;
-    if (_connectionState == BluetoothConnectionState.connected ||
-        _connectionState == BluetoothConnectionState.connecting) {
+    if (_connectionState == BluetoothConnectionState.connected || _connecting) {
       return;
     }
 
@@ -327,7 +368,7 @@ class HeartRateManager extends ChangeNotifier {
     if (_isTestEnv) return;
     if (!_isBleSupportedPlatform) return;
     try {
-      _status = '扫描附近设备...';
+      _setStatus('扫描附近设备...');
       _setUiScanning(true);
       notifyListeners();
       await FlutterBluePlus.startScan(
@@ -336,7 +377,7 @@ class HeartRateManager extends ChangeNotifier {
         continuousUpdates: true,
       );
     } catch (e) {
-      _status = '未连接';
+      _setStatus('未连接');
       _setUiScanning(false);
       notifyListeners();
     }
@@ -345,7 +386,7 @@ class HeartRateManager extends ChangeNotifier {
   Future<void> restartScan() async {
     if (_isTestEnv) return;
     if (!_isBleSupportedPlatform) {
-      _status = '当前平台不支持蓝牙扫描';
+      _setStatus('当前平台不支持蓝牙扫描');
       notifyListeners();
       return;
     }
@@ -360,6 +401,7 @@ class HeartRateManager extends ChangeNotifier {
     for (final r in results) {
       if (_isLikelyPhoneOrPc(r)) continue;
       if (!_isWearableHeartRateCandidate(r)) continue;
+      if (_userInitiatedDisconnect) continue; // 用户主动断开后，禁止自动回连
 
       final name = r.advertisementData.advName.isNotEmpty
           ? r.advertisementData.advName
@@ -386,6 +428,8 @@ class HeartRateManager extends ChangeNotifier {
       }
 
       _updateBroadcastHeartRate(r);
+
+      if (_userInitiatedDisconnect) continue;
 
       if (_autoConnectEnabled &&
           _shouldPrefer(r) &&
@@ -414,13 +458,14 @@ class HeartRateManager extends ChangeNotifier {
     if (bpm == null) return;
 
     final now = DateTime.now();
-    if (!_shouldPublishNow(now)) return;
-
+    _prevHeartRateAt = _lastUpdated;
     _heartRate = bpm;
     _rssi = r.rssi;
     _lastUpdated = now;
+    final shouldPublish = _shouldPublishNow(now);
+    if (!shouldPublish) return;
+
     _lastPublished = now;
-    _status = '广播心率';
     _notifyHeartRateUpdate();
     // Live Activity removed; no island update.
   }
@@ -500,7 +545,7 @@ class HeartRateManager extends ChangeNotifier {
   Future<void> _connectTo(BluetoothDevice device) async {
     if (_isTestEnv) return;
     if (!_isBleSupportedPlatform) {
-      _status = '当前平台不支持蓝牙连接';
+      _setStatus('当前平台不支持蓝牙连接');
       notifyListeners();
       return;
     }
@@ -510,8 +555,8 @@ class HeartRateManager extends ChangeNotifier {
     _connecting = true;
     _connectedDevice = device;
     _userInitiatedDisconnect = false;
-    _status = '正在连接 ${device.platformName}...';
-    _connectionState = BluetoothConnectionState.connecting;
+    _connectionState = BluetoothConnectionState.disconnected;
+    _setStatus('正在连接 ${device.platformName}...');
     notifyListeners();
 
     await FlutterBluePlus.stopScan();
@@ -522,12 +567,25 @@ class HeartRateManager extends ChangeNotifier {
       if (state == BluetoothConnectionState.disconnected) {
         _heartRateSub?.cancel();
         _heartRate = null;
+        _rssi = null;
+        _lastUpdated = null;
+        _prevHeartRateAt = null;
+        _autoConnectEnabled = !_userInitiatedDisconnect;
+        if (_userInitiatedDisconnect) {
+          _autoReconnect = false;
+        }
+        _connecting = false; // 保证下一次重连不会被旧的状态卡住
+        if (_userInitiatedDisconnect) {
+          _connectedDevice = null;
+          _deviceStateSub?.cancel();
+        }
       }
       _notifyConnectionState();
       notifyListeners();
       if (state == BluetoothConnectionState.disconnected &&
           !_userInitiatedDisconnect) {
-        _scheduleReconnect();
+        _reconnectAttempts = 0; // 重置退避，优先立即重连
+        _scheduleReconnect(immediate: true);
       }
     });
 
@@ -536,13 +594,17 @@ class HeartRateManager extends ChangeNotifier {
         timeout: const Duration(seconds: 10),
         autoConnect: false,
       );
-      _status = '已连接 ${device.platformName}';
+      _setStatus('');
       _rssi = await device.readRssi();
+      _connectionState = BluetoothConnectionState.connected;
+      _reconnectTimer?.cancel();
+      _reconnectAttempts = 0;
       notifyListeners();
       _rememberLastDevice(device.remoteId.str);
       await _subscribeHeartRate(device);
     } catch (e) {
-      _status = '连接失败: $e';
+      _setStatus('连接失败: $e', force: true);
+      _connectionState = BluetoothConnectionState.disconnected;
       notifyListeners();
       await restartScan();
       _scheduleReconnect();
@@ -553,12 +615,13 @@ class HeartRateManager extends ChangeNotifier {
 
   Future<void> manualConnect(NearbyDevice target) async {
     if (!_isBleSupportedPlatform) {
-      _status = '当前平台不支持蓝牙连接';
+      _setStatus('当前平台不支持蓝牙连接');
       notifyListeners();
       return;
     }
     _autoReconnect = true; // 用户重新连接后恢复自动重连
     _autoConnectEnabled = true; // 用户主动操作后再允许自动连接
+    _lastActionAt = DateTime.now();
     await _connectTo(target.device);
   }
 
@@ -568,8 +631,10 @@ class HeartRateManager extends ChangeNotifier {
   }) async {
     if (!_isBleSupportedPlatform) return;
     await _heartRateSub?.cancel();
-    _heartRate = null;
-    _lastUpdated = null;
+    _resubscribeTimer?.cancel();
+    _hrSubscribed = false;
+    _missingHrNotified = false;
+    _prevHeartRateAt = null;
 
     try {
       // 给设备短暂时间稳定 GATT，避免立即写 CCCD 报错
@@ -585,12 +650,15 @@ class HeartRateManager extends ChangeNotifier {
           }
         }
       }
-      _status = '未找到心率特征';
-      notifyListeners();
+      if (!_missingHrNotified) {
+        _missingHrNotified = true;
+        notifyListeners();
+      }
+      _scheduleResubscribe(device, attempt: attempt + 1);
     } catch (e) {
       // 部分设备刚连接时立即写 CCCD/READ 可能报错，延迟重试一次
       if (e is PlatformException && attempt < 1) {
-        _status = '订阅心率重试中...';
+        _setStatus('订阅心率重试中...');
         notifyListeners();
         await Future.delayed(const Duration(milliseconds: 800));
         if (_connectedDevice == device &&
@@ -600,9 +668,30 @@ class HeartRateManager extends ChangeNotifier {
         return;
       }
 
-      _status = '订阅心率失败: $e';
+      _setStatus('订阅心率失败: $e', force: true);
       notifyListeners();
+      _scheduleResubscribe(device, attempt: attempt + 1);
     }
+  }
+
+  void _scheduleResubscribe(BluetoothDevice device, {required int attempt}) {
+    if (attempt > 3) {
+      // 多次失败后重启扫描，等待设备状态恢复
+      _setStatus('', force: true);
+      notifyListeners();
+      _autoReconnect = true;
+      _connecting = false;
+      restartScan();
+      return;
+    }
+
+    _resubscribeTimer?.cancel();
+    _resubscribeTimer = Timer(const Duration(seconds: 2), () {
+      if (_connectedDevice == device &&
+          _connectionState == BluetoothConnectionState.connected) {
+        _subscribeHeartRate(device, attempt: attempt);
+      }
+    });
   }
 
   Future<bool> _enableHrNotifications(BluetoothCharacteristic c) async {
@@ -612,12 +701,18 @@ class HeartRateManager extends ChangeNotifier {
         await c.setNotifyValue(true);
         _heartRateSub = c.lastValueStream.listen(_handleHeartRateData);
         await c.read();
+        _resubscribeTimer?.cancel();
+        _hrSubscribed = true;
+        _missingHrNotified = false;
         return true;
       } catch (e) {
         // 如果已经开启通知, 忽略重复错误
         if (e is PlatformException && e.code == 'setNotifyValue') {
           try {
             _heartRateSub = c.lastValueStream.listen(_handleHeartRateData);
+            _resubscribeTimer?.cancel();
+            _hrSubscribed = true;
+            _missingHrNotified = false;
             return true;
           } catch (_) {}
         }
@@ -633,65 +728,112 @@ class HeartRateManager extends ChangeNotifier {
     final bpm = _parseHeartRateValue(data);
     if (bpm == null) return;
     final now = DateTime.now();
-    if (!_shouldPublishNow(now)) return;
-
+    _prevHeartRateAt = _lastUpdated;
     _heartRate = bpm;
     _lastUpdated = now;
+    final shouldPublish = _shouldPublishNow(now);
+    if (!shouldPublish) return;
+
     _lastPublished = now;
-    _status = '实时更新';
     _notifyHeartRateUpdate();
     notifyListeners();
   }
 
   Future<void> disconnect() async {
     if (!_isBleSupportedPlatform) {
-      _status = '当前平台不支持蓝牙连接';
+      _setStatus('当前平台不支持蓝牙连接');
       notifyListeners();
       return;
     }
+    _lastActionAt = DateTime.now();
     _userInitiatedDisconnect = true;
     _reconnectTimer?.cancel();
     _autoReconnect = false; // 手动断开后不再自动重连
     _autoConnectEnabled = false;
+    _reconnectAttempts = 0;
+    _connecting = false;
+    _resubscribeTimer?.cancel();
+    _setStatus('断开中...');
     try {
       await _connectedDevice?.disconnect();
-    } finally {
+      // 部分平台在“连接中”瞬间按断开可能无事件回调，强制置为断开态
       _connectionState = BluetoothConnectionState.disconnected;
-      _status = '已断开';
+    } finally {
+      await _deviceStateSub?.cancel();
+      await _heartRateSub?.cancel();
+      _connectedDevice = null;
+      _rssi = null;
+      _heartRate = null;
+      _lastUpdated = null;
+      _prevHeartRateAt = null;
+      _savedDeviceId = null;
+      await _prefs?.remove('last_device_id');
+      _connectionState = BluetoothConnectionState.disconnected;
+      _setStatus('已断开', force: true);
       _notifyConnectionState();
       notifyListeners();
+      // 某些设备断开后需要短暂间隔再扫描，避免“设备繁忙”
+      await Future.delayed(const Duration(milliseconds: 300));
       await restartScan();
     }
   }
 
-  void _scheduleReconnect() {
+  Duration _computeReconnectDelay() {
+    final factor = 1 << _reconnectAttempts;
+    final ms = (_reconnectBaseDelay.inMilliseconds * factor)
+        .clamp(
+          _reconnectBaseDelay.inMilliseconds,
+          _reconnectMaxDelay.inMilliseconds,
+        )
+        .toInt();
+    return Duration(milliseconds: ms);
+  }
+
+  Future<void> _ensureScanAlive() async {
+    if (_isScanning) return;
+    if (_connectionState == BluetoothConnectionState.connected || _connecting) {
+      return;
+    }
+    await FlutterBluePlus.stopScan();
+    await _startScan();
+  }
+
+  void _scheduleReconnect({bool immediate = false}) {
     if (!_isBleSupportedPlatform) return;
     if (!_autoReconnect || _connectedDevice == null) return;
+    if (_userInitiatedDisconnect) return;
+    if (_connectionState == BluetoothConnectionState.connected || _connecting) {
+      return;
+    }
     _reconnectTimer?.cancel();
-    _reconnectTimer = Timer(_reconnectDelay, () async {
+    final delay = immediate ? Duration.zero : _computeReconnectDelay();
+    if (!immediate) {
+      _reconnectAttempts = (_reconnectAttempts + 1).clamp(0, 10).toInt();
+    }
+
+    _reconnectTimer = Timer(delay, () async {
       final target = _connectedDevice;
-      if (target == null) return;
+      if (target == null || !_autoReconnect) return;
 
-      final lastSeen = _nearby
-          .firstWhere(
-            (d) => d.id == target.remoteId.str,
-            orElse: () => NearbyDevice(
-              id: '',
-              name: '',
-              rssi: 0,
-              device: target,
-              lastSeen: DateTime.fromMillisecondsSinceEpoch(0),
-            ),
-          )
-          .lastSeen;
-
-      final fresh = DateTime.now().difference(lastSeen) <= _nearbyTtl * 2;
-      if (!fresh) {
-        _status = '等待设备重新广播...';
+      if (_adapterState != BluetoothAdapterState.on) {
+        _setStatus('等待蓝牙开启...');
         notifyListeners();
+        _scheduleReconnect();
         return;
       }
 
+      await _ensureScanAlive();
+
+      final seen = _nearby.any((d) => d.id == target.remoteId.str);
+      if (!seen) {
+        _setStatus('等待设备重新广播...');
+        notifyListeners();
+        _scheduleReconnect();
+        return;
+      }
+
+      _setStatus('自动重连中...');
+      notifyListeners();
       await _connectTo(target);
     });
   }
@@ -939,6 +1081,7 @@ class HeartRateManager extends ChangeNotifier {
     _adapterStateSub?.cancel();
     _reconnectTimer?.cancel();
     _scanUiHoldTimer?.cancel();
+    _resubscribeTimer?.cancel();
     _scanLoopTimer?.cancel();
     _wsChannel?.sink.close();
     _oscSocket?.close();

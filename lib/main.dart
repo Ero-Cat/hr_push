@@ -99,7 +99,10 @@ class HeartDashboard extends StatelessWidget {
                           : mgr.connectedName,
                       rssi: mgr.rssi,
                       state: mgr.connectionState,
+                      isConnecting: mgr.isConnecting,
+                      isSubscribed: mgr.isSubscribed,
                       lastUpdated: mgr.lastUpdated,
+                      intervalMs: mgr.lastIntervalMs,
                     ),
                     const SizedBox(height: 18),
                     _ControlsRow(mgr: mgr),
@@ -188,7 +191,10 @@ class _Header extends StatelessWidget {
           status,
           maxLines: 1,
           overflow: TextOverflow.ellipsis,
-          style: TextStyle(color: statusColor.withOpacity(.9), fontSize: 14),
+          style: TextStyle(
+            color: statusColor.withAlpha((statusColor.a * 255.0 * 0.9).round()),
+            fontSize: 14,
+          ),
         ),
       ],
     );
@@ -201,23 +207,29 @@ class _HeartCard extends StatelessWidget {
     required this.deviceName,
     required this.rssi,
     required this.state,
+    required this.isConnecting,
+    required this.isSubscribed,
     required this.lastUpdated,
-  });
+    required this.intervalMs,
+  }) : _formatter = const _UpdateFormatter();
+
+  // 细分格式化逻辑，保持 Widget 本身简单
+  final _UpdateFormatter _formatter;
 
   final int? bpm;
   final String deviceName;
   final int? rssi;
   final BluetoothConnectionState state;
+  final bool isConnecting;
+  final bool isSubscribed;
   final DateTime? lastUpdated;
+  final int? intervalMs;
 
   @override
   Widget build(BuildContext context) {
-    final statusText = switch (state) {
-      BluetoothConnectionState.connected => '已连接',
-      BluetoothConnectionState.connecting => '连接中',
-      BluetoothConnectionState.disconnecting => '断开中',
-      _ => '未连接',
-    };
+    final statusText = isConnecting
+        ? '连接中'
+        : (state == BluetoothConnectionState.connected ? '已连接' : '未连接');
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -261,7 +273,7 @@ class _HeartCard extends StatelessWidget {
                 ),
                 if (lastUpdated != null)
                   Text(
-                    '更新 ${lastUpdated!.hour.toString().padLeft(2, '0')}:${lastUpdated!.minute.toString().padLeft(2, '0')}',
+                    _formatter.format(lastUpdated!, intervalMs),
                     style: const TextStyle(color: Colors.white38, fontSize: 11),
                   ),
               ],
@@ -343,6 +355,16 @@ class _HeartbeatMeterState extends State<_HeartbeatMeter>
   }
 }
 
+class _UpdateFormatter {
+  const _UpdateFormatter();
+  String format(DateTime time, int? intervalMs) {
+    final ts =
+        '${time.hour.toString().padLeft(2, '0')}:${time.minute.toString().padLeft(2, '0')}:${time.second.toString().padLeft(2, '0')}';
+    if (intervalMs == null) return '更新 $ts';
+    return '更新 $ts (+${intervalMs}ms)';
+  }
+}
+
 class _RssiBadge extends StatelessWidget {
   const _RssiBadge({required this.rssi});
 
@@ -362,9 +384,11 @@ class _RssiBadge extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
       decoration: BoxDecoration(
-        color: color.withOpacity(.18),
+        color: color.withAlpha((color.a * 255.0 * 0.18).round()),
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: color.withOpacity(.6)),
+        border: Border.all(
+          color: color.withAlpha((color.a * 255.0 * 0.6).round()),
+        ),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
@@ -388,13 +412,14 @@ class _ControlsRow extends StatelessWidget {
 
   bool _scanButtonEnabled(HeartRateManager mgr) {
     final connected = mgr.connectionState == BluetoothConnectionState.connected;
-    return !mgr.uiScanning && !connected;
+    return !mgr.uiScanning && !connected && !mgr.isConnecting;
   }
 
   String _scanButtonLabel(HeartRateManager mgr) {
     if (mgr.connectionState == BluetoothConnectionState.connected) {
       return '已连接';
     }
+    if (mgr.isConnecting) return '连接中...';
     if (mgr.uiScanning) return '扫描中...';
     return '重新扫描';
   }
@@ -403,7 +428,31 @@ class _ControlsRow extends StatelessWidget {
     if (mgr.connectionState == BluetoothConnectionState.connected) {
       return Icons.check_circle;
     }
+    if (mgr.isConnecting) return Icons.sync;
     return mgr.uiScanning ? Icons.sync : Icons.radar;
+  }
+
+  bool _quickConnectEnabled(HeartRateManager mgr) {
+    return mgr.connectionState != BluetoothConnectionState.connected &&
+        !mgr.isConnecting &&
+        mgr.nearbyDevices.isNotEmpty;
+  }
+
+  String _quickConnectLabel(HeartRateManager mgr) {
+    if (mgr.connectionState == BluetoothConnectionState.connected) {
+      return '已连接';
+    }
+    if (mgr.isConnecting) return '连接中...';
+    if (mgr.nearbyDevices.isEmpty) return '无可用设备';
+    return '快速连接';
+  }
+
+  IconData _quickConnectIcon(HeartRateManager mgr) {
+    if (mgr.connectionState == BluetoothConnectionState.connected) {
+      return Icons.check_circle;
+    }
+    if (mgr.isConnecting) return Icons.sync;
+    return mgr.nearbyDevices.isEmpty ? Icons.watch_off : Icons.flash_on;
   }
 
   @override
@@ -422,22 +471,11 @@ class _ControlsRow extends StatelessWidget {
             ),
             const SizedBox(width: 12),
             FilledButton.tonalIcon(
-              onPressed:
-                  mgr.connectionState == BluetoothConnectionState.connected
-                  ? mgr.disconnect
-                  : (mgr.nearbyDevices.isNotEmpty
-                        ? () => mgr.manualConnect(mgr.nearbyDevices.first)
-                        : null),
-              icon: Icon(
-                mgr.connectionState == BluetoothConnectionState.connected
-                    ? Icons.link_off
-                    : Icons.flash_on,
-              ),
-              label: Text(
-                mgr.connectionState == BluetoothConnectionState.connected
-                    ? '断开'
-                    : '快速连接',
-              ),
+              onPressed: !mgr.canToggleConnection || !_quickConnectEnabled(mgr)
+                  ? null
+                  : () => mgr.manualConnect(mgr.nearbyDevices.first),
+              icon: Icon(_quickConnectIcon(mgr)),
+              label: Text(_quickConnectLabel(mgr)),
             ),
           ],
         ),
@@ -652,7 +690,10 @@ class _SettingsPageState extends State<SettingsPage> {
               onPressed: _onSave,
               style: TextButton.styleFrom(
                 foregroundColor: const Color(0xFF0FA3B1),
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 10,
+                  vertical: 8,
+                ),
                 minimumSize: Size.zero,
                 tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                 textStyle: const TextStyle(
