@@ -3,7 +3,7 @@
 使用 Flutter 构建的跨平台心率推送 / 监控工具，面向直播、舞台、运动监测等需要实时心率数据的场景。
 
 <div align="center">
-  <img src="logo.png" alt="HR PUSH logo" width="140" />
+  <img src="images/logo.png" alt="HR PUSH logo" width="140" />
 </div>
 
 ## 效果预览
@@ -45,10 +45,11 @@
 - Android：需要开启蓝牙并授予扫描/连接权限（Android 12+ 无需定位，11 及以下需定位权限）。
 - iOS / macOS：首次启动会请求蓝牙权限。
 - Linux / Windows：需设备具备 BLE 硬件和驱动支持。
+- Windows 额外提示：Flutter/CMake 在含中文或空格的路径下构建容易失败，建议将项目放在例如 `C:\\dev\\hr_osc` 的纯英文目录。
 - Web：暂不支持（`flutter_blue_plus` 尚未覆盖 Web）。
 
 ## 开发说明
-- 应用图标与产品 Logo 均由根目录的 `logo.png` 生成。
+- 应用图标与产品 Logo 均由 `images/logo.png` 生成。
 - 主要代码：`lib/main.dart`（UI 与交互）、`lib/heart_rate_manager.dart`（扫描、连接、心率订阅与推送）。
 - 代码风格：2 空格缩进，`dart format .`；启用 `flutter_lints`（见 `analysis_options.yaml`）。
 - 测试：`flutter test`。当前提供默认测试脚手架，可按需补充 BLE/OSC 逻辑的 mocks/fakes。
@@ -58,6 +59,13 @@
 - 阈值告警（系统通知 / 震动）。
 - 多设备偏好与后台保持策略。
 - 可配置的浅色主题与更多刷新策略。
+
+## 更新日志
+- **v1.2.0**
+  - Windows/macOS/Android/iOS 统一使用 `images/logo.png` 生成应用图标。
+  - Windows：最小化/失焦时暂停心跳动画，降低 GPU 占用；检测心率数据长时间未更新时主动重连。
+  - README 补充中文路径构建提示。
+  - 依赖配置同步：`flutter_launcher_icons` 扩展桌面平台支持。
 
 ## 贡献与反馈
 欢迎提交 Issue / PR，一起完善 BLE 兼容性与推送链路。若在特定设备或平台遇到问题，请附上日志与环境信息，便于复现。

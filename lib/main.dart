@@ -168,7 +168,7 @@ class _Header extends StatelessWidget {
             ClipRRect(
               borderRadius: BorderRadius.circular(6),
               child: Image.asset(
-                'logo.png',
+                'images/logo.png',
                 width: 30,
                 height: 30,
                 fit: BoxFit.cover,
@@ -297,23 +297,42 @@ class _HeartbeatMeter extends StatefulWidget {
 }
 
 class _HeartbeatMeterState extends State<_HeartbeatMeter>
-    with SingleTickerProviderStateMixin {
+    with
+        SingleTickerProviderStateMixin,
+        WidgetsBindingObserver,
+        WindowListener {
   late AnimationController _controller;
   late Animation<double> _scale;
+  bool _appVisible = true;
+  bool _windowVisible = true;
 
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
+    if (!kIsWeb &&
+        (Platform.isWindows || Platform.isMacOS || Platform.isLinux)) {
+      windowManager.addListener(this);
+      // Minimized窗口不渲染首帧，异步获取一次可见性。
+      windowManager.isVisible().then((visible) {
+        if (!mounted) return;
+        _windowVisible = visible;
+        _updatePlayback();
+      });
+    }
+
     _controller = AnimationController(
       vsync: this,
       duration: _durationFor(widget.bpm),
       lowerBound: 0.0,
       upperBound: 1.0,
-    )..repeat();
+    );
     _scale = Tween<double>(
       begin: 0.9,
       end: 1.12,
     ).chain(CurveTween(curve: Curves.easeInOut)).animate(_controller);
+
+    _updatePlayback();
   }
 
   @override
@@ -322,14 +341,38 @@ class _HeartbeatMeterState extends State<_HeartbeatMeter>
     final newDuration = _durationFor(widget.bpm);
     if (_controller.duration != newDuration) {
       _controller.duration = newDuration;
-      _controller.forward(from: 0);
+      if (_controller.isAnimating) {
+        _controller.forward(from: 0);
+      }
     }
+    _updatePlayback();
   }
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    if (!kIsWeb &&
+        (Platform.isWindows || Platform.isMacOS || Platform.isLinux)) {
+      windowManager.removeListener(this);
+    }
     _controller.dispose();
     super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    _appVisible = state == AppLifecycleState.resumed;
+    _updatePlayback();
+  }
+
+  @override
+  void onWindowEvent(String eventName) {
+    if (eventName == 'minimize') {
+      _windowVisible = false;
+    } else if (eventName == 'restore' || eventName == 'focus') {
+      _windowVisible = true;
+    }
+    _updatePlayback();
   }
 
   @override
@@ -352,6 +395,20 @@ class _HeartbeatMeterState extends State<_HeartbeatMeter>
     final clamped = bpm.clamp(40, 180);
     final ms = (60000 / clamped).round();
     return Duration(milliseconds: ms.clamp(450, 1200));
+  }
+
+  void _updatePlayback() {
+    final shouldAnimate =
+        _appVisible && _windowVisible && (widget.bpm ?? 0) > 0;
+    if (shouldAnimate) {
+      if (!_controller.isAnimating) {
+        _controller.repeat();
+      }
+    } else {
+      if (_controller.isAnimating) {
+        _controller.stop();
+      }
+    }
   }
 }
 

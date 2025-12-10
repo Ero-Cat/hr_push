@@ -343,9 +343,29 @@ class HeartRateManager extends ChangeNotifier {
   void _startScanLoopTimer() {
     _scanLoopTimer?.cancel();
     _scanLoopTimer = Timer.periodic(_scanInterval, (_) {
-      _pruneNearby(DateTime.now());
+      final now = DateTime.now();
+      _pruneNearby(now);
+      _checkStaleConnection(now);
       _tryStartScan();
     });
+  }
+
+  void _checkStaleConnection(DateTime now) {
+    if (_isTestEnv) return;
+    if (_connecting) return;
+    if (_connectionState != BluetoothConnectionState.connected) return;
+
+    final last = _lastUpdated ?? _prevHeartRateAt;
+    if (last == null) return;
+
+    // 若超过两倍心率失效阈值仍无数据，判定为掉线，主动重连（Windows 上常见）.
+    if (now.difference(last) > _hrStaleThreshold * 2) {
+      _setStatus('连接失活，自动重连...');
+      _connectionState = BluetoothConnectionState.disconnected;
+      _notifyConnectionState();
+      notifyListeners();
+      _scheduleReconnect(immediate: true);
+    }
   }
 
   Future<void> _tryStartScan() async {
