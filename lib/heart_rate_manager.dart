@@ -430,6 +430,14 @@ class HeartRateManager extends ChangeNotifier {
                 : '未命名设备');
 
       final id = r.device.remoteId.str;
+      // Windows 上设备长时间离线后，缓存的 BluetoothDevice 可能失效。
+      // 如果扫描到同 ID 的新实例且当前未连接，刷新引用以便后续重连使用最新句柄。
+      if (_connectionState != BluetoothConnectionState.connected &&
+          _connectedDevice?.remoteId.str == id &&
+          !identical(_connectedDevice, r.device)) {
+        _connectedDevice = r.device;
+      }
+
       final existingIndex = _nearby.indexWhere((d) => d.id == id);
       if (existingIndex >= 0) {
         _nearby[existingIndex]
@@ -844,17 +852,30 @@ class HeartRateManager extends ChangeNotifier {
 
       await _ensureScanAlive();
 
-      final seen = _nearby.any((d) => d.id == target.remoteId.str);
-      if (!seen) {
+      NearbyDevice? nearby;
+      for (final d in _nearby) {
+        if (d.id == target.remoteId.str) {
+          nearby = d;
+          break;
+        }
+      }
+
+      if (nearby == null) {
         _setStatus('等待设备重新广播...');
         notifyListeners();
         _scheduleReconnect();
         return;
       }
 
+      final deviceForReconnect = nearby.device;
+      if (!identical(deviceForReconnect, _connectedDevice)) {
+        _connectedDevice = deviceForReconnect;
+      }
+
       _setStatus('自动重连中...');
       notifyListeners();
-      await _connectTo(target);
+      // Windows 偶发保留陈旧连接句柄，确保重连使用扫描到的最新实例。
+      await _connectTo(deviceForReconnect);
     });
   }
 

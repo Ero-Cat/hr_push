@@ -1,2 +1,8 @@
 #include "../../Flutter/Flutter-Release.xcconfig"
 #include "Warnings.xcconfig"
+EXCLUDED_ARCHS__EFFECTIVE_PLATFORM_SUFFIX_simulator = i386
+ONLY_ACTIVE_ARCH = NO
+STRIP_INSTALLED_PRODUCT = YES
+DEAD_CODE_STRIPPING = YES
+LLVM_LTO = YES
+SWIFT_OPTIMIZATION_LEVEL = -O

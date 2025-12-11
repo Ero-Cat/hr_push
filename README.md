@@ -45,7 +45,7 @@
 - Android：需要开启蓝牙并授予扫描/连接权限（Android 12+ 无需定位，11 及以下需定位权限）。
 - iOS / macOS：首次启动会请求蓝牙权限。
 - Linux / Windows：需设备具备 BLE 硬件和驱动支持。
-- Windows 额外提示：Flutter/CMake 在含中文或空格的路径下构建容易失败，建议将项目放在例如 `C:\\dev\\hr_osc` 的纯英文目录。
+- Windows 额外提示：Flutter/CMake 在含中文或空格的路径下构建容易失败，建议将项目放在例如 `C:\\dev\\hr_osc` 的纯英文目录。运行时内置的 BLEServer 会自动解压到 ASCII 目录 `C:\\hr_osc_temp`，避免中文用户名导致的崩溃。
 - Web：暂不支持（`flutter_blue_plus` 尚未覆盖 Web）。
 
 ## 开发说明
@@ -61,6 +61,10 @@
 - 可配置的浅色主题与更多刷新策略。
 
 ## 更新日志
+- **v1.2.2**
+  - Windows：内置 BLEServer 始终解压到 ASCII 目录 `C:\\hr_osc_temp`，彻底规避中文用户名/路径导致的启动失败。
+  - Windows：最小化自动隐藏到系统托盘，悬停显示在线状态与心率摘要。
+  - Android：发布构建启用 R8 混淆、资源压缩与 ABI 分包；Windows/macOS/iOS 开启链接优化以减小体积。
 - **v1.2.1**
   - Windows：win_ble 临时目录改为 ASCII 路径（`C:\\hr_osc_temp`），解决构建产物放在中文目录或中文用户名下无法运行/崩溃的问题。
   - Windows：BLE 连接在数据长时间未更新时会主动重连，提升掉线恢复成功率。

@@ -36,5 +36,10 @@ target_link_libraries(${BINARY_NAME} PRIVATE flutter flutter_wrapper_app)
 target_link_libraries(${BINARY_NAME} PRIVATE "dwmapi.lib")
 target_include_directories(${BINARY_NAME} PRIVATE "${CMAKE_SOURCE_DIR}")
 
+# Strip symbols in Release to reduce binary size
+if(CMAKE_BUILD_TYPE STREQUAL "Release")
+  target_link_options(${BINARY_NAME} PRIVATE /DEBUG:NONE /OPT:REF /OPT:ICF)
+endif()
+
 # Run the Flutter tool portions of the build. This must not be removed.
 add_dependencies(${BINARY_NAME} flutter_assemble)

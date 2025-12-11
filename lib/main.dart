@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:flutter_blue_plus_windows/flutter_blue_plus_windows.dart';
 import 'package:window_manager/window_manager.dart';
+import 'package:tray_manager/tray_manager.dart';
 
 import 'heart_rate_manager.dart';
 
@@ -300,11 +301,13 @@ class _HeartbeatMeterState extends State<_HeartbeatMeter>
     with
         SingleTickerProviderStateMixin,
         WidgetsBindingObserver,
-        WindowListener {
+        WindowListener,
+        TrayListener {
   late AnimationController _controller;
   late Animation<double> _scale;
   bool _appVisible = true;
   bool _windowVisible = true;
+  bool _trayVisible = false;
 
   @override
   void initState() {
@@ -319,6 +322,10 @@ class _HeartbeatMeterState extends State<_HeartbeatMeter>
         _windowVisible = visible;
         _updatePlayback();
       });
+
+      if (Platform.isWindows) {
+        trayManager.addListener(this);
+      }
     }
 
     _controller = AnimationController(
@@ -354,6 +361,10 @@ class _HeartbeatMeterState extends State<_HeartbeatMeter>
     if (!kIsWeb &&
         (Platform.isWindows || Platform.isMacOS || Platform.isLinux)) {
       windowManager.removeListener(this);
+      if (Platform.isWindows) {
+        trayManager.removeListener(this);
+        trayManager.destroy();
+      }
     }
     _controller.dispose();
     super.dispose();
@@ -369,10 +380,29 @@ class _HeartbeatMeterState extends State<_HeartbeatMeter>
   void onWindowEvent(String eventName) {
     if (eventName == 'minimize') {
       _windowVisible = false;
+      if (Platform.isWindows) {
+        _ensureTray();
+        _trayVisible = true;
+        windowManager.hide();
+      }
     } else if (eventName == 'restore' || eventName == 'focus') {
       _windowVisible = true;
+      if (Platform.isWindows && _trayVisible) {
+        trayManager.destroy();
+        _trayVisible = false;
+      }
     }
     _updatePlayback();
+  }
+
+  @override
+  void onTrayIconMouseEnter() {
+    _updateTrayTooltip();
+  }
+
+  @override
+  void onTrayIconMouseExit() {
+    // no-op
   }
 
   @override
@@ -409,6 +439,23 @@ class _HeartbeatMeterState extends State<_HeartbeatMeter>
         _controller.stop();
       }
     }
+  }
+
+  Future<void> _updateTrayTooltip() async {
+    if (!mounted) return;
+    final mgr = context.read<HeartRateManager>();
+    final bpm = mgr.heartRate;
+    final connected = mgr.isConnected;
+    final name = mgr.connectedName.isEmpty ? '未连接' : mgr.connectedName;
+    final text = connected ? '在线 · $name · 心率 ${bpm ?? '--'}' : '未连接';
+    await trayManager.setToolTip(text);
+  }
+
+  Future<void> _ensureTray() async {
+    if (!_trayVisible) {
+      await trayManager.setIcon('images/logo.png');
+    }
+    await _updateTrayTooltip();
   }
 }
 

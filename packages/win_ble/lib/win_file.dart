@@ -40,10 +40,19 @@ class WinServer {
   }
 
   static Future<String> _safeTempPath() async {
+    // Windows 中文用户名/路径容易导致 BLEServer.exe 启动失败，统一落到 ASCII 目录。
+    if (Platform.isWindows) {
+      final fallback = Directory(r'C:\hr_osc_temp');
+      if (!fallback.existsSync()) {
+        fallback.createSync(recursive: true);
+      }
+      return fallback.path;
+    }
+
     final dir = await getTemporaryDirectory();
     final path = dir.path;
     if (_hasNonAscii(path)) {
-      final fallback = Directory(r'C:\hr_osc_temp');
+      final fallback = Directory(r'/tmp/hr_osc_temp');
       if (!fallback.existsSync()) {
         fallback.createSync(recursive: true);
       }

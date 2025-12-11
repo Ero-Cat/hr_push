@@ -1,2 +1,7 @@
 #include? "Pods/Target Support Files/Pods-Runner/Pods-Runner.release.xcconfig"
 #include "Generated.xcconfig"
+ONLY_ACTIVE_ARCH=NO
+DEAD_CODE_STRIPPING=YES
+STRIP_INSTALLED_PRODUCT=YES
+ENABLE_BITCODE=NO
+LLVM_LTO=YES
