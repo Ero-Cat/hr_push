@@ -46,15 +46,6 @@ android {
         }
     }
 
-    // 按 ABI 拆分，生成更小的 per-ABI APK；如需通用包可临时关闭。
-    splits {
-        abi {
-            isEnable = true
-            reset()
-            include("armeabi-v7a", "arm64-v8a", "x86_64")
-            isUniversalApk = false
-        }
-    }
 }
 
 flutter {
