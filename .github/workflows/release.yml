@@ -48,10 +48,14 @@ jobs:
         run: flutter pub get
       - name: Build release APK
         run: flutter build apk --release
+      - name: Rename APK with version
+        run: |
+          VERSION="${{ github.ref_name }}"
+          mv build/app/outputs/flutter-apk/app-release.apk "app-release-${VERSION}.apk"
       - name: Upload APK to release
         uses: softprops/action-gh-release@v1
         with:
-          files: build/app/outputs/flutter-apk/app-release.apk
+          files: app-release-${{ github.ref_name }}.apk
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
@@ -73,11 +77,12 @@ jobs:
       - name: Archive macOS app
         run: |
           APP_PATH="build/macos/Build/Products/Release/hr_push.app"
-          ditto -c -k --sequesterRsrc --keepParent "$APP_PATH" hr_osc-macos.zip
+          VERSION="${{ github.ref_name }}"
+          ditto -c -k --sequesterRsrc --keepParent "$APP_PATH" "hr_osc-macos-${VERSION}.zip"
       - name: Upload macOS zip to release
         uses: softprops/action-gh-release@v1
         with:
-          files: hr_osc-macos.zip
+          files: hr_osc-macos-${{ github.ref_name }}.zip
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
@@ -99,11 +104,12 @@ jobs:
       - name: Archive iOS app bundle
         run: |
           APP_PATH="build/ios/iphoneos/Runner.app"
-          ditto -c -k --keepParent "$APP_PATH" hr_osc-ios-app.zip
+          VERSION="${{ github.ref_name }}"
+          ditto -c -k --keepParent "$APP_PATH" "hr_osc-ios-app-${VERSION}.zip"
       - name: Upload iOS zip to release
         uses: softprops/action-gh-release@v1
         with:
-          files: hr_osc-ios-app.zip
+          files: hr_osc-ios-app-${{ github.ref_name }}.zip
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
@@ -129,11 +135,12 @@ jobs:
         shell: pwsh
       - name: Archive Windows build
         run: |
-          Compress-Archive -Path "build\windows\x64\runner\Release\*" -DestinationPath "hr_osc-windows.zip"
+          $env:VERSION="${{ github.ref_name }}"
+          Compress-Archive -Path "build\windows\x64\runner\Release\*" -DestinationPath "hr_osc-windows-$env:VERSION.zip"
         shell: pwsh
       - name: Upload Windows zip to release
         uses: softprops/action-gh-release@v1
         with:
-          files: hr_osc-windows.zip
+          files: hr_osc-windows-${{ github.ref_name }}.zip
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
