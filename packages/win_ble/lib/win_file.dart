@@ -15,7 +15,7 @@ class WinServer {
   static Future<File> _getFilePath(String path, String? fileName) async {
     final byteData = await rootBundle.load(path);
     final buffer = byteData.buffer;
-    String tempPath = await _safeTempPath();
+    String tempPath = await _tempPath();
     var initPath = '$tempPath/${fileName ?? 'win_ble_server'}.exe';
     var filePath = initPath;
 
@@ -39,26 +39,35 @@ class WinServer {
         buffer.asUint8List(byteData.offsetInBytes, byteData.lengthInBytes));
   }
 
-  static Future<String> _safeTempPath() async {
-    // Windows 中文用户名/路径容易导致 BLEServer.exe 启动失败，统一落到 ASCII 目录。
-    if (Platform.isWindows) {
-      final fallback = Directory(r'C:\hr_osc_temp');
-      if (!fallback.existsSync()) {
-        fallback.createSync(recursive: true);
-      }
-      return fallback.path;
-    }
-
+  static Future<String> _tempPath() async {
     final dir = await getTemporaryDirectory();
     final path = dir.path;
-    if (_hasNonAscii(path)) {
-      final fallback = Directory(r'/tmp/hr_osc_temp');
-      if (!fallback.existsSync()) {
-        fallback.createSync(recursive: true);
-      }
-      return fallback.path;
+
+    if (!Platform.isWindows) {
+      return path;
     }
-    return path;
+
+    if (!_hasNonAscii(path)) {
+      return path;
+    }
+
+    // Windows 用户目录可能包含非 ASCII 字符，导致 BLEServer.exe 启动失败。
+    // 退回到一个可写且稳定的 ASCII 目录（Public/ProgramData）。
+    final publicBase =
+        Platform.environment['PUBLIC'] ?? Platform.environment['PROGRAMDATA'];
+    final base = (publicBase != null && publicBase.isNotEmpty)
+        ? publicBase
+        : r'C:\Users\Public';
+    final fallback = Directory('$base\\hr_osc_temp');
+    if (!fallback.existsSync()) {
+      try {
+        fallback.createSync(recursive: true);
+      } catch (_) {
+        // 如果创建失败（极少数权限策略），继续使用原 temp 目录。
+        return path;
+      }
+    }
+    return fallback.path;
   }
 
   static bool _hasNonAscii(String input) {

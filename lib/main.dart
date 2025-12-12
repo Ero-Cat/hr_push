@@ -516,29 +516,36 @@ class _ControlsRow extends StatelessWidget {
 
   bool _scanButtonEnabled(HeartRateManager mgr) {
     final connected = mgr.connectionState == BluetoothConnectionState.connected;
-    return !mgr.uiScanning && !connected && !mgr.isConnecting;
+    if (connected) {
+      return mgr.canToggleConnection;
+    }
+    return !mgr.uiScanning &&
+        !mgr.isConnecting &&
+        !mgr.isAutoReconnecting;
   }
 
   String _scanButtonLabel(HeartRateManager mgr) {
     if (mgr.connectionState == BluetoothConnectionState.connected) {
-      return '已连接';
+      return '断开';
     }
     if (mgr.isConnecting) return '连接中...';
+    if (mgr.isAutoReconnecting) return '自动重连中...';
     if (mgr.uiScanning) return '扫描中...';
     return '重新扫描';
   }
 
   IconData _scanButtonIcon(HeartRateManager mgr) {
     if (mgr.connectionState == BluetoothConnectionState.connected) {
-      return Icons.check_circle;
+      return Icons.link_off;
     }
-    if (mgr.isConnecting) return Icons.sync;
+    if (mgr.isConnecting || mgr.isAutoReconnecting) return Icons.sync;
     return mgr.uiScanning ? Icons.sync : Icons.radar;
   }
 
   bool _quickConnectEnabled(HeartRateManager mgr) {
     return mgr.connectionState != BluetoothConnectionState.connected &&
         !mgr.isConnecting &&
+        !mgr.isAutoReconnecting &&
         mgr.nearbyDevices.isNotEmpty;
   }
 
@@ -547,6 +554,7 @@ class _ControlsRow extends StatelessWidget {
       return '已连接';
     }
     if (mgr.isConnecting) return '连接中...';
+    if (mgr.isAutoReconnecting) return '自动重连中...';
     if (mgr.nearbyDevices.isEmpty) return '无可用设备';
     return '快速连接';
   }
@@ -555,7 +563,7 @@ class _ControlsRow extends StatelessWidget {
     if (mgr.connectionState == BluetoothConnectionState.connected) {
       return Icons.check_circle;
     }
-    if (mgr.isConnecting) return Icons.sync;
+    if (mgr.isConnecting || mgr.isAutoReconnecting) return Icons.sync;
     return mgr.nearbyDevices.isEmpty ? Icons.watch_off : Icons.flash_on;
   }
 
@@ -568,7 +576,11 @@ class _ControlsRow extends StatelessWidget {
           children: [
             Expanded(
               child: FilledButton.icon(
-                onPressed: _scanButtonEnabled(mgr) ? mgr.restartScan : null,
+                onPressed: _scanButtonEnabled(mgr)
+                    ? (mgr.connectionState == BluetoothConnectionState.connected
+                        ? mgr.disconnect
+                        : mgr.restartScan)
+                    : null,
                 icon: Icon(_scanButtonIcon(mgr)),
                 label: Text(_scanButtonLabel(mgr)),
               ),
@@ -745,12 +757,22 @@ class _SettingsPageState extends State<SettingsPage> {
   late final TextEditingController _oscPercentCtrl;
   late final TextEditingController _maxHrCtrl;
   late final TextEditingController _intervalCtrl;
+  late final TextEditingController _mqttBrokerCtrl;
+  late final TextEditingController _mqttPortCtrl;
+  late final TextEditingController _mqttTopicCtrl;
+  late final TextEditingController _mqttUsernameCtrl;
+  late final TextEditingController _mqttPasswordCtrl;
+  late final TextEditingController _mqttClientIdCtrl;
 
   @override
   void initState() {
     super.initState();
     _pushCtrl = TextEditingController(text: widget.initial.pushEndpoint);
-    _oscCtrl = TextEditingController(text: widget.initial.oscAddress);
+    _oscCtrl = TextEditingController(
+      text: widget.initial.oscAddress.isEmpty
+          ? '127.0.0.1:9000'
+          : widget.initial.oscAddress,
+    );
     _oscConnectedCtrl = TextEditingController(
       text: widget.initial.oscHrConnectedPath,
     );
@@ -764,6 +786,20 @@ class _SettingsPageState extends State<SettingsPage> {
     _intervalCtrl = TextEditingController(
       text: widget.initial.updateIntervalMs.toString(),
     );
+    _mqttBrokerCtrl = TextEditingController(text: widget.initial.mqttBroker);
+    _mqttPortCtrl = TextEditingController(
+      text: widget.initial.mqttPort.toString(),
+    );
+    _mqttTopicCtrl = TextEditingController(text: widget.initial.mqttTopic);
+    _mqttUsernameCtrl = TextEditingController(
+      text: widget.initial.mqttUsername,
+    );
+    _mqttPasswordCtrl = TextEditingController(
+      text: widget.initial.mqttPassword,
+    );
+    _mqttClientIdCtrl = TextEditingController(
+      text: widget.initial.mqttClientId,
+    );
   }
 
   @override
@@ -775,6 +811,12 @@ class _SettingsPageState extends State<SettingsPage> {
     _oscPercentCtrl.dispose();
     _maxHrCtrl.dispose();
     _intervalCtrl.dispose();
+    _mqttBrokerCtrl.dispose();
+    _mqttPortCtrl.dispose();
+    _mqttTopicCtrl.dispose();
+    _mqttUsernameCtrl.dispose();
+    _mqttPasswordCtrl.dispose();
+    _mqttClientIdCtrl.dispose();
     super.dispose();
   }
 
@@ -861,6 +903,47 @@ class _SettingsPageState extends State<SettingsPage> {
               hint: '默认 1000ms，过低可能影响性能',
               keyboardType: TextInputType.number,
             ),
+            const SizedBox(height: 18),
+            _sectionTitle('MQTT 推送'),
+            _buildTextField(
+              controller: _mqttBrokerCtrl,
+              label: 'Broker 地址',
+              hint: '例如 broker.example.com',
+              helper: '留空则不启用 MQTT',
+            ),
+            const SizedBox(height: 10),
+            _buildTextField(
+              controller: _mqttPortCtrl,
+              label: 'Broker 端口',
+              hint: '1883',
+              keyboardType: TextInputType.number,
+            ),
+            const SizedBox(height: 10),
+            _buildTextField(
+              controller: _mqttTopicCtrl,
+              label: '发布 Topic',
+              hint: 'hr_push',
+              helper: '将发送 JSON 心率/连接事件',
+            ),
+            const SizedBox(height: 10),
+            _buildTextField(
+              controller: _mqttUsernameCtrl,
+              label: '用户名 (可选)',
+              hint: '',
+            ),
+            const SizedBox(height: 10),
+            _buildTextField(
+              controller: _mqttPasswordCtrl,
+              label: '密码 (可选)',
+              hint: '',
+              obscureText: true,
+            ),
+            const SizedBox(height: 10),
+            _buildTextField(
+              controller: _mqttClientIdCtrl,
+              label: 'Client ID (可选)',
+              hint: '默认自动生成',
+            ),
           ],
         ),
       ),
@@ -888,10 +971,12 @@ class _SettingsPageState extends State<SettingsPage> {
     String? hint,
     String? helper,
     TextInputType? keyboardType,
+    bool obscureText = false,
   }) {
     return TextField(
       controller: controller,
       keyboardType: keyboardType,
+      obscureText: obscureText,
       style: const TextStyle(color: Colors.white),
       decoration: InputDecoration(
         labelText: label,
@@ -920,9 +1005,7 @@ class _SettingsPageState extends State<SettingsPage> {
 
   void _onSave() {
     final cleanedPush = _pushCtrl.text.trim();
-    final cleanedOsc = _oscCtrl.text.trim().isEmpty
-        ? HeartRateSettings.defaults().oscAddress
-        : _oscCtrl.text.trim();
+    final cleanedOsc = _oscCtrl.text.trim();
     final maxHr = int.tryParse(_maxHrCtrl.text.trim());
 
     final updated = widget.initial.copyWith(
@@ -941,6 +1024,16 @@ class _SettingsPageState extends State<SettingsPage> {
       updateIntervalMs:
           int.tryParse(_intervalCtrl.text.trim()) ??
           widget.initial.updateIntervalMs,
+      mqttBroker: _mqttBrokerCtrl.text.trim(),
+      mqttPort:
+          int.tryParse(_mqttPortCtrl.text.trim()) ??
+          HeartRateSettings.defaults().mqttPort,
+      mqttTopic: _mqttTopicCtrl.text.trim().isEmpty
+          ? HeartRateSettings.defaults().mqttTopic
+          : _mqttTopicCtrl.text.trim(),
+      mqttUsername: _mqttUsernameCtrl.text.trim(),
+      mqttPassword: _mqttPasswordCtrl.text,
+      mqttClientId: _mqttClientIdCtrl.text.trim(),
     );
 
     Navigator.of(context).pop(updated);

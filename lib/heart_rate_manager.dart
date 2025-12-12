@@ -7,9 +7,13 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_blue_plus_windows/flutter_blue_plus_windows.dart';
 import 'package:flutter/services.dart';
 import 'package:http/http.dart' as http;
+import 'package:mqtt_client/mqtt_client.dart';
+import 'package:mqtt_client/mqtt_server_client.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:web_socket_channel/io.dart';
+
+import 'hr_notification_service.dart';
 
 final Guid _heartRateService = Guid('0000180d-0000-1000-8000-00805f9b34fb');
 final Guid _heartRateMeasurement = Guid('00002a37-0000-1000-8000-00805f9b34fb');
@@ -39,6 +43,12 @@ class HeartRateSettings {
     required this.oscHrPercentPath,
     required this.maxHeartRate,
     required this.updateIntervalMs,
+    required this.mqttBroker,
+    required this.mqttPort,
+    required this.mqttTopic,
+    required this.mqttUsername,
+    required this.mqttPassword,
+    required this.mqttClientId,
   });
 
   final String pushEndpoint;
@@ -48,14 +58,26 @@ class HeartRateSettings {
   final String oscHrPercentPath;
   final int maxHeartRate;
   final int updateIntervalMs;
+  final String mqttBroker;
+  final int mqttPort;
+  final String mqttTopic;
+  final String mqttUsername;
+  final String mqttPassword;
+  final String mqttClientId;
 
   static const _defaultPushEndpoint = '';
-  static const _defaultOscAddress = '127.0.0.1:9000';
+  static const _defaultOscAddress = '';
   static const _defaultHrConnectedPath = '/avatar/parameters/hr_connected';
   static const _defaultHrValuePath = '/avatar/parameters/hr_val';
   static const _defaultHrPercentPath = '/avatar/parameters/hr_percent';
   static const _defaultMaxHeartRate = 200;
   static const _defaultUpdateIntervalMs = 1000;
+  static const _defaultMqttBroker = '';
+  static const _defaultMqttPort = 1883;
+  static const _defaultMqttTopic = 'hr_push';
+  static const _defaultMqttUsername = '';
+  static const _defaultMqttPassword = '';
+  static const _defaultMqttClientId = '';
 
   static const _kPushEndpointKey = 'cfg_push_endpoint';
   static const _kOscAddressKey = 'cfg_osc_address';
@@ -64,6 +86,12 @@ class HeartRateSettings {
   static const _kOscPercentKey = 'cfg_osc_percent_path';
   static const _kMaxHeartRateKey = 'cfg_max_heart_rate';
   static const _kUpdateIntervalKey = 'cfg_update_interval_ms';
+  static const _kMqttBrokerKey = 'cfg_mqtt_broker';
+  static const _kMqttPortKey = 'cfg_mqtt_port';
+  static const _kMqttTopicKey = 'cfg_mqtt_topic';
+  static const _kMqttUsernameKey = 'cfg_mqtt_username';
+  static const _kMqttPasswordKey = 'cfg_mqtt_password';
+  static const _kMqttClientIdKey = 'cfg_mqtt_client_id';
 
   factory HeartRateSettings.defaults() {
     return const HeartRateSettings(
@@ -74,6 +102,12 @@ class HeartRateSettings {
       oscHrPercentPath: _defaultHrPercentPath,
       maxHeartRate: _defaultMaxHeartRate,
       updateIntervalMs: _defaultUpdateIntervalMs,
+      mqttBroker: _defaultMqttBroker,
+      mqttPort: _defaultMqttPort,
+      mqttTopic: _defaultMqttTopic,
+      mqttUsername: _defaultMqttUsername,
+      mqttPassword: _defaultMqttPassword,
+      mqttClientId: _defaultMqttClientId,
     );
   }
 
@@ -91,6 +125,12 @@ class HeartRateSettings {
       maxHeartRate: prefs.getInt(_kMaxHeartRateKey) ?? _defaultMaxHeartRate,
       updateIntervalMs:
           prefs.getInt(_kUpdateIntervalKey) ?? _defaultUpdateIntervalMs,
+      mqttBroker: prefs.getString(_kMqttBrokerKey) ?? _defaultMqttBroker,
+      mqttPort: prefs.getInt(_kMqttPortKey) ?? _defaultMqttPort,
+      mqttTopic: prefs.getString(_kMqttTopicKey) ?? _defaultMqttTopic,
+      mqttUsername: prefs.getString(_kMqttUsernameKey) ?? _defaultMqttUsername,
+      mqttPassword: prefs.getString(_kMqttPasswordKey) ?? _defaultMqttPassword,
+      mqttClientId: prefs.getString(_kMqttClientIdKey) ?? _defaultMqttClientId,
     );
   }
 
@@ -103,6 +143,12 @@ class HeartRateSettings {
     await prefs.setString(_kOscPercentKey, oscHrPercentPath);
     await prefs.setInt(_kMaxHeartRateKey, maxHeartRate);
     await prefs.setInt(_kUpdateIntervalKey, updateIntervalMs);
+    await prefs.setString(_kMqttBrokerKey, mqttBroker);
+    await prefs.setInt(_kMqttPortKey, mqttPort);
+    await prefs.setString(_kMqttTopicKey, mqttTopic);
+    await prefs.setString(_kMqttUsernameKey, mqttUsername);
+    await prefs.setString(_kMqttPasswordKey, mqttPassword);
+    await prefs.setString(_kMqttClientIdKey, mqttClientId);
   }
 
   HeartRateSettings copyWith({
@@ -113,6 +159,12 @@ class HeartRateSettings {
     String? oscHrPercentPath,
     int? maxHeartRate,
     int? updateIntervalMs,
+    String? mqttBroker,
+    int? mqttPort,
+    String? mqttTopic,
+    String? mqttUsername,
+    String? mqttPassword,
+    String? mqttClientId,
   }) {
     return HeartRateSettings(
       pushEndpoint: pushEndpoint ?? this.pushEndpoint,
@@ -122,6 +174,12 @@ class HeartRateSettings {
       oscHrPercentPath: oscHrPercentPath ?? this.oscHrPercentPath,
       maxHeartRate: maxHeartRate ?? this.maxHeartRate,
       updateIntervalMs: updateIntervalMs ?? this.updateIntervalMs,
+      mqttBroker: mqttBroker ?? this.mqttBroker,
+      mqttPort: mqttPort ?? this.mqttPort,
+      mqttTopic: mqttTopic ?? this.mqttTopic,
+      mqttUsername: mqttUsername ?? this.mqttUsername,
+      mqttPassword: mqttPassword ?? this.mqttPassword,
+      mqttClientId: mqttClientId ?? this.mqttClientId,
     );
   }
 }
@@ -144,12 +202,18 @@ class HeartRateManager extends ChangeNotifier {
   IOWebSocketChannel? _wsChannel;
   bool _wsConnecting = false;
   RawDatagramSocket? _oscSocket;
+  MqttServerClient? _mqttClient;
+  bool _mqttConnecting = false;
+  bool _mqttConnected = false;
 
   Timer? _reconnectTimer;
   Timer? _scanUiHoldTimer;
   Timer? _resubscribeTimer;
+  Timer? _rssiPollTimer;
   DateTime? _lastPublished;
   bool _connecting = false;
+
+  final HrNotificationService _notificationService = HrNotificationService();
 
   bool _autoReconnect = true;
   bool _userInitiatedDisconnect = false;
@@ -200,6 +264,7 @@ class HeartRateManager extends ChangeNotifier {
       _lastUpdated != null &&
       DateTime.now().difference(_lastUpdated!) <= _hrStaleThreshold;
   bool get isConnecting => _connecting;
+  bool get isAutoReconnecting => _reconnectTimer?.isActive ?? false;
   bool get isSubscribed => _hrSubscribed;
   bool get canToggleConnection {
     if (_lastActionAt == null) return true;
@@ -208,9 +273,7 @@ class HeartRateManager extends ChangeNotifier {
 
   int? get heartRate => isHeartRateFresh ? _heartRate : null;
   int? get rssi =>
-      _connectionState == BluetoothConnectionState.connected && isHeartRateFresh
-      ? _rssi
-      : null;
+      _connectionState == BluetoothConnectionState.connected ? _rssi : null;
   int? get lastIntervalMs => _lastUpdated != null && _prevHeartRateAt != null
       ? _lastUpdated!.difference(_prevHeartRateAt!).inMilliseconds
       : null;
@@ -278,6 +341,19 @@ class HeartRateManager extends ChangeNotifier {
     _savedDeviceId = _prefs?.getString('last_device_id');
     if (_savedDeviceId != null) {
       _autoConnectEnabled = true; // 曾连接过，自动尝试重连
+    }
+
+    if (Platform.isAndroid) {
+      unawaited(() async {
+        await _notificationService.initialize();
+        final granted = await _notificationService.ensurePermission();
+        if (!granted) {
+          _setStatus('通知权限未授予，无法显示常驻心率卡片');
+          notifyListeners();
+          return;
+        }
+        await _notificationService.showDisconnected(status: _status);
+      }());
     }
 
     _adapterStateSub = FlutterBluePlus.adapterState.listen((state) {
@@ -362,6 +438,7 @@ class HeartRateManager extends ChangeNotifier {
     if (now.difference(last) > _hrStaleThreshold * 2) {
       _setStatus('连接失活，自动重连...');
       _connectionState = BluetoothConnectionState.disconnected;
+      _stopRssiPolling();
       _notifyConnectionState();
       notifyListeners();
       _scheduleReconnect(immediate: true);
@@ -421,7 +498,6 @@ class HeartRateManager extends ChangeNotifier {
     for (final r in results) {
       if (_isLikelyPhoneOrPc(r)) continue;
       if (!_isWearableHeartRateCandidate(r)) continue;
-      if (_userInitiatedDisconnect) continue; // 用户主动断开后，禁止自动回连
 
       final name = r.advertisementData.advName.isNotEmpty
           ? r.advertisementData.advName
@@ -598,11 +674,11 @@ class HeartRateManager extends ChangeNotifier {
         _rssi = null;
         _lastUpdated = null;
         _prevHeartRateAt = null;
+        _stopRssiPolling();
         _autoConnectEnabled = !_userInitiatedDisconnect;
         if (_userInitiatedDisconnect) {
           _autoReconnect = false;
         }
-        _connecting = false; // 保证下一次重连不会被旧的状态卡住
         if (_userInitiatedDisconnect) {
           _connectedDevice = null;
           _deviceStateSub?.cancel();
@@ -618,26 +694,37 @@ class HeartRateManager extends ChangeNotifier {
     });
 
     try {
-      await device.connect(
-        timeout: const Duration(seconds: 10),
-        autoConnect: false,
-      );
+      await device
+          .connect(timeout: const Duration(seconds: 10), autoConnect: false)
+          .timeout(const Duration(seconds: 10));
       _setStatus('');
-      _rssi = await device.readRssi();
+      try {
+        _rssi = await device.readRssi();
+      } catch (_) {
+        _rssi = null;
+      }
       _connectionState = BluetoothConnectionState.connected;
       _reconnectTimer?.cancel();
       _reconnectAttempts = 0;
       notifyListeners();
       _rememberLastDevice(device.remoteId.str);
+      _startRssiPolling(device);
       await _subscribeHeartRate(device);
     } catch (e) {
       _setStatus('连接失败: $e', force: true);
       _connectionState = BluetoothConnectionState.disconnected;
       notifyListeners();
       await restartScan();
-      _scheduleReconnect();
     } finally {
       _connecting = false;
+      if (_connectionState != BluetoothConnectionState.connected &&
+          !_userInitiatedDisconnect &&
+          _autoReconnect &&
+          _connectedDevice != null &&
+          !(_reconnectTimer?.isActive ?? false)) {
+        _scheduleReconnect();
+      }
+      notifyListeners();
     }
   }
 
@@ -767,6 +854,41 @@ class HeartRateManager extends ChangeNotifier {
     notifyListeners();
   }
 
+  void _startRssiPolling(BluetoothDevice device) {
+    _rssiPollTimer?.cancel();
+    final ms = _settings.updateIntervalMs;
+    if (ms <= 0) return;
+    final interval = Duration(milliseconds: ms);
+    _rssiPollTimer = Timer.periodic(interval, (_) {
+      unawaited(_pollRssi(device));
+    });
+  }
+
+  Future<void> _pollRssi(BluetoothDevice device) async {
+    if (_connectionState != BluetoothConnectionState.connected ||
+        _connectedDevice != device ||
+        _userInitiatedDisconnect ||
+        _connecting) {
+      return;
+    }
+    try {
+      final value = await device.readRssi();
+      if (_connectionState != BluetoothConnectionState.connected ||
+          _connectedDevice != device) {
+        return;
+      }
+      _rssi = value;
+      notifyListeners();
+    } catch (_) {
+      // 部分平台读 RSSI 可能失败，忽略即可
+    }
+  }
+
+  void _stopRssiPolling() {
+    _rssiPollTimer?.cancel();
+    _rssiPollTimer = null;
+  }
+
   Future<void> disconnect() async {
     if (!_isBleSupportedPlatform) {
       _setStatus('当前平台不支持蓝牙连接');
@@ -776,6 +898,7 @@ class HeartRateManager extends ChangeNotifier {
     _lastActionAt = DateTime.now();
     _userInitiatedDisconnect = true;
     _reconnectTimer?.cancel();
+    _stopRssiPolling();
     _autoReconnect = false; // 手动断开后不再自动重连
     _autoConnectEnabled = false;
     _reconnectAttempts = 0;
@@ -925,6 +1048,12 @@ class HeartRateManager extends ChangeNotifier {
 
     unawaited(_sendPushPayload(payload));
     unawaited(_sendOscHeartRate(bpm, percent));
+
+    unawaited(_notificationService.showConnected(
+      deviceName: _connectedDevice?.platformName ?? '',
+      bpm: bpm,
+      lastUpdated: _lastUpdated,
+    ));
   }
 
   void _notifyConnectionState() {
@@ -938,19 +1067,31 @@ class HeartRateManager extends ChangeNotifier {
 
     unawaited(_sendPushPayload(payload));
     unawaited(_sendOscConnected(connected));
+    if (connected) {
+      unawaited(_notificationService.showConnected(
+        deviceName: _connectedDevice?.platformName ?? '',
+        bpm: _heartRate,
+        lastUpdated: _lastUpdated,
+      ));
+    } else {
+      unawaited(_notificationService.showDisconnected(status: _status));
+    }
   }
 
   Future<void> _sendPushPayload(Map<String, dynamic> payload) async {
     final endpoint = _settings.pushEndpoint.trim();
-    if (endpoint.isEmpty) return;
-    final uri = Uri.tryParse(endpoint);
-    if (uri == null) return;
-
-    if (uri.scheme.startsWith('ws')) {
-      await _sendWs(uri, payload);
-    } else if (uri.scheme.startsWith('http')) {
-      await _sendHttp(uri, payload);
+    if (endpoint.isNotEmpty) {
+      final uri = Uri.tryParse(endpoint);
+      if (uri != null) {
+        if (uri.scheme.startsWith('ws')) {
+          await _sendWs(uri, payload);
+        } else if (uri.scheme.startsWith('http')) {
+          await _sendHttp(uri, payload);
+        }
+      }
     }
+
+    await _sendMqtt(payload);
   }
 
   Future<void> _sendHttp(Uri uri, Map<String, dynamic> payload) async {
@@ -999,6 +1140,91 @@ class HeartRateManager extends ChangeNotifier {
     }
   }
 
+  Future<void> _sendMqtt(Map<String, dynamic> payload) async {
+    final broker = _settings.mqttBroker.trim();
+    final topic = _settings.mqttTopic.trim();
+    if (broker.isEmpty || topic.isEmpty) return;
+
+    await _ensureMqttConnected();
+    final client = _mqttClient;
+    if (client == null || !_mqttConnected) return;
+
+    try {
+      final builder = MqttClientPayloadBuilder();
+      builder.addString(jsonEncode(payload));
+      client.publishMessage(topic, MqttQos.atLeastOnce, builder.payload!);
+    } catch (_) {
+      _mqttConnected = false;
+      _mqttClient?.disconnect();
+      _mqttClient = null;
+    }
+  }
+
+  Future<void> _ensureMqttConnected() async {
+    if (_mqttConnected && _mqttClient != null) return;
+    if (_mqttConnecting) return;
+
+    _mqttConnecting = true;
+    try {
+      final broker = _settings.mqttBroker.trim();
+      if (broker.isEmpty) return;
+      var host = broker;
+      var port = _settings.mqttPort > 0
+          ? _settings.mqttPort
+          : HeartRateSettings.defaults().mqttPort;
+      if (broker.contains('://')) {
+        final uri = Uri.tryParse(broker);
+        if (uri != null && uri.host.isNotEmpty) {
+          host = uri.host;
+          if (_settings.mqttPort <= 0 && uri.port > 0) {
+            port = uri.port;
+          }
+        }
+      }
+      final username = _settings.mqttUsername.trim();
+      final password = _settings.mqttPassword;
+      final rawClientId = _settings.mqttClientId.trim();
+      final clientId = rawClientId.isNotEmpty
+          ? rawClientId
+          : 'hr_push_${DateTime.now().millisecondsSinceEpoch}';
+
+      final client = MqttServerClient(host, clientId)
+        ..port = port
+        ..keepAlivePeriod = 20
+        ..logging(on: false)
+        ..onDisconnected = () {
+          _mqttConnected = false;
+          _mqttClient = null;
+        };
+
+      final connMess = MqttConnectMessage()
+          .withClientIdentifier(clientId)
+          .withWillQos(MqttQos.atLeastOnce)
+          .startClean();
+
+      client.connectionMessage = connMess;
+
+      try {
+        await client.connect(
+          username.isEmpty ? null : username,
+          username.isEmpty ? null : password,
+        );
+      } catch (_) {
+        client.disconnect();
+        return;
+      }
+
+      if (client.connectionStatus?.state == MqttConnectionState.connected) {
+        _mqttClient = client;
+        _mqttConnected = true;
+      } else {
+        client.disconnect();
+      }
+    } finally {
+      _mqttConnecting = false;
+    }
+  }
+
   Future<void> _sendOscConnected(bool connected) async {
     await _sendOscMessage(_settings.oscHrConnectedPath, connected);
   }
@@ -1023,9 +1249,8 @@ class HeartRateManager extends ChangeNotifier {
   }
 
   Future<_OscTarget?> _resolveOscTarget() async {
-    final raw = _settings.oscAddress.trim().isEmpty
-        ? HeartRateSettings.defaults().oscAddress
-        : _settings.oscAddress.trim();
+    final raw = _settings.oscAddress.trim();
+    if (raw.isEmpty) return null;
 
     final parts = raw.split(':');
     if (parts.length < 2) return null;
@@ -1111,6 +1336,30 @@ class HeartRateManager extends ChangeNotifier {
       _oscSocket?.close();
       _oscSocket = null;
     }
+
+    final mqttChanged =
+        old.mqttBroker != value.mqttBroker ||
+        old.mqttPort != value.mqttPort ||
+        old.mqttTopic != value.mqttTopic ||
+        old.mqttUsername != value.mqttUsername ||
+        old.mqttPassword != value.mqttPassword ||
+        old.mqttClientId != value.mqttClientId;
+    if (mqttChanged) {
+      _mqttClient?.disconnect();
+      _mqttClient = null;
+      _mqttConnected = false;
+      _mqttConnecting = false;
+    }
+
+    if (old.updateIntervalMs != value.updateIntervalMs &&
+        _connectionState == BluetoothConnectionState.connected &&
+        _connectedDevice != null) {
+      if (value.updateIntervalMs <= 0) {
+        _stopRssiPolling();
+      } else {
+        _startRssiPolling(_connectedDevice!);
+      }
+    }
   }
 
   @override
@@ -1123,9 +1372,12 @@ class HeartRateManager extends ChangeNotifier {
     _reconnectTimer?.cancel();
     _scanUiHoldTimer?.cancel();
     _resubscribeTimer?.cancel();
+    _rssiPollTimer?.cancel();
     _scanLoopTimer?.cancel();
     _wsChannel?.sink.close();
     _oscSocket?.close();
+    _mqttClient?.disconnect();
+    unawaited(_notificationService.cancel());
     super.dispose();
   }
 

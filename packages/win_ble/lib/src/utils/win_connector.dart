@@ -17,7 +17,11 @@ class WinConnector {
     required String serverPath,
   }) async {
     File bleFile = File(serverPath);
-    _bleServer = await Process.start(bleFile.path, []);
+    _bleServer = await Process.start(
+      bleFile.path,
+      const [],
+      workingDirectory: bleFile.parent.path,
+    );
     _stdoutSubscription = _bleServer?.stdout.listen((event) {
       var listData = _dataParser(event);
       for (var data in listData) {

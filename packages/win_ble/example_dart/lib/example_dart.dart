@@ -29,7 +29,7 @@ void main() async {
   WinBle.startScanning();
 
   // Stop scanning after 10 seconds
-  await Future.delayed(Duration(seconds: 10));
+  await Future.delayed(const Duration(seconds: 10));
   print("Stopping scan");
 
   WinBle.stopScanning();
