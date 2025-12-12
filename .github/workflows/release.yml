@@ -76,7 +76,13 @@ jobs:
         run: flutter build macos --release
       - name: Archive macOS app
         run: |
-          APP_PATH="build/macos/Build/Products/Release/hr_push.app"
+          APP_DIR="build/macos/Build/Products/Release"
+          APP_PATH="$(find "$APP_DIR" -maxdepth 1 -name '*.app' -print -quit)"
+          if [ -z "$APP_PATH" ]; then
+            echo "No .app found in $APP_DIR"
+            ls -la "$APP_DIR"
+            exit 1
+          fi
           VERSION="${{ github.ref_name }}"
           ditto -c -k --sequesterRsrc --keepParent "$APP_PATH" "hr_osc-macos-${VERSION}.zip"
       - name: Upload macOS zip to release
