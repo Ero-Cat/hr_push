@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io' show Platform;
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
@@ -70,12 +71,10 @@ class HeartDashboard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final mgr = context.watch<HeartRateManager>();
-
     return Scaffold(
       backgroundColor: const Color(0xFF0B1220),
       floatingActionButtonLocation: FloatingActionButtonLocation.centerFloat,
-      floatingActionButton: _SettingsFab(mgr: mgr),
+      floatingActionButton: const _SettingsFab(),
       body: SafeArea(
         child: LayoutBuilder(
           builder: (context, constraints) {
@@ -91,26 +90,61 @@ class HeartDashboard extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    _Header(status: mgr.status, adapterState: mgr.adapterState),
-                    const SizedBox(height: 18),
-                    _HeartCard(
-                      bpm: mgr.heartRate,
-                      deviceName: mgr.connectedName.isEmpty
-                          ? '未连接'
-                          : mgr.connectedName,
-                      rssi: mgr.rssi,
-                      state: mgr.connectionState,
-                      isConnecting: mgr.isConnecting,
-                      isSubscribed: mgr.isSubscribed,
-                      lastUpdated: mgr.lastUpdated,
-                      intervalMs: mgr.lastIntervalMs,
+                    Selector<HeartRateManager, (String, BluetoothAdapterState)>(
+                      selector: (_, mgr) => (mgr.status, mgr.adapterState),
+                      builder: (context, data, _) {
+                        return _Header(status: data.$1, adapterState: data.$2);
+                      },
                     ),
                     const SizedBox(height: 18),
-                    _ControlsRow(mgr: mgr),
+                    Selector<
+                      HeartRateManager,
+                      (
+                        int?,
+                        String,
+                        int?,
+                        BluetoothConnectionState,
+                        bool,
+                        bool,
+                        DateTime?,
+                        int?,
+                      )
+                    >(
+                      selector: (_, mgr) => (
+                        mgr.heartRate,
+                        mgr.connectedName.isEmpty ? '未连接' : mgr.connectedName,
+                        mgr.rssi,
+                        mgr.connectionState,
+                        mgr.isConnecting,
+                        mgr.isSubscribed,
+                        mgr.lastUpdated,
+                        mgr.lastIntervalMs,
+                      ),
+                      builder: (context, data, _) {
+                        return _HeartCard(
+                          bpm: data.$1,
+                          deviceName: data.$2,
+                          rssi: data.$3,
+                          state: data.$4,
+                          isConnecting: data.$5,
+                          isSubscribed: data.$6,
+                          lastUpdated: data.$7,
+                          intervalMs: data.$8,
+                        );
+                      },
+                    ),
+                    const SizedBox(height: 18),
+                    Consumer<HeartRateManager>(
+                      builder: (context, mgr, _) => _ControlsRow(mgr: mgr),
+                    ),
                     const SizedBox(height: 12),
-                    _NearbyList(mgr: mgr),
+                    Consumer<HeartRateManager>(
+                      builder: (context, mgr, _) => _NearbyList(mgr: mgr),
+                    ),
                     const SizedBox(height: 10),
-                    _DebugList(mgr: mgr),
+                    Consumer<HeartRateManager>(
+                      builder: (context, mgr, _) => _DebugList(mgr: mgr),
+                    ),
                     const SizedBox(height: 20),
                   ],
                 ),
@@ -124,9 +158,7 @@ class HeartDashboard extends StatelessWidget {
 }
 
 class _SettingsFab extends StatelessWidget {
-  const _SettingsFab({required this.mgr});
-
-  final HeartRateManager mgr;
+  const _SettingsFab();
 
   @override
   Widget build(BuildContext context) {
@@ -136,6 +168,7 @@ class _SettingsFab extends StatelessWidget {
       icon: const Icon(Icons.settings),
       label: const Text('配置'),
       onPressed: () async {
+        final mgr = context.read<HeartRateManager>();
         final updated = await Navigator.of(context).push<HeartRateSettings>(
           MaterialPageRoute(
             builder: (_) => SettingsPage(initial: mgr.settings),
@@ -383,12 +416,15 @@ class _HeartbeatMeterState extends State<_HeartbeatMeter>
       if (Platform.isWindows) {
         _ensureTray();
         _trayVisible = true;
-        windowManager.hide();
+        unawaited(() async {
+          await windowManager.setSkipTaskbar(true);
+          await windowManager.hide();
+        }());
       }
     } else if (eventName == 'restore' || eventName == 'focus') {
       _windowVisible = true;
       if (Platform.isWindows && _trayVisible) {
-        trayManager.destroy();
+        unawaited(trayManager.destroy());
         _trayVisible = false;
       }
     }
@@ -396,13 +432,15 @@ class _HeartbeatMeterState extends State<_HeartbeatMeter>
   }
 
   @override
-  void onTrayIconMouseEnter() {
-    _updateTrayTooltip();
+  void onTrayIconMouseDown() {
+    if (!Platform.isWindows) return;
+    unawaited(_restoreFromTray());
   }
 
   @override
-  void onTrayIconMouseExit() {
-    // no-op
+  void onTrayIconRightMouseDown() {
+    if (!Platform.isWindows) return;
+    unawaited(_restoreFromTray());
   }
 
   @override
@@ -456,6 +494,28 @@ class _HeartbeatMeterState extends State<_HeartbeatMeter>
       await trayManager.setIcon('images/logo.png');
     }
     await _updateTrayTooltip();
+  }
+
+  Future<void> _restoreFromTray() async {
+    _windowVisible = true;
+    _updatePlayback();
+
+    try {
+      await windowManager.setSkipTaskbar(false);
+    } catch (_) {}
+
+    try {
+      await windowManager.show();
+      await windowManager.restore();
+      await windowManager.focus();
+    } catch (_) {}
+
+    if (_trayVisible) {
+      try {
+        await trayManager.destroy();
+      } catch (_) {}
+      _trayVisible = false;
+    }
   }
 }
 
@@ -519,9 +579,7 @@ class _ControlsRow extends StatelessWidget {
     if (connected) {
       return mgr.canToggleConnection;
     }
-    return !mgr.uiScanning &&
-        !mgr.isConnecting &&
-        !mgr.isAutoReconnecting;
+    return !mgr.uiScanning && !mgr.isConnecting && !mgr.isAutoReconnecting;
   }
 
   String _scanButtonLabel(HeartRateManager mgr) {
@@ -578,8 +636,8 @@ class _ControlsRow extends StatelessWidget {
               child: FilledButton.icon(
                 onPressed: _scanButtonEnabled(mgr)
                     ? (mgr.connectionState == BluetoothConnectionState.connected
-                        ? mgr.disconnect
-                        : mgr.restartScan)
+                          ? mgr.disconnect
+                          : mgr.restartScan)
                     : null,
                 icon: Icon(_scanButtonIcon(mgr)),
                 label: Text(_scanButtonLabel(mgr)),

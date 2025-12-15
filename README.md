@@ -101,6 +101,12 @@
 - 打包：`flutter build apk|ios|windows|macos|linux`。
 
 ## 更新日志
+### v1.3.1
+- Windows：最小化到托盘后支持点击托盘图标恢复窗口。
+- Windows：掉线后自动重连更稳定（扫描卡死自愈、广播心率候选识别增强、陈旧连接句柄清理）。
+- UI：减少无关重建，整体交互更流畅。
+- OSC：`/avatar/parameters/hr_connected` 更贴合实际在线状态（抗抖动与掉线恢复）。
+
 ### v1.3.0
 - 新增 MQTT 推送（Broker 填写即启用，端口/Topic/鉴权可配）。
 - Android 新增通知栏常驻心率卡片，并自动按刷新间隔更新。

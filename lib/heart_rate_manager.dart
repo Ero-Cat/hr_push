@@ -23,6 +23,7 @@ class NearbyDevice {
     required this.id,
     required this.name,
     required this.rssi,
+    required this.connectable,
     required this.device,
     required this.lastSeen,
   });
@@ -30,6 +31,7 @@ class NearbyDevice {
   final String id;
   final String name;
   int rssi;
+  bool connectable;
   DateTime lastSeen;
   final BluetoothDevice device;
 }
@@ -222,8 +224,12 @@ class HeartRateManager extends ChangeNotifier {
   bool _isTestEnv = false;
   bool _autoConnectEnabled = false; // 首次启动不自动连接，等待用户操作
   bool _hrSubscribed = false;
+  bool _hrOnline = false;
+  String? _lastOscHrConnectedKey;
   bool _missingHrNotified = false;
   String? _savedDeviceId;
+  String? _savedDeviceName;
+  String? _pendingConnectName;
   SharedPreferences? _prefs;
 
   HeartRateSettings _settings = HeartRateSettings.defaults();
@@ -231,20 +237,25 @@ class HeartRateManager extends ChangeNotifier {
   int? _heartRate;
   int? _rssi;
   DateTime? _lastUpdated;
+  DateTime? _lastHrSeenAt;
   String _status = '等待蓝牙...';
   BluetoothAdapterState _adapterState = BluetoothAdapterState.unknown;
+  DateTime? _connectedAt;
 
   final List<NearbyDevice> _nearby = [];
   DateTime? _lastStatusChange;
+  DateTime? _lastScanResultAt;
 
   // 扫描周期 1000ms
   static const Duration _scanInterval = Duration(milliseconds: 1000);
   // 为避免按钮闪烁，至少保持 3s 的“扫描中”显示
   static const Duration _scanUiMinVisible = Duration(seconds: 3);
+  static const Duration _scanStaleThreshold = Duration(seconds: 4);
   static const Duration _nearbyTtl = Duration(seconds: 8);
   static const Duration _reconnectBaseDelay = Duration(seconds: 2);
   static const Duration _reconnectMaxDelay = Duration(seconds: 30);
   static const Duration _hrStaleThreshold = Duration(seconds: 6);
+  static const Duration _hrInitialOnlineGrace = Duration(seconds: 3);
   DateTime? _prevHeartRateAt;
   DateTime? _lastActionAt;
   static const Duration _actionCooldown = Duration(seconds: 2);
@@ -266,6 +277,7 @@ class HeartRateManager extends ChangeNotifier {
   bool get isConnecting => _connecting;
   bool get isAutoReconnecting => _reconnectTimer?.isActive ?? false;
   bool get isSubscribed => _hrSubscribed;
+  bool get hrOnline => _hrOnline;
   bool get canToggleConnection {
     if (_lastActionAt == null) return true;
     return DateTime.now().difference(_lastActionAt!) >= _actionCooldown;
@@ -293,6 +305,52 @@ class HeartRateManager extends ChangeNotifier {
     if (_heartRate == null || _settings.maxHeartRate <= 0) return null;
     final percent = _heartRate! / _settings.maxHeartRate;
     return percent.clamp(0, 1).toDouble();
+  }
+
+  @visibleForTesting
+  static bool computeHrOnline({
+    required bool userInitiatedDisconnect,
+    required BluetoothAdapterState adapterState,
+    required BluetoothConnectionState connectionState,
+    required DateTime now,
+    required DateTime? lastHeartRateAt,
+    required DateTime? connectedAt,
+    Duration hrFreshFor = _hrStaleThreshold,
+    Duration initialGrace = _hrInitialOnlineGrace,
+  }) {
+    if (userInitiatedDisconnect) return false;
+    if (adapterState != BluetoothAdapterState.on) return false;
+
+    final isFresh =
+        lastHeartRateAt != null &&
+        now.difference(lastHeartRateAt) <= hrFreshFor;
+    if (isFresh) return true;
+
+    if (connectionState == BluetoothConnectionState.connected &&
+        connectedAt != null &&
+        now.difference(connectedAt) <= initialGrace) {
+      return true;
+    }
+
+    return false;
+  }
+
+  void _syncHrOnline({DateTime? now, bool forceOsc = false}) {
+    final t = now ?? DateTime.now();
+    final next = computeHrOnline(
+      userInitiatedDisconnect: _userInitiatedDisconnect,
+      adapterState: _adapterState,
+      connectionState: _connectionState,
+      now: t,
+      lastHeartRateAt: _lastHrSeenAt,
+      connectedAt: _connectedAt,
+    );
+
+    final changed = next != _hrOnline;
+    _hrOnline = next;
+    if (changed || forceOsc) {
+      unawaited(_sendOscConnectedIfNeeded(_hrOnline, force: forceOsc));
+    }
   }
 
   void _setStatus(String value, {bool force = false}) {
@@ -339,6 +397,7 @@ class HeartRateManager extends ChangeNotifier {
     _prefs = await SharedPreferences.getInstance();
     _settings = HeartRateSettings.fromPrefs(_prefs);
     _savedDeviceId = _prefs?.getString('last_device_id');
+    _savedDeviceName = _prefs?.getString('last_device_name');
     if (_savedDeviceId != null) {
       _autoConnectEnabled = true; // 曾连接过，自动尝试重连
     }
@@ -361,6 +420,7 @@ class HeartRateManager extends ChangeNotifier {
       if (state != BluetoothAdapterState.on) {
         _setStatus('请开启蓝牙');
       }
+      _syncHrOnline(now: DateTime.now(), forceOsc: true);
       notifyListeners();
     });
 
@@ -373,6 +433,7 @@ class HeartRateManager extends ChangeNotifier {
     _startScanLoopTimer();
 
     await _startScan();
+    _syncHrOnline(now: DateTime.now(), forceOsc: true);
   }
 
   Future<bool> _ensurePermissionsAndBluetooth() async {
@@ -422,6 +483,7 @@ class HeartRateManager extends ChangeNotifier {
       final now = DateTime.now();
       _pruneNearby(now);
       _checkStaleConnection(now);
+      _syncHrOnline(now: now);
       _tryStartScan();
     });
   }
@@ -438,7 +500,13 @@ class HeartRateManager extends ChangeNotifier {
     if (now.difference(last) > _hrStaleThreshold * 2) {
       _setStatus('连接失活，自动重连...');
       _connectionState = BluetoothConnectionState.disconnected;
+      _connectedAt = null;
       _stopRssiPolling();
+      unawaited(() async {
+        try {
+          await _connectedDevice?.disconnect();
+        } catch (_) {}
+      }());
       _notifyConnectionState();
       notifyListeners();
       _scheduleReconnect(immediate: true);
@@ -465,6 +533,7 @@ class HeartRateManager extends ChangeNotifier {
     if (_isTestEnv) return;
     if (!_isBleSupportedPlatform) return;
     try {
+      _lastScanResultAt = DateTime.now();
       _setStatus('扫描附近设备...');
       _setUiScanning(true);
       notifyListeners();
@@ -495,6 +564,9 @@ class HeartRateManager extends ChangeNotifier {
 
   void _handleScanResults(List<ScanResult> results) {
     final now = DateTime.now();
+    if (results.isNotEmpty) {
+      _lastScanResultAt = now;
+    }
     for (final r in results) {
       if (_isLikelyPhoneOrPc(r)) continue;
       if (!_isWearableHeartRateCandidate(r)) continue;
@@ -518,6 +590,7 @@ class HeartRateManager extends ChangeNotifier {
       if (existingIndex >= 0) {
         _nearby[existingIndex]
           ..rssi = r.rssi
+          ..connectable = r.advertisementData.connectable
           ..lastSeen = now;
       } else {
         _nearby.add(
@@ -525,6 +598,7 @@ class HeartRateManager extends ChangeNotifier {
             id: id,
             name: name,
             rssi: r.rssi,
+            connectable: r.advertisementData.connectable,
             device: r.device,
             lastSeen: now,
           ),
@@ -541,6 +615,7 @@ class HeartRateManager extends ChangeNotifier {
           _connectionState != BluetoothConnectionState.connected &&
           // 广播模式设备通常不可连接，避免无意义的连接尝试
           r.advertisementData.connectable) {
+        _pendingConnectName = name;
         _connectTo(r.device);
       }
     }
@@ -566,6 +641,8 @@ class HeartRateManager extends ChangeNotifier {
     _heartRate = bpm;
     _rssi = r.rssi;
     _lastUpdated = now;
+    _lastHrSeenAt = now;
+    _syncHrOnline(now: now);
     final shouldPublish = _shouldPublishNow(now);
     if (!shouldPublish) return;
 
@@ -593,6 +670,9 @@ class HeartRateManager extends ChangeNotifier {
     final hasHeartRateService = r.advertisementData.serviceUuids
         .map((e) => e.str.toLowerCase())
         .any((id) => id.contains('180d'));
+    final hasHeartRateServiceData = r.advertisementData.serviceData.containsKey(
+      _heartRateService,
+    );
 
     final name = r.advertisementData.advName.toLowerCase();
     final likelyHrWearable =
@@ -606,7 +686,7 @@ class HeartRateManager extends ChangeNotifier {
         name.contains('fitbit') ||
         name.contains('watch');
 
-    return hasHeartRateService || likelyHrWearable;
+    return hasHeartRateService || hasHeartRateServiceData || likelyHrWearable;
   }
 
   bool _isLikelyPhoneOrPc(ScanResult r) {
@@ -660,7 +740,10 @@ class HeartRateManager extends ChangeNotifier {
     _connectedDevice = device;
     _userInitiatedDisconnect = false;
     _connectionState = BluetoothConnectionState.disconnected;
-    _setStatus('正在连接 ${device.platformName}...');
+    final label = (_pendingConnectName?.trim().isNotEmpty ?? false)
+        ? _pendingConnectName!.trim()
+        : device.platformName;
+    _setStatus('正在连接 $label...');
     notifyListeners();
 
     await FlutterBluePlus.stopScan();
@@ -668,7 +751,11 @@ class HeartRateManager extends ChangeNotifier {
     await _deviceStateSub?.cancel();
     _deviceStateSub = device.connectionState.listen((state) {
       _connectionState = state;
+      if (state == BluetoothConnectionState.connected) {
+        _connectedAt = DateTime.now();
+      }
       if (state == BluetoothConnectionState.disconnected) {
+        _connectedAt = null;
         _heartRateSub?.cancel();
         _heartRate = null;
         _rssi = null;
@@ -704,19 +791,28 @@ class HeartRateManager extends ChangeNotifier {
         _rssi = null;
       }
       _connectionState = BluetoothConnectionState.connected;
+      _connectedAt = DateTime.now();
       _reconnectTimer?.cancel();
       _reconnectAttempts = 0;
       notifyListeners();
-      _rememberLastDevice(device.remoteId.str);
+      final name = (_pendingConnectName?.trim().isNotEmpty ?? false)
+          ? _pendingConnectName!.trim()
+          : device.platformName.trim();
+      _pendingConnectName = null;
+      _rememberLastDevice(device.remoteId.str, name);
       _startRssiPolling(device);
       await _subscribeHeartRate(device);
     } catch (e) {
       _setStatus('连接失败: $e', force: true);
       _connectionState = BluetoothConnectionState.disconnected;
+      _connectedAt = null;
       notifyListeners();
       await restartScan();
     } finally {
       _connecting = false;
+      if (_connectionState != BluetoothConnectionState.connected) {
+        _pendingConnectName = null;
+      }
       if (_connectionState != BluetoothConnectionState.connected &&
           !_userInitiatedDisconnect &&
           _autoReconnect &&
@@ -737,6 +833,7 @@ class HeartRateManager extends ChangeNotifier {
     _autoReconnect = true; // 用户重新连接后恢复自动重连
     _autoConnectEnabled = true; // 用户主动操作后再允许自动连接
     _lastActionAt = DateTime.now();
+    _pendingConnectName = target.name;
     await _connectTo(target.device);
   }
 
@@ -846,6 +943,8 @@ class HeartRateManager extends ChangeNotifier {
     _prevHeartRateAt = _lastUpdated;
     _heartRate = bpm;
     _lastUpdated = now;
+    _lastHrSeenAt = now;
+    _syncHrOnline(now: now);
     final shouldPublish = _shouldPublishNow(now);
     if (!shouldPublish) return;
 
@@ -905,10 +1004,12 @@ class HeartRateManager extends ChangeNotifier {
     _connecting = false;
     _resubscribeTimer?.cancel();
     _setStatus('断开中...');
+    _syncHrOnline(now: DateTime.now(), forceOsc: true);
     try {
       await _connectedDevice?.disconnect();
       // 部分平台在“连接中”瞬间按断开可能无事件回调，强制置为断开态
       _connectionState = BluetoothConnectionState.disconnected;
+      _connectedAt = null;
     } finally {
       await _deviceStateSub?.cancel();
       await _heartRateSub?.cancel();
@@ -916,10 +1017,14 @@ class HeartRateManager extends ChangeNotifier {
       _rssi = null;
       _heartRate = null;
       _lastUpdated = null;
+      _lastHrSeenAt = null;
       _prevHeartRateAt = null;
       _savedDeviceId = null;
       await _prefs?.remove('last_device_id');
+      _savedDeviceName = null;
+      await _prefs?.remove('last_device_name');
       _connectionState = BluetoothConnectionState.disconnected;
+      _connectedAt = null;
       _setStatus('已断开', force: true);
       _notifyConnectionState();
       notifyListeners();
@@ -941,10 +1046,15 @@ class HeartRateManager extends ChangeNotifier {
   }
 
   Future<void> _ensureScanAlive() async {
-    if (_isScanning) return;
     if (_connectionState == BluetoothConnectionState.connected || _connecting) {
       return;
     }
+    final now = DateTime.now();
+    final scanStale =
+        _isScanning &&
+        _lastScanResultAt != null &&
+        now.difference(_lastScanResultAt!) > _scanStaleThreshold;
+    if (_isScanning && !scanStale) return;
     await FlutterBluePlus.stopScan();
     await _startScan();
   }
@@ -983,6 +1093,17 @@ class HeartRateManager extends ChangeNotifier {
         }
       }
 
+      if (nearby == null && (_savedDeviceName?.trim().isNotEmpty ?? false)) {
+        final matches = _nearby
+            .where(
+              (d) => d.connectable && d.name.trim() == _savedDeviceName!.trim(),
+            )
+            .toList();
+        if (matches.length == 1) {
+          nearby = matches.first;
+        }
+      }
+
       if (nearby == null) {
         _setStatus('等待设备重新广播...');
         notifyListeners();
@@ -995,6 +1116,7 @@ class HeartRateManager extends ChangeNotifier {
         _connectedDevice = deviceForReconnect;
       }
 
+      _pendingConnectName = nearby.name;
       _setStatus('自动重连中...');
       notifyListeners();
       // Windows 偶发保留陈旧连接句柄，确保重连使用扫描到的最新实例。
@@ -1026,9 +1148,13 @@ class HeartRateManager extends ChangeNotifier {
     }
   }
 
-  void _rememberLastDevice(String id) {
+  void _rememberLastDevice(String id, String name) {
     _savedDeviceId = id;
+    _savedDeviceName = name;
     _prefs?.setString('last_device_id', id);
+    if (name.trim().isNotEmpty) {
+      _prefs?.setString('last_device_name', name);
+    }
   }
 
   void _notifyHeartRateUpdate() {
@@ -1049,14 +1175,17 @@ class HeartRateManager extends ChangeNotifier {
     unawaited(_sendPushPayload(payload));
     unawaited(_sendOscHeartRate(bpm, percent));
 
-    unawaited(_notificationService.showConnected(
-      deviceName: _connectedDevice?.platformName ?? '',
-      bpm: bpm,
-      lastUpdated: _lastUpdated,
-    ));
+    unawaited(
+      _notificationService.showConnected(
+        deviceName: _connectedDevice?.platformName ?? '',
+        bpm: bpm,
+        lastUpdated: _lastUpdated,
+      ),
+    );
   }
 
   void _notifyConnectionState() {
+    _syncHrOnline(now: DateTime.now());
     final connected = isConnected;
     final payload = <String, dynamic>{
       'event': 'connection',
@@ -1066,13 +1195,14 @@ class HeartRateManager extends ChangeNotifier {
     };
 
     unawaited(_sendPushPayload(payload));
-    unawaited(_sendOscConnected(connected));
     if (connected) {
-      unawaited(_notificationService.showConnected(
-        deviceName: _connectedDevice?.platformName ?? '',
-        bpm: _heartRate,
-        lastUpdated: _lastUpdated,
-      ));
+      unawaited(
+        _notificationService.showConnected(
+          deviceName: _connectedDevice?.platformName ?? '',
+          bpm: _heartRate,
+          lastUpdated: _lastUpdated,
+        ),
+      );
     } else {
       unawaited(_notificationService.showDisconnected(status: _status));
     }
@@ -1225,8 +1355,18 @@ class HeartRateManager extends ChangeNotifier {
     }
   }
 
-  Future<void> _sendOscConnected(bool connected) async {
-    await _sendOscMessage(_settings.oscHrConnectedPath, connected);
+  Future<void> _sendOscConnectedIfNeeded(
+    bool connected, {
+    bool force = false,
+  }) async {
+    final key =
+        '${_settings.oscAddress.trim()}|${_settings.oscHrConnectedPath}|$connected';
+    if (!force && _lastOscHrConnectedKey == key) return;
+
+    final ok = await _sendOscMessage(_settings.oscHrConnectedPath, connected);
+    if (ok) {
+      _lastOscHrConnectedKey = key;
+    }
   }
 
   Future<void> _sendOscHeartRate(int bpm, double? percent) async {
@@ -1236,16 +1376,18 @@ class HeartRateManager extends ChangeNotifier {
     }
   }
 
-  Future<void> _sendOscMessage(String address, Object value) async {
+  Future<bool> _sendOscMessage(String address, Object value) async {
     final target = await _resolveOscTarget();
-    if (target == null) return;
+    if (target == null) return false;
     final socket = await _ensureOscSocket();
-    if (socket == null) return;
+    if (socket == null) return false;
 
     final msg = _encodeOscMessage(address, [_oscArgFromValue(value)]);
     try {
       socket.send(msg, target.address, target.port);
+      return true;
     } catch (_) {}
+    return false;
   }
 
   Future<_OscTarget?> _resolveOscTarget() async {
@@ -1335,6 +1477,14 @@ class HeartRateManager extends ChangeNotifier {
     if (old.oscAddress != value.oscAddress) {
       _oscSocket?.close();
       _oscSocket = null;
+    }
+
+    final oscConnectedChanged =
+        old.oscAddress != value.oscAddress ||
+        old.oscHrConnectedPath != value.oscHrConnectedPath;
+    if (oscConnectedChanged) {
+      _lastOscHrConnectedKey = null;
+      _syncHrOnline(now: DateTime.now(), forceOsc: true);
     }
 
     final mqttChanged =
