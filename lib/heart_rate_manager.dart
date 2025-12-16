@@ -1173,6 +1173,7 @@ class HeartRateManager extends ChangeNotifier {
     };
 
     unawaited(_sendPushPayload(payload));
+    unawaited(_sendOscConnectedIfNeeded(_hrOnline, force: true));
     unawaited(_sendOscHeartRate(bpm, percent));
 
     unawaited(
