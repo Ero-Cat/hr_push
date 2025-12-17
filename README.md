@@ -87,6 +87,12 @@
 - 推荐搭配默认 OSC 参数插件：https://booth.pm/zh-cn/items/5531594
 - 也可在 Avatar 参数中自行监听上述 OSC 路径。
 
+### 测试截图
+<img src="images/vrchat.png" alt="VRChat OSC 测试" width="900" />
+
+## 已测试设备
+1. Garmin Enduro 2
+
 ## 平台支持与权限
 - Android：需要 BLE 扫描/连接权限（Android 12+ 无需定位，11 及以下需定位权限）。Android 13+ 若想显示常驻通知卡片，请允许通知权限。
   - ColorOS/部分国产 ROM：需在系统设置中打开应用通知，并允许后台运行/自启动，否则可能看不到常驻卡片或后台停止更新。
