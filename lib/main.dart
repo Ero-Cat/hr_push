@@ -33,7 +33,7 @@ Future<void> main() async {
       minimumSize: size,
       maximumSize: size,
       center: true,
-      title: 'OSC/HTTP心率监控推送',
+      title: 'OSC/HTTP心率推送',
       backgroundColor: Color(0xFF0B1220),
     );
     windowManager.waitUntilReadyToShow(options, () async {
@@ -54,7 +54,7 @@ class HrOscApp extends StatelessWidget {
       create: (_) => HeartRateManager()..start(),
       child: MaterialApp(
         debugShowCheckedModeBanner: false,
-        title: '心率监控推送',
+        title: '心率推送',
         theme: ThemeData(
           colorScheme: ColorScheme.fromSeed(seedColor: const Color(0xFF0FA3B1)),
           useMaterial3: true,
@@ -73,84 +73,99 @@ class HeartDashboard extends StatelessWidget {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: const Color(0xFF0B1220),
-      floatingActionButtonLocation: FloatingActionButtonLocation.centerFloat,
-      floatingActionButton: const _SettingsFab(),
       body: SafeArea(
-        child: LayoutBuilder(
-          builder: (context, constraints) {
-            return SingleChildScrollView(
-              padding: const EdgeInsets.symmetric(
-                horizontal: 16,
-                vertical: 14,
-              ).copyWith(bottom: 96),
-              child: ConstrainedBox(
-                constraints: BoxConstraints(
-                  minHeight: constraints.maxHeight - 32,
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Selector<HeartRateManager, (String, BluetoothAdapterState)>(
-                      selector: (_, mgr) => (mgr.status, mgr.adapterState),
-                      builder: (context, data, _) {
-                        return _Header(status: data.$1, adapterState: data.$2);
-                      },
+        child: Stack(
+          children: [
+            LayoutBuilder(
+              builder: (context, constraints) {
+                const contentPadding = EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 14,
+                );
+                final minHeight =
+                    constraints.maxHeight > contentPadding.vertical
+                    ? constraints.maxHeight - contentPadding.vertical
+                    : 0.0;
+                return SingleChildScrollView(
+                  padding: contentPadding,
+                  physics: const ClampingScrollPhysics(),
+                  child: ConstrainedBox(
+                    constraints: BoxConstraints(minHeight: minHeight),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Selector<
+                          HeartRateManager,
+                          (String, BluetoothAdapterState)
+                        >(
+                          selector: (_, mgr) => (mgr.status, mgr.adapterState),
+                          builder: (context, data, _) {
+                            return _Header(
+                              status: data.$1,
+                              adapterState: data.$2,
+                            );
+                          },
+                        ),
+                        const SizedBox(height: 18),
+                        Selector<
+                          HeartRateManager,
+                          (
+                            int?,
+                            String,
+                            int?,
+                            BluetoothConnectionState,
+                            bool,
+                            bool,
+                            DateTime?,
+                            int?,
+                          )
+                        >(
+                          selector: (_, mgr) => (
+                            mgr.heartRate,
+                            mgr.connectedName.isEmpty
+                                ? '未连接'
+                                : mgr.connectedName,
+                            mgr.rssi,
+                            mgr.connectionState,
+                            mgr.isConnecting,
+                            mgr.isSubscribed,
+                            mgr.lastUpdated,
+                            mgr.lastIntervalMs,
+                          ),
+                          builder: (context, data, _) {
+                            return _HeartCard(
+                              bpm: data.$1,
+                              deviceName: data.$2,
+                              rssi: data.$3,
+                              state: data.$4,
+                              isConnecting: data.$5,
+                              isSubscribed: data.$6,
+                              lastUpdated: data.$7,
+                              intervalMs: data.$8,
+                            );
+                          },
+                        ),
+                        const SizedBox(height: 18),
+                        Consumer<HeartRateManager>(
+                          builder: (context, mgr, _) => _ControlsRow(mgr: mgr),
+                        ),
+                        const SizedBox(height: 12),
+                        Consumer<HeartRateManager>(
+                          builder: (context, mgr, _) => _NearbyList(mgr: mgr),
+                        ),
+                        const SizedBox(height: 10),
+                        Consumer<HeartRateManager>(
+                          builder: (context, mgr, _) => _DebugList(mgr: mgr),
+                        ),
+                        const SizedBox(height: 20),
+                      ],
                     ),
-                    const SizedBox(height: 18),
-                    Selector<
-                      HeartRateManager,
-                      (
-                        int?,
-                        String,
-                        int?,
-                        BluetoothConnectionState,
-                        bool,
-                        bool,
-                        DateTime?,
-                        int?,
-                      )
-                    >(
-                      selector: (_, mgr) => (
-                        mgr.heartRate,
-                        mgr.connectedName.isEmpty ? '未连接' : mgr.connectedName,
-                        mgr.rssi,
-                        mgr.connectionState,
-                        mgr.isConnecting,
-                        mgr.isSubscribed,
-                        mgr.lastUpdated,
-                        mgr.lastIntervalMs,
-                      ),
-                      builder: (context, data, _) {
-                        return _HeartCard(
-                          bpm: data.$1,
-                          deviceName: data.$2,
-                          rssi: data.$3,
-                          state: data.$4,
-                          isConnecting: data.$5,
-                          isSubscribed: data.$6,
-                          lastUpdated: data.$7,
-                          intervalMs: data.$8,
-                        );
-                      },
-                    ),
-                    const SizedBox(height: 18),
-                    Consumer<HeartRateManager>(
-                      builder: (context, mgr, _) => _ControlsRow(mgr: mgr),
-                    ),
-                    const SizedBox(height: 12),
-                    Consumer<HeartRateManager>(
-                      builder: (context, mgr, _) => _NearbyList(mgr: mgr),
-                    ),
-                    const SizedBox(height: 10),
-                    Consumer<HeartRateManager>(
-                      builder: (context, mgr, _) => _DebugList(mgr: mgr),
-                    ),
-                    const SizedBox(height: 20),
-                  ],
-                ),
-              ),
-            );
-          },
+                  ),
+                );
+              },
+            ),
+            Positioned(top: 14, right: 8, child: const _SettingsFab()),
+          ],
         ),
       ),
     );
@@ -162,11 +177,9 @@ class _SettingsFab extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return FloatingActionButton.extended(
-      backgroundColor: const Color(0xFF111827),
-      foregroundColor: Colors.white,
-      icon: const Icon(Icons.settings),
-      label: const Text('配置'),
+    return _TopActionButton(
+      icon: Icons.settings,
+      label: '配置',
       onPressed: () async {
         final mgr = context.read<HeartRateManager>();
         final updated = await Navigator.of(context).push<HeartRateSettings>(
@@ -178,6 +191,38 @@ class _SettingsFab extends StatelessWidget {
           await mgr.updateSettings(updated);
         }
       },
+    );
+  }
+}
+
+class _TopActionButton extends StatelessWidget {
+  const _TopActionButton({
+    required this.icon,
+    required this.label,
+    required this.onPressed,
+  });
+
+  final IconData icon;
+  final String label;
+  final VoidCallback onPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    return TextButton.icon(
+      onPressed: onPressed,
+      style: TextButton.styleFrom(
+        foregroundColor: Colors.white,
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+        minimumSize: const Size(44, 44),
+        tapTargetSize: MaterialTapTargetSize.padded,
+        textStyle: const TextStyle(
+          fontSize: 16,
+          fontWeight: FontWeight.w600,
+          letterSpacing: -0.1,
+        ),
+      ),
+      icon: Icon(icon, size: 18),
+      label: Text(label),
     );
   }
 }
@@ -210,7 +255,7 @@ class _Header extends StatelessWidget {
             ),
             const SizedBox(width: 8),
             const Text(
-              '心率监控推送',
+              '心率推送',
               style: TextStyle(
                 color: Colors.white,
                 fontSize: 22,
@@ -890,23 +935,10 @@ class _SettingsPageState extends State<SettingsPage> {
         actions: [
           Padding(
             padding: const EdgeInsets.only(right: 8),
-            child: TextButton(
+            child: _TopActionButton(
+              icon: Icons.save_rounded,
+              label: '保存',
               onPressed: _onSave,
-              style: TextButton.styleFrom(
-                foregroundColor: const Color(0xFF0FA3B1),
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 10,
-                  vertical: 8,
-                ),
-                minimumSize: Size.zero,
-                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                textStyle: const TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.w600,
-                  letterSpacing: -0.1,
-                ),
-              ),
-              child: const Text('保存'),
             ),
           ),
         ],
@@ -915,21 +947,29 @@ class _SettingsPageState extends State<SettingsPage> {
         child: ListView(
           padding: const EdgeInsets.all(16),
           children: [
-            _sectionTitle('推送地址'),
+            _sectionTitle('HTTP/WS 私有服务'),
             _buildTextField(
               controller: _pushCtrl,
+              label: '推送地址',
               hint: 'http:// 或 ws:// 开头',
               helper: '用于 HTTP / WebSocket 推送',
             ),
-            const SizedBox(height: 18),
-            _sectionTitle('OSC 地址'),
+            const SizedBox(height: 10),
+            _buildTextField(
+              controller: _intervalCtrl,
+              label: '推送/刷新间隔 (ms)',
+              hint: '默认 1000ms，过低可能影响性能',
+              keyboardType: TextInputType.number,
+            ),
+            const SizedBox(height: 20),
+            _sectionTitle('VRChat OSC'),
             _buildTextField(
               controller: _oscCtrl,
+              label: 'OSC 地址',
               hint: '例如 127.0.0.1:9000',
               helper: '目标主机与端口',
             ),
-            const SizedBox(height: 18),
-            _sectionTitle('OSC 参数路径'),
+            const SizedBox(height: 10),
             _buildTextField(
               controller: _oscConnectedCtrl,
               label: '心率在线状态',
@@ -947,22 +987,15 @@ class _SettingsPageState extends State<SettingsPage> {
               label: '心率百分比',
               hint: '/avatar/parameters/hr_percent',
             ),
-            const SizedBox(height: 18),
-            _sectionTitle('最大心率'),
+            const SizedBox(height: 10),
             _buildTextField(
               controller: _maxHrCtrl,
-              hint: '用于百分比计算，默认 200',
+              label: '最大心率（心率百分比 = 当前心率 / 最大心率 × 100）',
+              hint: '默认 200',
               keyboardType: TextInputType.number,
             ),
-            const SizedBox(height: 14),
-            _sectionTitle('推送/刷新间隔 (ms)'),
-            _buildTextField(
-              controller: _intervalCtrl,
-              hint: '默认 1000ms，过低可能影响性能',
-              keyboardType: TextInputType.number,
-            ),
-            const SizedBox(height: 18),
-            _sectionTitle('MQTT 推送'),
+            const SizedBox(height: 20),
+            _sectionTitle('MQTT 客户端'),
             _buildTextField(
               controller: _mqttBrokerCtrl,
               label: 'Broker 地址',
@@ -1014,8 +1047,8 @@ class _SettingsPageState extends State<SettingsPage> {
       child: Text(
         text,
         style: const TextStyle(
-          color: Colors.white70,
-          fontSize: 13,
+          color: Colors.white,
+          fontSize: 16,
           fontWeight: FontWeight.w700,
           letterSpacing: -0.1,
         ),

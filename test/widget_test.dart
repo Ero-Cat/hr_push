@@ -13,7 +13,7 @@ void main() {
   testWidgets('Dashboard renders basic UI', (WidgetTester tester) async {
     await tester.pumpWidget(const HrOscApp());
 
-    expect(find.text('心率监控推送'), findsOneWidget);
+    expect(find.text('心率推送'), findsOneWidget);
     expect(find.text('附近心率设备'), findsOneWidget);
     expect(find.textContaining('扫描'), findsOneWidget);
 

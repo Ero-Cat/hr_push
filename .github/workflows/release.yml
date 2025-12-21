@@ -92,33 +92,6 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-  build_ios:
-    name: iOS (unsigned app bundle)
-    runs-on: macos-latest
-    needs: create_release
-    steps:
-      - uses: actions/checkout@v4
-      - name: Set up Flutter (${{ env.FLUTTER_CHANNEL }})
-        uses: subosito/flutter-action@v2
-        with:
-          channel: ${{ env.FLUTTER_CHANNEL }}
-          cache: true
-      - name: Install dependencies
-        run: flutter pub get
-      - name: Build iOS app (no codesign)
-        run: flutter build ios --no-codesign
-      - name: Archive iOS app bundle
-        run: |
-          APP_PATH="build/ios/iphoneos/Runner.app"
-          VERSION="${{ github.ref_name }}"
-          ditto -c -k --keepParent "$APP_PATH" "hr_osc-ios-app-${VERSION}.zip"
-      - name: Upload iOS zip to release
-        uses: softprops/action-gh-release@v1
-        with:
-          files: hr_osc-ios-app-${{ github.ref_name }}.zip
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
   build_windows:
     name: Windows ZIP
     runs-on: windows-latest
