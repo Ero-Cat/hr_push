@@ -90,9 +90,14 @@
 ### 测试截图
 <img src="images/vrchat.png" alt="VRChat OSC 测试" width="900" />
 
-## 已测试设备
-1. Garmin Enduro 2
-
+#### 安卓设备状态栏
+<img src="images/android.jpeg" alt="安卓测试"/>
+## 已通过测试的蓝牙相关设备
+1. Garmin Enduro 2 (佳明手表 蓝牙广播推送)
+2. iPhone15 Pro (穷鬼买不起证书,有能力的开发者可以自己签)
+3. OnePlus Ace (ColorOS/Android 14)
+4. MacBook Pro M5 macOS Tahoe 26.1
+5. Windows (B450I GAMING PLUS AC主板 自带蓝牙的主板) 
 ## 已知问题
 在 Windows 平台下中文路径可能会存在运行失败的问题，建议在英文路径目录下执行本程序。
 
@@ -100,8 +105,6 @@
 - Android：需要 BLE 扫描/连接权限（Android 12+ 无需定位，11 及以下需定位权限）。Android 13+ 若想显示常驻通知卡片，请允许通知权限。
   - ColorOS/部分国产 ROM：需在系统设置中打开应用通知，并允许后台运行/自启动，否则可能看不到常驻卡片或后台停止更新。
 - iOS/macOS：首次启动会请求蓝牙权限。
-- Linux/Windows：需设备具备 BLE 硬件与驱动；内置 BLEServer 若检测到临时目录含非 ASCII 字符，会自动解压到 `C:\\Users\\Public\\hr_osc_temp` 以避免中文用户名/路径导致的启动失败。
-- Web：暂不支持（`flutter_blue_plus` 尚未覆盖 Web）。
 
 ## 开发与构建
 - 主要代码：`lib/main.dart`（UI 与交互）、`lib/heart_rate_manager.dart`（扫描、连接、心率订阅与推送）。

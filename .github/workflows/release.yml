@@ -84,11 +84,11 @@ jobs:
             exit 1
           fi
           VERSION="${{ github.ref_name }}"
-          ditto -c -k --sequesterRsrc --keepParent "$APP_PATH" "hr_osc-macos-${VERSION}.zip"
+          ditto -c -k --sequesterRsrc --keepParent "$APP_PATH" "hr-push-macos-${VERSION}.zip"
       - name: Upload macOS zip to release
         uses: softprops/action-gh-release@v1
         with:
-          files: hr_osc-macos-${{ github.ref_name }}.zip
+          files: hr-push-macos-${{ github.ref_name }}.zip
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
@@ -115,11 +115,11 @@ jobs:
       - name: Archive Windows build
         run: |
           $env:VERSION="${{ github.ref_name }}"
-          Compress-Archive -Path "build\windows\x64\runner\Release\*" -DestinationPath "hr_osc-windows-$env:VERSION.zip"
+          Compress-Archive -Path "build\windows\x64\runner\Release\*" -DestinationPath "hr-push-windows-$env:VERSION.zip"
         shell: pwsh
       - name: Upload Windows zip to release
         uses: softprops/action-gh-release@v1
         with:
-          files: hr_osc-windows-${{ github.ref_name }}.zip
+          files: hr-push-windows-${{ github.ref_name }}.zip
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

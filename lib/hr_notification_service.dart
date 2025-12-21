@@ -3,7 +3,7 @@ import 'dart:io' show Platform;
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 
 class HrNotificationService {
-  static const _channelId = 'hr_osc_live';
+  static const _channelId = 'hr_push_live';
   static const _channelName = '心率常驻通知';
   static const _channelDescription = '显示当前心率与连接状态';
   static const _notificationId = 1001;
@@ -19,8 +19,10 @@ class HrNotificationService {
     const initSettings = InitializationSettings(android: androidInit);
     await _plugin.initialize(initSettings);
 
-    final androidImpl = _plugin.resolvePlatformSpecificImplementation<
-        AndroidFlutterLocalNotificationsPlugin>();
+    final androidImpl = _plugin
+        .resolvePlatformSpecificImplementation<
+          AndroidFlutterLocalNotificationsPlugin
+        >();
     if (androidImpl != null) {
       const channel = AndroidNotificationChannel(
         _channelId,
@@ -42,8 +44,10 @@ class HrNotificationService {
     if (!_initialized) {
       await initialize();
     }
-    final androidImpl = _plugin.resolvePlatformSpecificImplementation<
-        AndroidFlutterLocalNotificationsPlugin>();
+    final androidImpl = _plugin
+        .resolvePlatformSpecificImplementation<
+          AndroidFlutterLocalNotificationsPlugin
+        >();
     if (androidImpl == null) return true;
     try {
       final granted = await androidImpl.requestNotificationsPermission();
@@ -90,10 +94,7 @@ class HrNotificationService {
     } catch (_) {}
   }
 
-  Future<void> _show({
-    required String title,
-    required String body,
-  }) async {
+  Future<void> _show({required String title, required String body}) async {
     if (!_initialized) {
       try {
         await initialize();
