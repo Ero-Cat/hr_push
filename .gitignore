@@ -51,3 +51,6 @@ app.*.map.json
 /android/app/profile
 /android/app/release
 .vscode/settings.json
+
+# local release helper
+tag.sh

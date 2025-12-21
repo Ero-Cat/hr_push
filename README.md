@@ -92,7 +92,9 @@
 
 #### 安卓设备状态栏
 <img src="images/android.jpeg" alt="安卓测试"/>
+
 ## 已通过测试的蓝牙相关设备
+
 1. Garmin Enduro 2 (佳明手表 蓝牙广播推送)
 2. iPhone15 Pro (穷鬼买不起证书,有能力的开发者可以自己签)
 3. OnePlus Ace (ColorOS/Android 14)
