@@ -77,7 +77,7 @@ class HeartRateSettings {
   static const _defaultHrValuePath = '/avatar/parameters/hr_val';
   static const _defaultHrPercentPath = '/avatar/parameters/hr_percent';
   static const _defaultOscChatboxEnabled = false;
-  static const _defaultOscChatboxTemplate = '心率: {hr} BPM';
+  static const _defaultOscChatboxTemplate = '💓{hr}';
   static const _defaultMaxHeartRate = 200;
   static const _defaultUpdateIntervalMs = 1000;
   static const _defaultMqttBroker = '';

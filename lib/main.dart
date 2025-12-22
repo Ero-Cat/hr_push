@@ -1021,14 +1021,6 @@ class _SettingsPageState extends State<SettingsPage> {
                 helper: '支持 {hr}/{percent}，最多 144 字符 / 9 行',
               ),
               const SizedBox(height: 10),
-              _buildInfoBox(
-                title: '游戏内 Chatbox 建议',
-                lines: const [
-                  'Chatbox Height：最小',
-                  'Chatbox Size：最小（50%）',
-                  'Chatbox Opacity：最低（25%，无法设为完全透明）',
-                ],
-              ),
             ],
             const SizedBox(height: 20),
             _sectionTitle('MQTT 客户端'),
@@ -1161,10 +1153,7 @@ class _SettingsPageState extends State<SettingsPage> {
     );
   }
 
-  Widget _buildInfoBox({
-    required String title,
-    required List<String> lines,
-  }) {
+  Widget _buildInfoBox({required String title, required List<String> lines}) {
     return Container(
       decoration: BoxDecoration(
         color: const Color(0xFF0F172A),
@@ -1189,10 +1178,7 @@ class _SettingsPageState extends State<SettingsPage> {
               padding: const EdgeInsets.only(bottom: 2),
               child: Text(
                 line,
-                style: const TextStyle(
-                  color: Colors.white38,
-                  fontSize: 12,
-                ),
+                style: const TextStyle(color: Colors.white38, fontSize: 12),
               ),
             ),
         ],
