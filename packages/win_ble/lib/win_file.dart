@@ -58,7 +58,7 @@ class WinServer {
     final base = (publicBase != null && publicBase.isNotEmpty)
         ? publicBase
         : r'C:\Users\Public';
-    final fallback = Directory('$base\\hr_osc_temp');
+    final fallback = Directory('$base\\hr_push_temp');
     if (!fallback.existsSync()) {
       try {
         fallback.createSync(recursive: true);

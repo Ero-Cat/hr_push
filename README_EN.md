@@ -1,4 +1,4 @@
-# HR OSC / Heart Rate Push
+# HR PUSH / Heart Rate Push
 
 ![Release](https://img.shields.io/github/v/release/Ero-Cat/hr_push?display_name=tag)
 ![License](https://img.shields.io/github/license/Ero-Cat/hr_push)

@@ -1,4 +1,4 @@
-# HR OSC / 心拍プッシュ
+# HR PUSH / 心拍プッシュ
 
 ![Release](https://img.shields.io/github/v/release/Ero-Cat/hr_push?display_name=tag)
 ![License](https://img.shields.io/github/license/Ero-Cat/hr_push)
