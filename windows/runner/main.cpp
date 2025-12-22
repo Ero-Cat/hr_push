@@ -100,10 +100,11 @@ bool InitFileLogger(FileLogger* logger) {
 
   RotateLogIfNeeded(logger->path);
 
-  logger->file = _wfopen(logger->path.c_str(), L"a+, ccs=UTF-8");
-  if (!logger->file) {
+  FILE* file = nullptr;
+  if (_wfopen_s(&file, logger->path.c_str(), L"a+, ccs=UTF-8") != 0 || !file) {
     return false;
   }
+  logger->file = file;
 
   setvbuf(logger->file, nullptr, _IOLBF, 1024);
   return true;
@@ -114,8 +115,16 @@ bool RedirectStdToLog(const std::wstring& log_path) {
     return false;
   }
 
-  FILE* stdout_file = _wfreopen(log_path.c_str(), L"a+, ccs=UTF-8", stdout);
-  FILE* stderr_file = _wfreopen(log_path.c_str(), L"a+, ccs=UTF-8", stderr);
+  FILE* stdout_file = nullptr;
+  FILE* stderr_file = nullptr;
+  if (_wfreopen_s(&stdout_file, log_path.c_str(), L"a+, ccs=UTF-8", stdout) !=
+      0) {
+    return false;
+  }
+  if (_wfreopen_s(&stderr_file, log_path.c_str(), L"a+, ccs=UTF-8", stderr) !=
+      0) {
+    return false;
+  }
   if (!stdout_file || !stderr_file) {
     return false;
   }
