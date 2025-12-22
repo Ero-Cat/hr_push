@@ -107,6 +107,7 @@
 ### 已验证设备
 **蓝牙广播发送端**
 1. Garmin Enduro 2（佳明手表，蓝牙广播推送）
+2. Xiaomi Smart Band 9（小米手环9，更新到1.3.206+固件后在 设置-心率广播 手动开启）
 
 **蓝牙广播接收端**
 1. iPhone 15 Pro（无证书可自行签名）
@@ -114,8 +115,6 @@
 3. MacBook Pro M5（macOS Tahoe 26.1）
 4. Windows（B450I GAMING PLUS AC 主板，自带蓝牙）
 
-### 已知不支持/限制
-- **Mi Smart Band 系列**：设备通常不公开标准 BLE Heart Rate Service，且心率读取依赖厂商私有协议与鉴权（如配对密钥/握手），因此无法通过通用 BLE 心率特征直接接入本项目。
 
 ## 🛡️ 平台支持与权限
 - **Android**：需要 BLE 扫描/连接权限（Android 12+ 无需定位，11 及以下需定位权限）。Android 13+ 若想显示常驻通知卡片，请允许通知权限。
