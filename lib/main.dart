@@ -536,9 +536,16 @@ class _HeartbeatMeterState extends State<_HeartbeatMeter>
 
   Future<void> _ensureTray() async {
     if (!_trayVisible) {
-      await trayManager.setIcon('images/logo.png');
+      await trayManager.setIcon(_trayIconPath());
     }
     await _updateTrayTooltip();
+  }
+
+  String _trayIconPath() {
+    if (Platform.isWindows) {
+      return 'images/logo.ico';
+    }
+    return 'images/logo.png';
   }
 
   Future<void> _restoreFromTray() async {
