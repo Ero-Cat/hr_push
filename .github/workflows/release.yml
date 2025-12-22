@@ -10,7 +10,8 @@ permissions:
   contents: write
 
 env:
-  FLUTTER_CHANNEL: stable
+  FLUTTER_CHANNEL: beta
+  FLUTTER_VERSION: 3.40.0-0.2.pre
 
 jobs:
   create_release:
@@ -43,6 +44,7 @@ jobs:
         uses: subosito/flutter-action@v2
         with:
           channel: ${{ env.FLUTTER_CHANNEL }}
+          flutter-version: ${{ env.FLUTTER_VERSION }}
           cache: true
       - name: Install dependencies
         run: flutter pub get
@@ -69,6 +71,7 @@ jobs:
         uses: subosito/flutter-action@v2
         with:
           channel: ${{ env.FLUTTER_CHANNEL }}
+          flutter-version: ${{ env.FLUTTER_VERSION }}
           cache: true
       - name: Install dependencies
         run: flutter pub get
@@ -102,6 +105,7 @@ jobs:
         uses: subosito/flutter-action@v2
         with:
           channel: ${{ env.FLUTTER_CHANNEL }}
+          flutter-version: ${{ env.FLUTTER_VERSION }}
           cache: true
       - name: Enable Windows desktop
         run: flutter config --enable-windows-desktop
