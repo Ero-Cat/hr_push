@@ -1,44 +1,31 @@
 # HR OSC / 心率推送
 
+![Release](https://img.shields.io/github/v/release/Ero-Cat/hr_push?display_name=tag)
+![License](https://img.shields.io/github/license/Ero-Cat/hr_push)
+![Flutter](https://img.shields.io/badge/Flutter-3.10%2B-02569B?logo=flutter&logoColor=white)
+![Platform](https://img.shields.io/badge/Platform-Android%20%7C%20iOS%20%7C%20macOS%20%7C%20Windows%20%7C%20Linux-0ea5e9)
+![Protocols](https://img.shields.io/badge/Protocols-HTTP%2FWS%20%7C%20OSC%20%7C%20MQTT-10b981)
+![BLE](https://img.shields.io/badge/BLE-Heart%20Rate-ef4444)
+
+**中文** | [English](README_EN.md) | [日本語](README_JA.md)
+
 一个用 Flutter 开发的跨平台 BLE 心率监控与推送工具。连接心率设备后，可将实时 BPM、在线状态与心率百分比同步到 **HTTP/WS、OSC、MQTT** 等链路，方便在桌面端或周边应用中联动使用。
 
 <div align="center">
   <img src="images/logo.png" alt="HR PUSH logo" width="140" />
 </div>
 
-## 适用场景
+## 🗺️ 适用场景
 - **常驻心率推送**：家里/工作室有一台不关机的 Mac mini 或 Windows 主机，手表常开心率广播，回到范围内即可自动连接并持续推送。
 - **VRChat/自定义程序联动**：通过 OSC 或 HTTP/WS/MQTT 订阅心率，用于状态显示、动画驱动或自定义交互。
 
-## 目录
-- [HR OSC / 心率推送](#hr-osc--心率推送)
-  - [适用场景](#适用场景)
-  - [效果预览](#效果预览)
-  - [主要功能](#主要功能)
-  - [快速开始（用户）](#快速开始用户)
-  - [使用说明](#使用说明)
-    - [连接与重连](#连接与重连)
-    - [推送数据格式](#推送数据格式)
-    - [配置项说明](#配置项说明)
-  - [VRChat（OSC）](#vrchatosc)
-    - [测试截图](#测试截图)
-  - [设备兼容性](#设备兼容性)
-    - [已验证设备](#已验证设备)
-    - [已知不支持/限制](#已知不支持限制)
-  - [平台支持与权限](#平台支持与权限)
-  - [开发与构建](#开发与构建)
-  - [已知问题](#已知问题)
-  - [更新日志](#更新日志)
-  - [开源协议](#开源协议)
-  - [贡献与反馈](#贡献与反馈)
-
-## 效果预览
+## 📷 效果预览
 
 | 首页 | 配置页 |
 | --- | --- |
 | ![主界面](images/main.png) | ![配置界面](images/settings.png) |
 
-## 主要功能
+## ✨ 主要功能
 - **BLE 扫描与连接**：自动过滤无关广播，优先匹配心率服务/常见穿戴品牌；支持快速连接。
 - **智能自动重连**：记忆最近成功设备；断连或心率长时间无更新时自动重连并避免并发死锁。
 - **实时展示**：BPM、上次更新时间、RSSI 信号强度；RSSI 轮询间隔与“推送/刷新间隔”一致。
@@ -50,14 +37,14 @@
 - **桌面端体验**：Windows/macOS/Linux 固定竖屏窗口；Windows 支持托盘最小化。
 - **Android 常驻通知卡片**：连接后在通知栏显示当前心率并按刷新间隔更新。
 
-## 快速开始（用户）
+## 🚀 快速开始（用户）
 1. 启动应用后点击“重新扫描”。
 2. 选择心率设备并连接。
 3. 在配置页填写推送目标（HTTP/WS、OSC 或 MQTT），保存后即可推送。
 
 > 若设备仅广播心率但不支持连接，仍可在“广播调试”视图中查看数据与信号，但推送仅在连接并订阅特征后触发。
 
-## 使用说明
+## 🧰 使用说明
 ### 连接与重连
 - “重新扫描”会刷新附近心率设备列表。
 - “快速连接”会优先连接 RSSI 更好/最近出现的设备。
@@ -106,7 +93,7 @@
 | 最大心率 | 用于计算百分比 | `200` |
 | 推送/刷新间隔 (ms) | 控制 UI 刷新、推送节流、RSSI 轮询 | `1000` |
 
-## VRChat（OSC）
+## 🎮 VRChat（OSC）
 - 推荐搭配默认 OSC 参数插件：[booth.pm/zh-cn/items/5531594](https://booth.pm/zh-cn/items/5531594)
 - 也可在 Avatar 参数中自行监听上述 OSC 路径。
 
@@ -116,7 +103,7 @@
 #### 安卓设备状态栏
 <img src="images/android.jpeg" alt="安卓测试" />
 
-## 设备兼容性
+## 🧩 设备兼容性
 ### 已验证设备
 **蓝牙广播发送端**
 1. Garmin Enduro 2（佳明手表，蓝牙广播推送）
@@ -130,12 +117,12 @@
 ### 已知不支持/限制
 - **Mi Smart Band 系列**：设备通常不公开标准 BLE Heart Rate Service，且心率读取依赖厂商私有协议与鉴权（如配对密钥/握手），因此无法通过通用 BLE 心率特征直接接入本项目。
 
-## 平台支持与权限
+## 🛡️ 平台支持与权限
 - **Android**：需要 BLE 扫描/连接权限（Android 12+ 无需定位，11 及以下需定位权限）。Android 13+ 若想显示常驻通知卡片，请允许通知权限。
   - ColorOS/部分国产 ROM：需在系统设置中打开应用通知，并允许后台运行/自启动，否则可能看不到常驻卡片或后台停止更新。
 - **iOS/macOS**：首次启动会请求蓝牙权限。
 
-## 开发与构建
+## 🔧 开发与构建
 - 主要代码：`lib/main.dart`（UI 与交互）、`lib/heart_rate_manager.dart`（扫描、连接、心率订阅与推送）。
 - 依赖安装：`flutter pub get`。
 - 运行：`flutter run -d <device>`。
@@ -143,10 +130,10 @@
 - 打包：`flutter build apk|ios|windows|macos|linux`。
 - 代码风格：2 空格缩进；`dart format .`；启用 `flutter_lints`。
 
-## 已知问题
+## ⚠️ 已知问题
 - Windows 平台下中文路径可能会存在运行失败的问题，建议在英文路径目录下执行本程序。
 
-## 更新日志
+## 🧾 更新日志
 ### v1.3.4
 - OSC：新增 ChatBox 心率推送，支持 `{hr}/{percent}` 模板与节流/去重，避免刷屏。
 - UI：设置页新增 ChatBox 开关与模板输入；移除旧的 ChatBox 建议提示文案。
@@ -189,8 +176,12 @@
 - README 补充中文路径构建提示。
 - 依赖配置同步：`flutter_launcher_icons` 扩展桌面平台支持。
 
-## 开源协议
+## 📜 开源协议
 本项目采用 MIT License，详见 `LICENSE`。
 
-## 贡献与反馈
+## 🌐 多语言 README
+- English: [README_EN.md](README_EN.md)
+- 日本語: [README_JA.md](README_JA.md)
+
+## 🤝 贡献与反馈
 欢迎提交 Issue / PR，一起完善 BLE 兼容性与推送链路。若在特定设备或平台遇到问题，请附上日志与环境信息，便于复现。
