@@ -858,6 +858,7 @@ class _SettingsPageState extends State<SettingsPage> {
   late final TextEditingController _oscConnectedCtrl;
   late final TextEditingController _oscValueCtrl;
   late final TextEditingController _oscPercentCtrl;
+  late final TextEditingController _oscChatboxTemplateCtrl;
   late final TextEditingController _maxHrCtrl;
   late final TextEditingController _intervalCtrl;
   late final TextEditingController _mqttBrokerCtrl;
@@ -866,6 +867,7 @@ class _SettingsPageState extends State<SettingsPage> {
   late final TextEditingController _mqttUsernameCtrl;
   late final TextEditingController _mqttPasswordCtrl;
   late final TextEditingController _mqttClientIdCtrl;
+  bool _oscChatboxEnabled = false;
 
   @override
   void initState() {
@@ -882,6 +884,12 @@ class _SettingsPageState extends State<SettingsPage> {
     _oscValueCtrl = TextEditingController(text: widget.initial.oscHrValuePath);
     _oscPercentCtrl = TextEditingController(
       text: widget.initial.oscHrPercentPath,
+    );
+    _oscChatboxEnabled = widget.initial.oscChatboxEnabled;
+    _oscChatboxTemplateCtrl = TextEditingController(
+      text: widget.initial.oscChatboxTemplate.isEmpty
+          ? HeartRateSettings.defaults().oscChatboxTemplate
+          : widget.initial.oscChatboxTemplate,
     );
     _maxHrCtrl = TextEditingController(
       text: widget.initial.maxHeartRate.toString(),
@@ -912,6 +920,7 @@ class _SettingsPageState extends State<SettingsPage> {
     _oscConnectedCtrl.dispose();
     _oscValueCtrl.dispose();
     _oscPercentCtrl.dispose();
+    _oscChatboxTemplateCtrl.dispose();
     _maxHrCtrl.dispose();
     _intervalCtrl.dispose();
     _mqttBrokerCtrl.dispose();
@@ -994,6 +1003,33 @@ class _SettingsPageState extends State<SettingsPage> {
               hint: '默认 200',
               keyboardType: TextInputType.number,
             ),
+            const SizedBox(height: 10),
+            _buildSwitchTile(
+              title: 'ChatBox 心率',
+              subtitle: '在 VRChat 聊天框显示心率',
+              value: _oscChatboxEnabled,
+              onChanged: (value) {
+                setState(() => _oscChatboxEnabled = value);
+              },
+            ),
+            if (_oscChatboxEnabled) ...[
+              const SizedBox(height: 10),
+              _buildTextField(
+                controller: _oscChatboxTemplateCtrl,
+                label: 'ChatBox 文本内容',
+                hint: '例如：🩷: {hr}',
+                helper: '支持 {hr}/{percent}，最多 144 字符 / 9 行',
+              ),
+              const SizedBox(height: 10),
+              _buildInfoBox(
+                title: '游戏内 Chatbox 建议',
+                lines: const [
+                  'Chatbox Height：最小',
+                  'Chatbox Size：最小（50%）',
+                  'Chatbox Opacity：最低（25%，无法设为完全透明）',
+                ],
+              ),
+            ],
             const SizedBox(height: 20),
             _sectionTitle('MQTT 客户端'),
             _buildTextField(
@@ -1094,6 +1130,76 @@ class _SettingsPageState extends State<SettingsPage> {
     );
   }
 
+  Widget _buildSwitchTile({
+    required String title,
+    String? subtitle,
+    required bool value,
+    required ValueChanged<bool> onChanged,
+  }) {
+    return Container(
+      decoration: BoxDecoration(
+        color: const Color(0xFF111827),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: Colors.white12),
+      ),
+      child: SwitchListTile.adaptive(
+        value: value,
+        onChanged: onChanged,
+        activeColor: const Color(0xFF0FA3B1),
+        title: Text(
+          title,
+          style: const TextStyle(color: Colors.white, fontSize: 14),
+        ),
+        subtitle: subtitle == null
+            ? null
+            : Text(
+                subtitle,
+                style: const TextStyle(color: Colors.white38, fontSize: 12),
+              ),
+        contentPadding: const EdgeInsets.symmetric(horizontal: 12),
+      ),
+    );
+  }
+
+  Widget _buildInfoBox({
+    required String title,
+    required List<String> lines,
+  }) {
+    return Container(
+      decoration: BoxDecoration(
+        color: const Color(0xFF0F172A),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: Colors.white10),
+      ),
+      padding: const EdgeInsets.all(12),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            title,
+            style: const TextStyle(
+              color: Colors.white70,
+              fontSize: 12,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+          const SizedBox(height: 6),
+          for (final line in lines)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 2),
+              child: Text(
+                line,
+                style: const TextStyle(
+                  color: Colors.white38,
+                  fontSize: 12,
+                ),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+
   void _onSave() {
     final cleanedPush = _pushCtrl.text.trim();
     final cleanedOsc = _oscCtrl.text.trim();
@@ -1111,6 +1217,10 @@ class _SettingsPageState extends State<SettingsPage> {
       oscHrPercentPath: _oscPercentCtrl.text.trim().isEmpty
           ? HeartRateSettings.defaults().oscHrPercentPath
           : _oscPercentCtrl.text.trim(),
+      oscChatboxEnabled: _oscChatboxEnabled,
+      oscChatboxTemplate: _oscChatboxTemplateCtrl.text.trim().isEmpty
+          ? HeartRateSettings.defaults().oscChatboxTemplate
+          : _oscChatboxTemplateCtrl.text.trim(),
       maxHeartRate: maxHr ?? widget.initial.maxHeartRate,
       updateIntervalMs:
           int.tryParse(_intervalCtrl.text.trim()) ??

@@ -43,6 +43,8 @@ class HeartRateSettings {
     required this.oscHrConnectedPath,
     required this.oscHrValuePath,
     required this.oscHrPercentPath,
+    required this.oscChatboxEnabled,
+    required this.oscChatboxTemplate,
     required this.maxHeartRate,
     required this.updateIntervalMs,
     required this.mqttBroker,
@@ -58,6 +60,8 @@ class HeartRateSettings {
   final String oscHrConnectedPath;
   final String oscHrValuePath;
   final String oscHrPercentPath;
+  final bool oscChatboxEnabled;
+  final String oscChatboxTemplate;
   final int maxHeartRate;
   final int updateIntervalMs;
   final String mqttBroker;
@@ -72,6 +76,8 @@ class HeartRateSettings {
   static const _defaultHrConnectedPath = '/avatar/parameters/hr_connected';
   static const _defaultHrValuePath = '/avatar/parameters/hr_val';
   static const _defaultHrPercentPath = '/avatar/parameters/hr_percent';
+  static const _defaultOscChatboxEnabled = false;
+  static const _defaultOscChatboxTemplate = '心率: {hr} BPM';
   static const _defaultMaxHeartRate = 200;
   static const _defaultUpdateIntervalMs = 1000;
   static const _defaultMqttBroker = '';
@@ -86,6 +92,8 @@ class HeartRateSettings {
   static const _kOscConnectedKey = 'cfg_osc_connected_path';
   static const _kOscValueKey = 'cfg_osc_value_path';
   static const _kOscPercentKey = 'cfg_osc_percent_path';
+  static const _kOscChatboxEnabledKey = 'cfg_osc_chatbox_enabled';
+  static const _kOscChatboxTemplateKey = 'cfg_osc_chatbox_template';
   static const _kMaxHeartRateKey = 'cfg_max_heart_rate';
   static const _kUpdateIntervalKey = 'cfg_update_interval_ms';
   static const _kMqttBrokerKey = 'cfg_mqtt_broker';
@@ -102,6 +110,8 @@ class HeartRateSettings {
       oscHrConnectedPath: _defaultHrConnectedPath,
       oscHrValuePath: _defaultHrValuePath,
       oscHrPercentPath: _defaultHrPercentPath,
+      oscChatboxEnabled: _defaultOscChatboxEnabled,
+      oscChatboxTemplate: _defaultOscChatboxTemplate,
       maxHeartRate: _defaultMaxHeartRate,
       updateIntervalMs: _defaultUpdateIntervalMs,
       mqttBroker: _defaultMqttBroker,
@@ -124,6 +134,11 @@ class HeartRateSettings {
       oscHrValuePath: prefs.getString(_kOscValueKey) ?? _defaultHrValuePath,
       oscHrPercentPath:
           prefs.getString(_kOscPercentKey) ?? _defaultHrPercentPath,
+      oscChatboxEnabled:
+          prefs.getBool(_kOscChatboxEnabledKey) ?? _defaultOscChatboxEnabled,
+      oscChatboxTemplate:
+          prefs.getString(_kOscChatboxTemplateKey) ??
+          _defaultOscChatboxTemplate,
       maxHeartRate: prefs.getInt(_kMaxHeartRateKey) ?? _defaultMaxHeartRate,
       updateIntervalMs:
           prefs.getInt(_kUpdateIntervalKey) ?? _defaultUpdateIntervalMs,
@@ -143,6 +158,8 @@ class HeartRateSettings {
     await prefs.setString(_kOscConnectedKey, oscHrConnectedPath);
     await prefs.setString(_kOscValueKey, oscHrValuePath);
     await prefs.setString(_kOscPercentKey, oscHrPercentPath);
+    await prefs.setBool(_kOscChatboxEnabledKey, oscChatboxEnabled);
+    await prefs.setString(_kOscChatboxTemplateKey, oscChatboxTemplate);
     await prefs.setInt(_kMaxHeartRateKey, maxHeartRate);
     await prefs.setInt(_kUpdateIntervalKey, updateIntervalMs);
     await prefs.setString(_kMqttBrokerKey, mqttBroker);
@@ -159,6 +176,8 @@ class HeartRateSettings {
     String? oscHrConnectedPath,
     String? oscHrValuePath,
     String? oscHrPercentPath,
+    bool? oscChatboxEnabled,
+    String? oscChatboxTemplate,
     int? maxHeartRate,
     int? updateIntervalMs,
     String? mqttBroker,
@@ -174,6 +193,8 @@ class HeartRateSettings {
       oscHrConnectedPath: oscHrConnectedPath ?? this.oscHrConnectedPath,
       oscHrValuePath: oscHrValuePath ?? this.oscHrValuePath,
       oscHrPercentPath: oscHrPercentPath ?? this.oscHrPercentPath,
+      oscChatboxEnabled: oscChatboxEnabled ?? this.oscChatboxEnabled,
+      oscChatboxTemplate: oscChatboxTemplate ?? this.oscChatboxTemplate,
       maxHeartRate: maxHeartRate ?? this.maxHeartRate,
       updateIntervalMs: updateIntervalMs ?? this.updateIntervalMs,
       mqttBroker: mqttBroker ?? this.mqttBroker,
@@ -241,6 +262,8 @@ class HeartRateManager extends ChangeNotifier {
   String _status = '等待蓝牙...';
   BluetoothAdapterState _adapterState = BluetoothAdapterState.unknown;
   DateTime? _connectedAt;
+  DateTime? _lastChatboxSentAt;
+  String? _lastChatboxMessage;
 
   final List<NearbyDevice> _nearby = [];
   DateTime? _lastStatusChange;
@@ -256,6 +279,7 @@ class HeartRateManager extends ChangeNotifier {
   static const Duration _reconnectMaxDelay = Duration(seconds: 30);
   static const Duration _hrStaleThreshold = Duration(seconds: 6);
   static const Duration _hrInitialOnlineGrace = Duration(seconds: 3);
+  static const Duration _oscChatboxMinInterval = Duration(seconds: 2);
   DateTime? _prevHeartRateAt;
   DateTime? _lastActionAt;
   static const Duration _actionCooldown = Duration(seconds: 2);
@@ -1175,6 +1199,7 @@ class HeartRateManager extends ChangeNotifier {
     unawaited(_sendPushPayload(payload));
     unawaited(_sendOscConnectedIfNeeded(_hrOnline, force: true));
     unawaited(_sendOscHeartRate(bpm, percent));
+    unawaited(_sendOscChatboxIfNeeded(bpm, percent));
 
     unawaited(
       _notificationService.showConnected(
@@ -1377,6 +1402,51 @@ class HeartRateManager extends ChangeNotifier {
     }
   }
 
+  Future<void> _sendOscChatboxIfNeeded(int bpm, double? percent) async {
+    if (!_settings.oscChatboxEnabled) return;
+
+    final text = _buildChatboxText(bpm, percent);
+    if (text.trim().isEmpty) return;
+    if (text == _lastChatboxMessage) return;
+
+    final now = DateTime.now();
+    if (_lastChatboxSentAt != null &&
+        now.difference(_lastChatboxSentAt!) < _oscChatboxMinInterval) {
+      return;
+    }
+
+    final ok = await _sendOscMessageWithArgs('/chatbox/input', [
+      text,
+      true, // send immediately
+      false, // disable notification SFX
+    ]);
+    if (ok) {
+      _lastChatboxSentAt = now;
+      _lastChatboxMessage = text;
+    }
+  }
+
+  String _buildChatboxText(int bpm, double? percent) {
+    final template = _settings.oscChatboxTemplate.trim();
+    if (template.isEmpty) return '';
+
+    final percentValue = percent == null ? null : (percent * 100).round();
+    var text = template
+        .replaceAll('{hr}', bpm.toString())
+        .replaceAll('{percent}', percentValue?.toString() ?? '');
+
+    text = text.replaceAll('\r\n', '\n').replaceAll('\r', '\n');
+    final lines = text.split('\n');
+    if (lines.length > 9) {
+      text = lines.take(9).join('\n');
+    }
+    if (text.length > 144) {
+      text = text.substring(0, 144);
+    }
+
+    return text;
+  }
+
   Future<bool> _sendOscMessage(String address, Object value) async {
     final target = await _resolveOscTarget();
     if (target == null) return false;
@@ -1384,6 +1454,24 @@ class HeartRateManager extends ChangeNotifier {
     if (socket == null) return false;
 
     final msg = _encodeOscMessage(address, [_oscArgFromValue(value)]);
+    try {
+      socket.send(msg, target.address, target.port);
+      return true;
+    } catch (_) {}
+    return false;
+  }
+
+  Future<bool> _sendOscMessageWithArgs(
+    String address,
+    List<Object> args,
+  ) async {
+    final target = await _resolveOscTarget();
+    if (target == null) return false;
+    final socket = await _ensureOscSocket();
+    if (socket == null) return false;
+
+    final oscArgs = args.map(_oscArgFromValue).toList();
+    final msg = _encodeOscMessage(address, oscArgs);
     try {
       socket.send(msg, target.address, target.port);
       return true;
@@ -1454,6 +1542,9 @@ class HeartRateManager extends ChangeNotifier {
   }
 
   _OscArg _oscArgFromValue(Object value) {
+    if (value is String) {
+      return _OscArg('s', _oscString(value));
+    }
     if (value is bool) {
       return _OscArg(value ? 'T' : 'F', null);
     }
@@ -1478,6 +1569,12 @@ class HeartRateManager extends ChangeNotifier {
     if (old.oscAddress != value.oscAddress) {
       _oscSocket?.close();
       _oscSocket = null;
+    }
+
+    if (old.oscChatboxEnabled != value.oscChatboxEnabled ||
+        old.oscChatboxTemplate != value.oscChatboxTemplate) {
+      _lastChatboxMessage = null;
+      _lastChatboxSentAt = null;
     }
 
     final oscConnectedChanged =
