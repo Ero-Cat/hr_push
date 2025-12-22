@@ -708,6 +708,7 @@ class HeartRateManager extends ChangeNotifier {
         name.contains('coros') ||
         name.contains('suunto') ||
         name.contains('fitbit') ||
+        name.contains('mi smart band') ||
         name.contains('xiaomi') ||
         name.contains('watch');
 
@@ -753,7 +754,6 @@ class HeartRateManager extends ChangeNotifier {
     'watch',
     'hrm',
     'heart',
-    'tracker',
     'fit',
     'wear',
     'miband',
