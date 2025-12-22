@@ -1,8 +1,23 @@
 #include "flutter_window.h"
 
+#include <cstdarg>
+#include <cstdio>
 #include <optional>
 
 #include "flutter/generated_plugin_registrant.h"
+
+namespace {
+
+void LogLine(const wchar_t* format, ...) {
+  va_list args;
+  va_start(args, format);
+  vfwprintf(stderr, format, args);
+  va_end(args);
+  fputwc(L'\n', stderr);
+  fflush(stderr);
+}
+
+}  // namespace
 
 FlutterWindow::FlutterWindow(const flutter::DartProject& project)
     : project_(project) {}
@@ -10,7 +25,9 @@ FlutterWindow::FlutterWindow(const flutter::DartProject& project)
 FlutterWindow::~FlutterWindow() {}
 
 bool FlutterWindow::OnCreate() {
+  LogLine(L"[window] OnCreate begin");
   if (!Win32Window::OnCreate()) {
+    LogLine(L"[error] Win32Window::OnCreate failed");
     return false;
   }
 
@@ -22,6 +39,7 @@ bool FlutterWindow::OnCreate() {
       frame.right - frame.left, frame.bottom - frame.top, project_);
   // Ensure that basic setup of the controller was successful.
   if (!flutter_controller_->engine() || !flutter_controller_->view()) {
+    LogLine(L"[error] FlutterViewController init failed");
     return false;
   }
   RegisterPlugins(flutter_controller_->engine());
@@ -36,6 +54,7 @@ bool FlutterWindow::OnCreate() {
   // window is shown. It is a no-op if the first frame hasn't completed yet.
   flutter_controller_->ForceRedraw();
 
+  LogLine(L"[window] OnCreate done");
   return true;
 }
 

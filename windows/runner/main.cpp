@@ -5,6 +5,8 @@
 
 #include <cstdarg>
 #include <cstdio>
+#include <cstdlib>
+#include <exception>
 #include <string>
 
 #include "flutter_window.h"
@@ -16,7 +18,7 @@ constexpr const wchar_t kWindowTitle[] = L"hr_push";
 constexpr const wchar_t kWindowClassName[] = L"FLUTTER_RUNNER_WIN32_WINDOW";
 constexpr const wchar_t kSingleInstanceMutexName[] =
     L"hr_osc_single_instance_mutex";
-constexpr const wchar_t kLogSubdir[] = L"hr_osc\\logs";
+constexpr const wchar_t kLogSubdir[] = L"hr_push\\logs";
 constexpr const wchar_t kLogFileName[] = L"hr_push.log";
 constexpr ULONGLONG kMaxLogBytes = 2ULL * 1024 * 1024;
 
@@ -31,6 +33,8 @@ struct LogGuard {
   HANDLE thread = nullptr;
 };
 
+FileLogger* g_logger = nullptr;
+
 std::wstring JoinPath(const std::wstring& base, const std::wstring& leaf) {
   if (base.empty()) {
     return leaf;
@@ -39,6 +43,41 @@ std::wstring JoinPath(const std::wstring& base, const std::wstring& leaf) {
     return base + leaf;
   }
   return base + L'\\' + leaf;
+}
+
+void LogLineSafe(const wchar_t* format, ...) {
+  if (!g_logger || !g_logger->file) {
+    return;
+  }
+
+  va_list args;
+  va_start(args, format);
+  vfwprintf(g_logger->file, format, args);
+  va_end(args);
+  fputwc(L'\n', g_logger->file);
+  fflush(g_logger->file);
+}
+
+LONG WINAPI CrashHandler(EXCEPTION_POINTERS* info) {
+  if (info && info->ExceptionRecord) {
+    LogLineSafe(L"[crash] code=0x%08lX addr=%p flags=0x%08lX",
+                info->ExceptionRecord->ExceptionCode,
+                info->ExceptionRecord->ExceptionAddress,
+                info->ExceptionRecord->ExceptionFlags);
+  } else {
+    LogLineSafe(L"[crash] unknown exception");
+  }
+  return EXCEPTION_EXECUTE_HANDLER;
+}
+
+void TerminateHandler() {
+  LogLineSafe(L"[crash] std::terminate");
+  abort();
+}
+
+void InstallCrashHandlers() {
+  ::SetUnhandledExceptionFilter(CrashHandler);
+  std::set_terminate(TerminateHandler);
 }
 
 std::wstring GetLogFilePath() {
@@ -243,6 +282,8 @@ int APIENTRY wWinMain(_In_ HINSTANCE instance, _In_opt_ HINSTANCE prev,
   LogGuard log_guard;
   const bool logging_ready = InitFileLogger(&logger);
   if (logging_ready) {
+    g_logger = &logger;
+    InstallCrashHandlers();
     LogLine(&logger, L"[startup] log=%ls", logger.path.c_str());
     wchar_t module_path[MAX_PATH] = {};
     ::GetModuleFileNameW(nullptr, module_path, MAX_PATH);
@@ -297,15 +338,18 @@ int APIENTRY wWinMain(_In_ HINSTANCE instance, _In_opt_ HINSTANCE prev,
   FlutterWindow window(project);
   Win32Window::Point origin(10, 10);
   Win32Window::Size size(1280, 720);
+  LogLine(&logger, L"[startup] creating window");
   if (!window.Create(kWindowTitle, origin, size)) {
     LogLine(&logger, L"[error] window.Create failed");
     ::CloseHandle(instance_mutex);
     CleanupLogging(&logger, &log_guard);
     return EXIT_FAILURE;
   }
+  LogLine(&logger, L"[startup] window created");
   window.SetQuitOnClose(true);
 
   ::MSG msg;
+  LogLine(&logger, L"[startup] entering message loop");
   while (::GetMessage(&msg, nullptr, 0, 0)) {
     ::TranslateMessage(&msg);
     ::DispatchMessage(&msg);
