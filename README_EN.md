@@ -85,6 +85,8 @@ All protocols use the same JSON payload.
 | OSC Path: online | bool | `/avatar/parameters/hr_connected` |
 | OSC Path: BPM | int | `/avatar/parameters/hr_val` |
 | OSC Path: percent | float 0-1 | `/avatar/parameters/hr_percent` |
+| OSC ChatBox toggle | When enabled, send text to `/chatbox/input` | off |
+| OSC ChatBox template | Supports `{hr}`/`{percent}`; max 144 chars / 9 lines | `💓{hr}` |
 | MQTT Broker | Empty disables; `mqtt://host:port` or host | empty |
 | MQTT Port | Used when broker has no port | `1883` |
 | MQTT Topic | JSON payload topic | `hr_push` |

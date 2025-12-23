@@ -85,6 +85,8 @@ Flutter で開発されたクロスプラットフォームの BLE 心拍モニ�
 | OSC パス：オンライン | bool | `/avatar/parameters/hr_connected` |
 | OSC パス：心拍 | int BPM | `/avatar/parameters/hr_val` |
 | OSC パス：心拍率 | float 0-1 | `/avatar/parameters/hr_percent` |
+| OSC ChatBox トグル | 有効時に `/chatbox/input` へ送信 | オフ |
+| OSC ChatBox テンプレート | `{hr}`/`{percent}` 対応、最大 144 文字 / 9 行 | `💓{hr}` |
 | MQTT Broker | 空で無効、`mqtt://host:port` or host | 空 |
 | MQTT ポート | Broker にポートが無い場合に使用 | `1883` |
 | MQTT Topic | JSON 送信 | `hr_push` |
