@@ -708,6 +708,8 @@ class HeartRateManager extends ChangeNotifier {
         name.contains('coros') ||
         name.contains('suunto') ||
         name.contains('fitbit') ||
+        name.contains('mi smart band') ||
+        name.contains('xiaomi') ||
         name.contains('watch');
 
     return hasHeartRateService || hasHeartRateServiceData || likelyHrWearable;
@@ -747,6 +749,22 @@ class HeartRateManager extends ChangeNotifier {
       'desktop',
     ];
 
+  const wearableKeywords = [
+    'band',
+    'watch',
+    'hrm',
+    'heart',
+    'fit',
+    'wear',
+    'miband',
+    'mi band',
+    'smart band',
+    'smartband'
+  ];
+    
+  if (wearableKeywords.any(name.contains)) {
+    return false;
+  }
     return phoneKeywords.any(name.contains) || pcKeywords.any(name.contains);
   }
 
