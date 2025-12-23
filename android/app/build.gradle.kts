@@ -50,7 +50,7 @@ android {
 }
 
 dependencies {
-    coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.1.2")
+    coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.1.4")
     // Needed when R8 is enabled; Flutter embedding references Play Core classes.
     implementation("com.google.android.play:core:1.10.3")
 }
