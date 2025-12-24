@@ -1,4 +1,4 @@
-package com.example.hr_push
+package moe.iacg.hrpush
 
 import android.os.Bundle
 import io.flutter.embedding.android.FlutterActivity

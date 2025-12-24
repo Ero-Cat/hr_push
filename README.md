@@ -135,6 +135,13 @@
 - Windows 平台下中文路径可能会存在运行失败的问题，建议在英文路径目录下执行本程序。
 
 ## 🧾 更新日志
+### v1.4.0
+- Android：状态栏/导航栏颜色同步与沉浸式刷新优化（含 ColorOS 等机型）。
+- Android：常驻通知卡片样式与通道配置优化。
+- Android：Play Core 适配 targetSdk 34（迁移至 feature-delivery），Release 构建签名更完整。
+- 性能：心率 UI 刷新节流，降低无效重建提升流畅度。
+- 工程：全平台包名统一为 `moe.iacg.hrpush`。
+
 ### v1.3.4
 - OSC：新增 ChatBox 心率推送，支持 `{hr}/{percent}` 模板与节流/去重，避免刷屏。
 - UI：设置页新增 ChatBox 开关与模板输入；移除旧的 ChatBox 建议提示文案。

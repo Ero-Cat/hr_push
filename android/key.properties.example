@@ -1,0 +1,4 @@
+storeFile=../keystore/hrpush_upload.jks
+storePassword=CHANGE_ME
+keyAlias=hrpush
+keyPassword=CHANGE_ME

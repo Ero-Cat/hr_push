@@ -1,4 +1,5 @@
 import 'dart:io' show Platform;
+import 'dart:ui' show Color;
 
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 
@@ -28,7 +29,7 @@ class HrNotificationService {
         _channelId,
         _channelName,
         description: _channelDescription,
-        importance: Importance.defaultImportance,
+        importance: Importance.low,
         playSound: false,
         enableVibration: false,
         showBadge: false,
@@ -107,12 +108,21 @@ class HrNotificationService {
       _channelId,
       _channelName,
       channelDescription: _channelDescription,
-      importance: Importance.defaultImportance,
-      priority: Priority.defaultPriority,
+      importance: Importance.low,
+      priority: Priority.low,
       ongoing: true,
       onlyAlertOnce: true,
       showWhen: false,
       autoCancel: false,
+      color: const Color(0xFFFF375F),
+      colorized: true,
+      category: AndroidNotificationCategory.service,
+      visibility: NotificationVisibility.public,
+      styleInformation: BigTextStyleInformation(
+        body,
+        contentTitle: title,
+        summaryText: '心率常驻',
+      ),
     );
 
     final details = NotificationDetails(android: androidDetails);

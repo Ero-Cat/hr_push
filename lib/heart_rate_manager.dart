@@ -233,6 +233,9 @@ class HeartRateManager extends ChangeNotifier {
   Timer? _scanUiHoldTimer;
   Timer? _resubscribeTimer;
   Timer? _rssiPollTimer;
+  Timer? _uiNotifyTimer;
+  DateTime _lastUiNotifyAt = DateTime.fromMillisecondsSinceEpoch(0);
+  bool _uiNotifyScheduled = false;
   DateTime? _lastPublished;
   bool _connecting = false;
 
@@ -271,6 +274,7 @@ class HeartRateManager extends ChangeNotifier {
 
   // 扫描周期 1000ms
   static const Duration _scanInterval = Duration(milliseconds: 1000);
+  static const Duration _uiNotifyInterval = Duration(milliseconds: 200);
   // 为避免按钮闪烁，至少保持 3s 的“扫描中”显示
   static const Duration _scanUiMinVisible = Duration(seconds: 3);
   static const Duration _scanStaleThreshold = Duration(seconds: 4);
@@ -662,7 +666,7 @@ class HeartRateManager extends ChangeNotifier {
 
     _pruneNearby(now);
     _nearby.sort((a, b) => b.rssi.compareTo(a.rssi));
-    notifyListeners();
+    _notifyUi();
   }
 
   void _pruneNearby(DateTime now) {
@@ -1068,7 +1072,7 @@ class HeartRateManager extends ChangeNotifier {
 
     _lastPublished = now;
     _notifyHeartRateUpdate();
-    notifyListeners();
+    _notifyUi();
   }
 
   void _startRssiPolling(BluetoothDevice device) {
@@ -1095,7 +1099,7 @@ class HeartRateManager extends ChangeNotifier {
         return;
       }
       _rssi = value;
-      notifyListeners();
+      _notifyUi();
     } catch (_) {
       // 部分平台读 RSSI 可能失败，忽略即可
     }
@@ -1268,6 +1272,33 @@ class HeartRateManager extends ChangeNotifier {
         notifyListeners();
       }
     }
+  }
+
+  void _notifyUi({bool force = false}) {
+    if (force) {
+      _uiNotifyTimer?.cancel();
+      _uiNotifyScheduled = false;
+      _lastUiNotifyAt = DateTime.now();
+      notifyListeners();
+      return;
+    }
+
+    final now = DateTime.now();
+    final elapsed = now.difference(_lastUiNotifyAt);
+    if (elapsed >= _uiNotifyInterval) {
+      _lastUiNotifyAt = now;
+      notifyListeners();
+      return;
+    }
+
+    if (_uiNotifyScheduled) return;
+    _uiNotifyScheduled = true;
+    _uiNotifyTimer?.cancel();
+    _uiNotifyTimer = Timer(_uiNotifyInterval - elapsed, () {
+      _uiNotifyScheduled = false;
+      _lastUiNotifyAt = DateTime.now();
+      notifyListeners();
+    });
   }
 
   Future<void> _forceReconnect({required String reason}) async {
@@ -1743,6 +1774,7 @@ class HeartRateManager extends ChangeNotifier {
     _resubscribeTimer?.cancel();
     _rssiPollTimer?.cancel();
     _scanLoopTimer?.cancel();
+    _uiNotifyTimer?.cancel();
     _wsChannel?.sink.close();
     _oscSocket?.close();
     _mqttClient?.disconnect();
