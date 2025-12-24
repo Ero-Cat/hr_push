@@ -35,6 +35,29 @@ struct LogGuard {
 
 FileLogger* g_logger = nullptr;
 
+std::wstring LogTimestamp() {
+  SYSTEMTIME st{};
+  ::GetLocalTime(&st);
+  wchar_t buffer[64] = {};
+  _snwprintf_s(buffer, sizeof(buffer) / sizeof(wchar_t), _TRUNCATE,
+               L"%04d-%02d-%02d %02d:%02d:%02d.%03d", st.wYear, st.wMonth,
+               st.wDay, st.wHour, st.wMinute, st.wSecond, st.wMilliseconds);
+  return buffer;
+}
+
+void WriteLogLine(FILE* file, const wchar_t* format, va_list args) {
+  if (!file) {
+    return;
+  }
+  const DWORD pid = ::GetCurrentProcessId();
+  const DWORD tid = ::GetCurrentThreadId();
+  const std::wstring ts = LogTimestamp();
+  fwprintf(file, L"[%ls][pid=%lu][tid=%lu] ", ts.c_str(), pid, tid);
+  vfwprintf(file, format, args);
+  fputwc(L'\n', file);
+  fflush(file);
+}
+
 std::wstring JoinPath(const std::wstring& base, const std::wstring& leaf) {
   if (base.empty()) {
     return leaf;
@@ -52,10 +75,8 @@ void LogLineSafe(const wchar_t* format, ...) {
 
   va_list args;
   va_start(args, format);
-  vfwprintf(g_logger->file, format, args);
+  WriteLogLine(g_logger->file, format, args);
   va_end(args);
-  fputwc(L'\n', g_logger->file);
-  fflush(g_logger->file);
 }
 
 LONG WINAPI CrashHandler(EXCEPTION_POINTERS* info) {
@@ -121,10 +142,8 @@ void LogLine(FileLogger* logger, const wchar_t* format, ...) {
 
   va_list args;
   va_start(args, format);
-  vfwprintf(logger->file, format, args);
+  WriteLogLine(logger->file, format, args);
   va_end(args);
-  fputwc(L'\n', logger->file);
-  fflush(logger->file);
 }
 
 bool InitFileLogger(FileLogger* logger) {
@@ -271,6 +290,7 @@ bool ActivateExistingWindow() {
     ::ShowWindow(existing, SW_SHOW);
   }
   ::SetForegroundWindow(existing);
+  LogLineSafe(L"[single-instance] activated existing window hwnd=%p", existing);
   return true;
 }
 
@@ -285,6 +305,7 @@ int APIENTRY wWinMain(_In_ HINSTANCE instance, _In_opt_ HINSTANCE prev,
     g_logger = &logger;
     InstallCrashHandlers();
     LogLine(&logger, L"[startup] log=%ls", logger.path.c_str());
+    LogLine(&logger, L"[startup] pid=%lu", ::GetCurrentProcessId());
     wchar_t module_path[MAX_PATH] = {};
     ::GetModuleFileNameW(nullptr, module_path, MAX_PATH);
     LogLine(&logger, L"[startup] exe=%ls", module_path);
@@ -321,12 +342,18 @@ int APIENTRY wWinMain(_In_ HINSTANCE instance, _In_opt_ HINSTANCE prev,
     CreateAndAttachConsole();
   }
   if (logging_ready && ::GetConsoleWindow() == nullptr) {
-    RedirectStdToLog(logger.path);
+    if (!RedirectStdToLog(logger.path)) {
+      LogLine(&logger, L"[error] RedirectStdToLog failed, code=%lu",
+              ::GetLastError());
+    } else {
+      LogLine(&logger, L"[startup] stdio redirected");
+    }
   }
 
   // Initialize COM, so that it is available for use in the library and/or
   // plugins.
-  ::CoInitializeEx(nullptr, COINIT_APARTMENTTHREADED);
+  HRESULT com_result = ::CoInitializeEx(nullptr, COINIT_APARTMENTTHREADED);
+  LogLine(&logger, L"[startup] COM init result=0x%08lX", com_result);
 
   flutter::DartProject project(L"data");
 
@@ -354,8 +381,10 @@ int APIENTRY wWinMain(_In_ HINSTANCE instance, _In_opt_ HINSTANCE prev,
     ::TranslateMessage(&msg);
     ::DispatchMessage(&msg);
   }
+  LogLine(&logger, L"[shutdown] message loop exit code=%ld", msg.wParam);
 
   ::CoUninitialize();
+  LogLine(&logger, L"[shutdown] COM uninitialized");
   ::CloseHandle(instance_mutex);
   CleanupLogging(&logger, &log_guard);
   return EXIT_SUCCESS;

@@ -9,8 +9,15 @@
 namespace {
 
 void LogLine(const wchar_t* format, ...) {
+  SYSTEMTIME st{};
+  ::GetLocalTime(&st);
+  const DWORD pid = ::GetCurrentProcessId();
+  const DWORD tid = ::GetCurrentThreadId();
   va_list args;
   va_start(args, format);
+  fwprintf(stderr, L"[%04d-%02d-%02d %02d:%02d:%02d.%03d][pid=%lu][tid=%lu] ",
+           st.wYear, st.wMonth, st.wDay, st.wHour, st.wMinute, st.wSecond,
+           st.wMilliseconds, pid, tid);
   vfwprintf(stderr, format, args);
   va_end(args);
   fputwc(L'\n', stderr);
@@ -59,11 +66,13 @@ bool FlutterWindow::OnCreate() {
 }
 
 void FlutterWindow::OnDestroy() {
+  LogLine(L"[window] OnDestroy begin");
   if (flutter_controller_) {
     flutter_controller_ = nullptr;
   }
 
   Win32Window::OnDestroy();
+  LogLine(L"[window] OnDestroy done");
 }
 
 LRESULT
@@ -81,6 +90,9 @@ FlutterWindow::MessageHandler(HWND hwnd, UINT const message,
   }
 
   switch (message) {
+    case WM_CLOSE:
+      LogLine(L"[window] WM_CLOSE");
+      break;
     case WM_FONTCHANGE:
       flutter_controller_->engine()->ReloadSystemFonts();
       break;

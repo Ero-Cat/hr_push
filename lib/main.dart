@@ -107,47 +107,61 @@ class HeartDashboard extends StatelessWidget {
                           },
                         ),
                         const SizedBox(height: 18),
-                        Selector<
-                          HeartRateManager,
-                          (
-                            int?,
-                            String,
-                            int?,
-                            BluetoothConnectionState,
-                            bool,
-                            bool,
-                            DateTime?,
-                            int?,
-                          )
-                        >(
-                          selector: (_, mgr) => (
-                            mgr.heartRate,
-                            mgr.connectedName.isEmpty
-                                ? '未连接'
-                                : mgr.connectedName,
-                            mgr.rssi,
-                            mgr.connectionState,
-                            mgr.isConnecting,
-                            mgr.isSubscribed,
-                            mgr.lastUpdated,
-                            mgr.lastIntervalMs,
+                        Container(
+                          width: double.infinity,
+                          padding: const EdgeInsets.all(16),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFF111827),
+                            borderRadius: BorderRadius.circular(16),
+                            border: Border.all(color: Colors.white10),
                           ),
-                          builder: (context, data, _) {
-                            return _HeartCard(
-                              bpm: data.$1,
-                              deviceName: data.$2,
-                              rssi: data.$3,
-                              state: data.$4,
-                              isConnecting: data.$5,
-                              isSubscribed: data.$6,
-                              lastUpdated: data.$7,
-                              intervalMs: data.$8,
-                            );
-                          },
-                        ),
-                        const SizedBox(height: 18),
-                        Consumer<HeartRateManager>(
-                          builder: (context, mgr, _) => _ControlsRow(mgr: mgr),
+                          child: Column(
+                            children: [
+                              Selector<
+                                HeartRateManager,
+                                (
+                                  int?,
+                                  String,
+                                  int?,
+                                  BluetoothConnectionState,
+                                  bool,
+                                  bool,
+                                  DateTime?,
+                                  int?,
+                                )
+                              >(
+                                selector: (_, mgr) => (
+                                  mgr.heartRate,
+                                  mgr.connectedName.isEmpty
+                                      ? '未连接'
+                                      : mgr.connectedName,
+                                  mgr.rssi,
+                                  mgr.connectionState,
+                                  mgr.isConnecting,
+                                  mgr.isSubscribed,
+                                  mgr.lastUpdated,
+                                  mgr.lastIntervalMs,
+                                ),
+                                builder: (context, data, _) {
+                                  return _HeartCard(
+                                    bpm: data.$1,
+                                    deviceName: data.$2,
+                                    rssi: data.$3,
+                                    state: data.$4,
+                                    isConnecting: data.$5,
+                                    isSubscribed: data.$6,
+                                    lastUpdated: data.$7,
+                                    intervalMs: data.$8,
+                                  );
+                                },
+                              ),
+                              const SizedBox(height: 16),
+                              Consumer<HeartRateManager>(
+                                builder: (context, mgr, _) =>
+                                    _ControlsRow(mgr: mgr),
+                              ),
+                            ],
+                          ),
                         ),
                         const SizedBox(height: 12),
                         Consumer<HeartRateManager>(
@@ -308,7 +322,9 @@ class _HeartCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final statusText = isConnecting
         ? '连接中'
-        : (state == BluetoothConnectionState.connected ? '已连接' : '未连接');
+        : (state == BluetoothConnectionState.connected
+              ? (isSubscribed ? '已连接' : '已连接 · 等待心率')
+              : '未连接');
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -626,55 +642,40 @@ class _ControlsRow extends StatelessWidget {
 
   final HeartRateManager mgr;
 
-  bool _scanButtonEnabled(HeartRateManager mgr) {
-    final connected = mgr.connectionState == BluetoothConnectionState.connected;
-    if (connected) {
-      return mgr.canToggleConnection;
-    }
-    return !mgr.uiScanning && !mgr.isConnecting && !mgr.isAutoReconnecting;
+  bool _toggleEnabled(HeartRateManager mgr) {
+    return mgr.canToggleConnection &&
+        (!mgr.isConnecting ||
+            mgr.connectionState == BluetoothConnectionState.connected);
   }
 
-  String _scanButtonLabel(HeartRateManager mgr) {
+  String _toggleLabel(HeartRateManager mgr) {
     if (mgr.connectionState == BluetoothConnectionState.connected) {
-      return '断开';
+      return '断开连接';
     }
     if (mgr.isConnecting) return '连接中...';
     if (mgr.isAutoReconnecting) return '自动重连中...';
-    if (mgr.uiScanning) return '扫描中...';
-    return '重新扫描';
+    return '连接设备';
   }
 
-  IconData _scanButtonIcon(HeartRateManager mgr) {
+  IconData _toggleIcon(HeartRateManager mgr) {
     if (mgr.connectionState == BluetoothConnectionState.connected) {
       return Icons.link_off;
     }
     if (mgr.isConnecting || mgr.isAutoReconnecting) return Icons.sync;
-    return mgr.uiScanning ? Icons.sync : Icons.radar;
+    return Icons.link;
   }
 
-  bool _quickConnectEnabled(HeartRateManager mgr) {
-    return mgr.connectionState != BluetoothConnectionState.connected &&
+  bool _scanEnabled(HeartRateManager mgr) {
+    return mgr.canToggleConnection &&
+        !mgr.uiScanning &&
         !mgr.isConnecting &&
         !mgr.isAutoReconnecting &&
-        mgr.nearbyDevices.isNotEmpty;
+        mgr.connectionState != BluetoothConnectionState.connected;
   }
 
-  String _quickConnectLabel(HeartRateManager mgr) {
-    if (mgr.connectionState == BluetoothConnectionState.connected) {
-      return '已连接';
-    }
-    if (mgr.isConnecting) return '连接中...';
-    if (mgr.isAutoReconnecting) return '自动重连中...';
-    if (mgr.nearbyDevices.isEmpty) return '无可用设备';
-    return '快速连接';
-  }
-
-  IconData _quickConnectIcon(HeartRateManager mgr) {
-    if (mgr.connectionState == BluetoothConnectionState.connected) {
-      return Icons.check_circle;
-    }
-    if (mgr.isConnecting || mgr.isAutoReconnecting) return Icons.sync;
-    return mgr.nearbyDevices.isEmpty ? Icons.watch_off : Icons.flash_on;
+  String _scanLabel(HeartRateManager mgr) {
+    if (mgr.uiScanning) return '扫描中...';
+    return '重新扫描';
   }
 
   @override
@@ -686,22 +687,16 @@ class _ControlsRow extends StatelessWidget {
           children: [
             Expanded(
               child: FilledButton.icon(
-                onPressed: _scanButtonEnabled(mgr)
-                    ? (mgr.connectionState == BluetoothConnectionState.connected
-                          ? mgr.disconnect
-                          : mgr.restartScan)
-                    : null,
-                icon: Icon(_scanButtonIcon(mgr)),
-                label: Text(_scanButtonLabel(mgr)),
+                onPressed: _toggleEnabled(mgr) ? mgr.toggleConnection : null,
+                icon: Icon(_toggleIcon(mgr)),
+                label: Text(_toggleLabel(mgr)),
               ),
             ),
             const SizedBox(width: 12),
-            FilledButton.tonalIcon(
-              onPressed: !mgr.canToggleConnection || !_quickConnectEnabled(mgr)
-                  ? null
-                  : () => mgr.manualConnect(mgr.nearbyDevices.first),
-              icon: Icon(_quickConnectIcon(mgr)),
-              label: Text(_quickConnectLabel(mgr)),
+            OutlinedButton.icon(
+              onPressed: _scanEnabled(mgr) ? mgr.restartScan : null,
+              icon: const Icon(Icons.radar),
+              label: Text(_scanLabel(mgr)),
             ),
           ],
         ),
@@ -720,63 +715,72 @@ class _NearbyList extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final devices = mgr.nearbyDevices.take(4).toList();
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(
-          children: const [
-            Icon(Icons.waves, color: Color(0xFF67E8F9), size: 18),
-            SizedBox(width: 6),
-            Text(
-              '附近心率设备',
-              style: TextStyle(
-                color: Colors.white70,
-                fontSize: 13,
-                fontWeight: FontWeight.w600,
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: const Color(0xFF111827),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: Colors.white10),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: const [
+              Icon(Icons.waves, color: Color(0xFF67E8F9), size: 18),
+              SizedBox(width: 6),
+              Text(
+                '附近心率设备',
+                style: TextStyle(
+                  color: Colors.white70,
+                  fontSize: 13,
+                  fontWeight: FontWeight.w600,
+                ),
               ),
-            ),
-          ],
-        ),
-        const SizedBox(height: 8),
-        if (devices.isEmpty)
-          const Text(
-            '暂无广播，保持蓝牙开启并靠近设备。',
-            style: TextStyle(color: Colors.white38, fontSize: 12),
-          )
-        else
-          Wrap(
-            spacing: 8,
-            runSpacing: 8,
-            children: devices
-                .map(
-                  (d) => ActionChip(
-                    label: SizedBox(
-                      width: 160,
-                      child: Text(
-                        '${d.name} • ${d.rssi}dBm',
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontSize: 12,
+            ],
+          ),
+          const SizedBox(height: 8),
+          if (devices.isEmpty)
+            const Text(
+              '暂无广播，保持蓝牙开启并靠近设备。',
+              style: TextStyle(color: Colors.white38, fontSize: 12),
+            )
+          else
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: devices
+                  .map(
+                    (d) => ActionChip(
+                      label: SizedBox(
+                        width: 160,
+                        child: Text(
+                          '${d.name} • ${d.rssi}dBm',
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 12,
+                          ),
+                          overflow: TextOverflow.ellipsis,
+                          softWrap: false,
                         ),
-                        overflow: TextOverflow.ellipsis,
-                        softWrap: false,
+                      ),
+                      avatar: const Icon(
+                        Icons.watch,
+                        color: Colors.white70,
+                        size: 16,
+                      ),
+                      onPressed: () => mgr.manualConnect(d),
+                      backgroundColor: const Color(0xFF1F2937),
+                      shape: StadiumBorder(
+                        side: BorderSide(color: Colors.white12),
                       ),
                     ),
-                    avatar: const Icon(
-                      Icons.watch,
-                      color: Colors.white70,
-                      size: 16,
-                    ),
-                    onPressed: () => mgr.manualConnect(d),
-                    backgroundColor: const Color(0xFF1F2937),
-                    shape: StadiumBorder(
-                      side: BorderSide(color: Colors.white12),
-                    ),
-                  ),
-                )
-                .toList(),
-          ),
-      ],
+                  )
+                  .toList(),
+            ),
+        ],
+      ),
     );
   }
 }
