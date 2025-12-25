@@ -13,6 +13,7 @@ import 'package:permission_handler/permission_handler.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:web_socket_channel/io.dart';
 
+import 'app_log.dart';
 import 'hr_notification_service.dart';
 
 final Guid _heartRateService = Guid('0000180d-0000-1000-8000-00805f9b34fb');
@@ -47,6 +48,7 @@ class HeartRateSettings {
     required this.oscChatboxTemplate,
     required this.maxHeartRate,
     required this.updateIntervalMs,
+    required this.logEnabled,
     required this.mqttBroker,
     required this.mqttPort,
     required this.mqttTopic,
@@ -64,6 +66,7 @@ class HeartRateSettings {
   final String oscChatboxTemplate;
   final int maxHeartRate;
   final int updateIntervalMs;
+  final bool logEnabled;
   final String mqttBroker;
   final int mqttPort;
   final String mqttTopic;
@@ -80,6 +83,7 @@ class HeartRateSettings {
   static const _defaultOscChatboxTemplate = '💓{hr}';
   static const _defaultMaxHeartRate = 200;
   static const _defaultUpdateIntervalMs = 1000;
+  static const _defaultLogEnabled = false;
   static const _defaultMqttBroker = '';
   static const _defaultMqttPort = 1883;
   static const _defaultMqttTopic = 'hr_push';
@@ -96,6 +100,7 @@ class HeartRateSettings {
   static const _kOscChatboxTemplateKey = 'cfg_osc_chatbox_template';
   static const _kMaxHeartRateKey = 'cfg_max_heart_rate';
   static const _kUpdateIntervalKey = 'cfg_update_interval_ms';
+  static const _kLogEnabledKey = 'cfg_log_enabled';
   static const _kMqttBrokerKey = 'cfg_mqtt_broker';
   static const _kMqttPortKey = 'cfg_mqtt_port';
   static const _kMqttTopicKey = 'cfg_mqtt_topic';
@@ -114,6 +119,7 @@ class HeartRateSettings {
       oscChatboxTemplate: _defaultOscChatboxTemplate,
       maxHeartRate: _defaultMaxHeartRate,
       updateIntervalMs: _defaultUpdateIntervalMs,
+      logEnabled: _defaultLogEnabled,
       mqttBroker: _defaultMqttBroker,
       mqttPort: _defaultMqttPort,
       mqttTopic: _defaultMqttTopic,
@@ -142,6 +148,7 @@ class HeartRateSettings {
       maxHeartRate: prefs.getInt(_kMaxHeartRateKey) ?? _defaultMaxHeartRate,
       updateIntervalMs:
           prefs.getInt(_kUpdateIntervalKey) ?? _defaultUpdateIntervalMs,
+      logEnabled: prefs.getBool(_kLogEnabledKey) ?? _defaultLogEnabled,
       mqttBroker: prefs.getString(_kMqttBrokerKey) ?? _defaultMqttBroker,
       mqttPort: prefs.getInt(_kMqttPortKey) ?? _defaultMqttPort,
       mqttTopic: prefs.getString(_kMqttTopicKey) ?? _defaultMqttTopic,
@@ -162,6 +169,7 @@ class HeartRateSettings {
     await prefs.setString(_kOscChatboxTemplateKey, oscChatboxTemplate);
     await prefs.setInt(_kMaxHeartRateKey, maxHeartRate);
     await prefs.setInt(_kUpdateIntervalKey, updateIntervalMs);
+    await prefs.setBool(_kLogEnabledKey, logEnabled);
     await prefs.setString(_kMqttBrokerKey, mqttBroker);
     await prefs.setInt(_kMqttPortKey, mqttPort);
     await prefs.setString(_kMqttTopicKey, mqttTopic);
@@ -180,6 +188,7 @@ class HeartRateSettings {
     String? oscChatboxTemplate,
     int? maxHeartRate,
     int? updateIntervalMs,
+    bool? logEnabled,
     String? mqttBroker,
     int? mqttPort,
     String? mqttTopic,
@@ -197,6 +206,7 @@ class HeartRateSettings {
       oscChatboxTemplate: oscChatboxTemplate ?? this.oscChatboxTemplate,
       maxHeartRate: maxHeartRate ?? this.maxHeartRate,
       updateIntervalMs: updateIntervalMs ?? this.updateIntervalMs,
+      logEnabled: logEnabled ?? this.logEnabled,
       mqttBroker: mqttBroker ?? this.mqttBroker,
       mqttPort: mqttPort ?? this.mqttPort,
       mqttTopic: mqttTopic ?? this.mqttTopic,
@@ -326,6 +336,7 @@ class HeartRateManager extends ChangeNotifier {
     if (_connectionState != BluetoothConnectionState.connected) return '';
     return _connectedDevice?.platformName ?? '';
   }
+  String? get activeDeviceId => _connectedDevice?.remoteId.str;
 
   BluetoothConnectionState get connectionState => _connectionState;
   BluetoothAdapterState get adapterState => _adapterState;
@@ -428,6 +439,7 @@ class HeartRateManager extends ChangeNotifier {
 
     _prefs = await SharedPreferences.getInstance();
     _settings = HeartRateSettings.fromPrefs(_prefs);
+    AppLog.setEnabled(_settings.logEnabled);
     _savedDeviceId = _prefs?.getString('last_device_id');
     _savedDeviceName = _prefs?.getString('last_device_name');
     if (_savedDeviceId != null) {
@@ -646,6 +658,9 @@ class HeartRateManager extends ChangeNotifier {
             lastSeen: now,
           ),
         );
+        _log(
+          'scan found: $name ($id) rssi=${r.rssi} connectable=${r.advertisementData.connectable}',
+        );
       }
 
       _updateBroadcastHeartRate(r);
@@ -681,6 +696,7 @@ class HeartRateManager extends ChangeNotifier {
     if (bpm == null) return;
 
     final now = DateTime.now();
+    _log('hr rx broadcast: bpm=$bpm rssi=${r.rssi} name=${r.device.platformName}');
     _prevHeartRateAt = _lastUpdated;
     _heartRate = bpm;
     _rssi = r.rssi;
@@ -751,12 +767,10 @@ class HeartRateManager extends ChangeNotifier {
       'galaxy',
       'huawei',
       'honor',
-      'xiaomi',
-      'redmi',
+      'honor',
       'oneplus',
       'oppo',
       'vivo',
-      'mi ',
     ];
 
     const pcKeywords = [
@@ -971,8 +985,15 @@ class HeartRateManager extends ChangeNotifier {
 
       _log('subscribe hr attempt=$attempt');
       final services = await device.discoverServices();
+      
+      // Debug log all services to see what the device actually exposes
+      final serviceUuids = services.map((s) => s.uuid.str).join(', ');
+      _log('discovered services: [$serviceUuids]');
+
+      bool foundHr = false;
       for (final service in services) {
         if (service.uuid != _heartRateService) continue;
+        foundHr = true;
         for (final c in service.characteristics) {
           if (c.uuid == _heartRateMeasurement) {
             final ok = await _enableHrNotifications(c);
@@ -980,6 +1001,11 @@ class HeartRateManager extends ChangeNotifier {
           }
         }
       }
+      
+      if (!foundHr) {
+         _log('HR service not found! Available services: $serviceUuids');
+      }
+
       if (!_missingHrNotified) {
         _missingHrNotified = true;
         notifyListeners();
@@ -1062,6 +1088,7 @@ class HeartRateManager extends ChangeNotifier {
     final bpm = _parseHeartRateValue(data);
     if (bpm == null) return;
     final now = DateTime.now();
+    _log('hr rx notify: bpm=$bpm');
     _prevHeartRateAt = _lastUpdated;
     _heartRate = bpm;
     _lastUpdated = now;
@@ -1346,6 +1373,9 @@ class HeartRateManager extends ChangeNotifier {
       'device': _connectedDevice?.platformName,
       'timestamp': DateTime.now().toIso8601String(),
     };
+    _log(
+      'push event=heartRate bpm=$bpm percent=${percent == null ? '-' : (percent * 100).round()} connected=$connected',
+    );
 
     unawaited(_sendPushPayload(payload));
     unawaited(_sendOscConnectedIfNeeded(_hrOnline, force: true));
@@ -1370,6 +1400,7 @@ class HeartRateManager extends ChangeNotifier {
       'device': _connectedDevice?.platformName,
       'timestamp': DateTime.now().toIso8601String(),
     };
+    _log('push event=connection connected=$connected');
 
     unawaited(_sendPushPayload(payload));
     if (connected) {
@@ -1391,10 +1422,14 @@ class HeartRateManager extends ChangeNotifier {
       final uri = Uri.tryParse(endpoint);
       if (uri != null) {
         if (uri.scheme.startsWith('ws')) {
+          _log('push ws start: ${_formatEndpoint(uri)}');
           await _sendWs(uri, payload);
         } else if (uri.scheme.startsWith('http')) {
+          _log('push http start: ${_formatEndpoint(uri)}');
           await _sendHttp(uri, payload);
         }
+      } else {
+        _log('push endpoint invalid: $endpoint');
       }
     }
 
@@ -1410,7 +1445,9 @@ class HeartRateManager extends ChangeNotifier {
             body: jsonEncode(payload),
           )
           .timeout(const Duration(seconds: 3));
-    } catch (_) {
+      _log('push http ok: ${_formatEndpoint(uri)}');
+    } catch (e) {
+      _log('push http failed: ${_formatEndpoint(uri)}', error: e);
       // 发送失败静默忽略，避免打断主流程
     }
   }
@@ -1427,13 +1464,17 @@ class HeartRateManager extends ChangeNotifier {
         _wsChannel!.stream.listen(
           (_) {},
           onError: (_) {
+            _log('push ws error: ${_formatEndpoint(uri)}');
             _wsChannel = null;
           },
           onDone: () {
+            _log('push ws closed: ${_formatEndpoint(uri)}');
             _wsChannel = null;
           },
         );
-      } catch (_) {
+        _log('push ws connected: ${_formatEndpoint(uri)}');
+      } catch (e) {
+        _log('push ws connect failed: ${_formatEndpoint(uri)}', error: e);
         _wsChannel = null;
       } finally {
         _wsConnecting = false;
@@ -1443,6 +1484,7 @@ class HeartRateManager extends ChangeNotifier {
     if (_wsChannel != null) {
       try {
         _wsChannel!.sink.add(jsonEncode(payload));
+        _log('push ws sent: ${_formatEndpoint(uri)}');
       } catch (_) {}
     }
   }
@@ -1460,7 +1502,9 @@ class HeartRateManager extends ChangeNotifier {
       final builder = MqttClientPayloadBuilder();
       builder.addString(jsonEncode(payload));
       client.publishMessage(topic, MqttQos.atLeastOnce, builder.payload!);
-    } catch (_) {
+      _log('push mqtt published: $topic');
+    } catch (e) {
+      _log('push mqtt publish failed: $topic', error: e);
       _mqttConnected = false;
       _mqttClient?.disconnect();
       _mqttClient = null;
@@ -1495,11 +1539,13 @@ class HeartRateManager extends ChangeNotifier {
           ? rawClientId
           : 'hr_push_${DateTime.now().millisecondsSinceEpoch}';
 
+      _log('push mqtt connecting: $host:$port clientId=$clientId');
       final client = MqttServerClient(host, clientId)
         ..port = port
         ..keepAlivePeriod = 20
         ..logging(on: false)
         ..onDisconnected = () {
+          _log('push mqtt disconnected: $host:$port');
           _mqttConnected = false;
           _mqttClient = null;
         };
@@ -1516,7 +1562,8 @@ class HeartRateManager extends ChangeNotifier {
           username.isEmpty ? null : username,
           username.isEmpty ? null : password,
         );
-      } catch (_) {
+      } catch (e) {
+        _log('push mqtt connect failed: $host:$port', error: e);
         client.disconnect();
         return;
       }
@@ -1524,6 +1571,7 @@ class HeartRateManager extends ChangeNotifier {
       if (client.connectionStatus?.state == MqttConnectionState.connected) {
         _mqttClient = client;
         _mqttConnected = true;
+        _log('push mqtt connected: $host:$port');
       } else {
         client.disconnect();
       }
@@ -1600,15 +1648,23 @@ class HeartRateManager extends ChangeNotifier {
 
   Future<bool> _sendOscMessage(String address, Object value) async {
     final target = await _resolveOscTarget();
-    if (target == null) return false;
+    if (target == null) {
+      _log('push osc target invalid: $address');
+      return false;
+    }
     final socket = await _ensureOscSocket();
-    if (socket == null) return false;
+    if (socket == null) {
+      _log('push osc socket unavailable: $address');
+      return false;
+    }
 
     final msg = _encodeOscMessage(address, [_oscArgFromValue(value)]);
     try {
       socket.send(msg, target.address, target.port);
+      _log('push osc sent: $address -> ${target.address.address}:${target.port}');
       return true;
     } catch (_) {}
+    _log('push osc failed: $address -> ${target.address.address}:${target.port}');
     return false;
   }
 
@@ -1617,16 +1673,24 @@ class HeartRateManager extends ChangeNotifier {
     List<Object> args,
   ) async {
     final target = await _resolveOscTarget();
-    if (target == null) return false;
+    if (target == null) {
+      _log('push osc target invalid: $address');
+      return false;
+    }
     final socket = await _ensureOscSocket();
-    if (socket == null) return false;
+    if (socket == null) {
+      _log('push osc socket unavailable: $address');
+      return false;
+    }
 
     final oscArgs = args.map(_oscArgFromValue).toList();
     final msg = _encodeOscMessage(address, oscArgs);
     try {
       socket.send(msg, target.address, target.port);
+      _log('push osc sent: $address -> ${target.address.address}:${target.port}');
       return true;
     } catch (_) {}
+    _log('push osc failed: $address -> ${target.address.address}:${target.port}');
     return false;
   }
 
@@ -1759,6 +1823,10 @@ class HeartRateManager extends ChangeNotifier {
         _startRssiPolling(_connectedDevice!);
       }
     }
+
+    if (old.logEnabled != value.logEnabled) {
+      AppLog.setEnabled(value.logEnabled);
+    }
   }
 
   @override
@@ -1791,14 +1859,17 @@ class HeartRateManager extends ChangeNotifier {
   }
 
   void _log(String message, {Object? error, StackTrace? stackTrace}) {
-    if (kIsWeb) return;
-    if (!Platform.isWindows) return;
-    final ts = DateTime.now().toIso8601String();
-    final suffix = [
-      if (error != null) ' error=$error',
-      if (stackTrace != null) ' stack=$stackTrace',
-    ].join();
-    debugPrint('[hr_osc][$ts] $message$suffix');
+    if (error != null || stackTrace != null) {
+      AppLog.error(message, error: error, stackTrace: stackTrace);
+      return;
+    }
+    AppLog.info(message);
+  }
+
+  String _formatEndpoint(Uri uri) {
+    final port = uri.hasPort ? ':${uri.port}' : '';
+    final path = uri.path.isEmpty ? '' : uri.path;
+    return '${uri.scheme}://${uri.host}$port$path';
   }
 
   String _formatErrorForStatus(Object error, {required String fallback}) {

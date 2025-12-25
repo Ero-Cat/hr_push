@@ -198,6 +198,19 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "1.0.3"
+  flutter_localizations:
+    dependency: "direct main"
+    description: flutter
+    source: sdk
+    version: "0.0.0"
+  flutter_loggy:
+    dependency: "direct main"
+    description:
+      name: flutter_loggy
+      sha256: f7640f2d06e64a6141b2210e18cac3146f30bcb4b92349da53f969f59b78c04b
+      url: "https://pub.dev"
+    source: hosted
+    version: "2.0.3+1"
   flutter_test:
     dependency: "direct dev"
     description: flutter
@@ -232,6 +245,14 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "4.7.2"
+  intl:
+    dependency: "direct main"
+    description:
+      name: intl
+      sha256: "3df61194eb431efc39c4ceba583b95633a403f46c9fd341e550ce0bfa50e9aa5"
+      url: "https://pub.dev"
+    source: hosted
+    version: "0.20.2"
   json_annotation:
     dependency: transitive
     description:
@@ -272,6 +293,14 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "6.0.0"
+  loggy:
+    dependency: "direct main"
+    description:
+      name: loggy
+      sha256: "981e03162bbd3a5a843026f75f73d26e4a0d8aa035ae060456ca7b30dfd1e339"
+      url: "https://pub.dev"
+    source: hosted
+    version: "2.0.3"
   matcher:
     dependency: transitive
     description:

@@ -1,42 +1,60 @@
 <?xml version="1.0" encoding="utf-8"?>
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
-    android:orientation="horizontal"
-    android:gravity="center_vertical"
-    android:padding="12dp"
     android:layout_width="match_parent"
-    android:layout_height="wrap_content"
-    android:background="#161b22">
+    android:layout_height="64dp"
+    android:background="#2C2C2E"
+    android:gravity="center_vertical"
+    android:orientation="horizontal"
+    android:paddingStart="16dp"
+    android:paddingEnd="16dp">
 
+    <!-- Heart Icon -->
+    <ImageView
+        android:id="@+id/icon"
+        android:layout_width="24dp"
+        android:layout_height="24dp"
+        android:src="@drawable/ic_heart_filled"
+        android:contentDescription="Heart Icon" />
+
+    <Space
+        android:layout_width="16dp"
+        android:layout_height="wrap_content" />
+
+    <!-- Text Info -->
     <LinearLayout
-        android:orientation="vertical"
         android:layout_width="0dp"
         android:layout_height="wrap_content"
-        android:layout_weight="1">
-
-        <TextView
-            android:id="@+id/status_text"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="心率"
-            android:textColor="#9fb5c3"
-            android:textSize="12sp" />
+        android:layout_weight="1"
+        android:orientation="vertical">
 
         <TextView
             android:id="@+id/bpm_value"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:text="--"
-            android:textColor="#ffffff"
-            android:textSize="32sp"
-            android:textStyle="bold" />
+            android:textColor="#FFFFFF"
+            android:textSize="20sp"
+            android:textStyle="bold"
+            android:includeFontPadding="false" />
+
+        <TextView
+            android:id="@+id/status_text"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="等待连接..."
+            android:textColor="#98989D"
+            android:textSize="12sp"
+            android:includeFontPadding="false" />
     </LinearLayout>
 
-    <Chronometer
+    <!-- Time / Extra Info -->
+    <TextView
         android:id="@+id/time_text"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:text="更新"
-        android:textColor="#9fb5c3"
-        android:textSize="12sp" />
+        android:text="Live"
+        android:textColor="#34C759"
+        android:textSize="12sp"
+        android:textStyle="bold" />
 
 </LinearLayout>
