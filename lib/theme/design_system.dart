@@ -5,7 +5,7 @@ import 'package:flutter/cupertino.dart';
 class AppColors {
   // Backgrounds
   static const bgPrimary = CupertinoDynamicColor.withBrightness(
-    color: Color(0xFFF0F2F5), // Refined off-white
+    color: Color(0xFFF2F2F7), // iOS System Gray 6
     darkColor: Color(0xFF000000), // Pure black for OLED
   );
   static const bgSecondary = CupertinoDynamicColor.withBrightness(
@@ -63,6 +63,15 @@ class AppColors {
   static const glassBorder = CupertinoDynamicColor.withBrightness(
     color: Color(0x33FFFFFF),
     darkColor: Color(0x1FFFFFFF),
+  );
+}
+
+class AppShadows {
+  static final card = BoxShadow(
+     color: const Color(0x1F000000), // Black with ~12% opacity
+     offset: const Offset(0, 4),
+     blurRadius: 12,
+     spreadRadius: 0,
   );
 }
 

@@ -25,24 +25,31 @@ class GlassSurface extends StatelessWidget {
         ? CupertinoColors.black.withValues(alpha: bgOpacity) 
         : CupertinoColors.white.withValues(alpha: bgOpacity);
 
-    final content = ClipRRect(
-      borderRadius: BorderRadius.circular(AppRadius.r20),
-      child: BackdropFilter(
-        filter: ImageFilter.blur(
-          sigmaX: GlassStyle.blurAmount, 
-          sigmaY: GlassStyle.blurAmount
-        ),
-        child: Container(
-          padding: padding ?? const EdgeInsets.all(AppSpacing.cardPadding),
-          decoration: BoxDecoration(
-            color: bgColor,
-            borderRadius: BorderRadius.circular(AppRadius.r20),
-            border: Border.all(
-              color: AppColors.glassBorder.resolveFrom(context),
-              width: 0.5,
-            ),
+    final content = Container(
+      decoration: BoxDecoration(
+        boxShadow: [ AppShadows.card ],
+        borderRadius: BorderRadius.circular(AppRadius.r20),
+      ),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(AppRadius.r20),
+        child: BackdropFilter(
+          filter: ImageFilter.blur(
+            sigmaX: GlassStyle.blurAmount, 
+            sigmaY: GlassStyle.blurAmount
           ),
-          child: child,
+          child: Container(
+            padding: padding ?? const EdgeInsets.all(AppSpacing.cardPadding),
+            decoration: BoxDecoration(
+              color: bgColor,
+              // borderRadius handling is done by ClipRRect, but inner border needs it too
+              borderRadius: BorderRadius.circular(AppRadius.r20),
+              border: Border.all(
+                color: AppColors.glassBorder.resolveFrom(context),
+                width: 0.5,
+              ),
+            ),
+            child: child,
+          ),
         ),
       ),
     );

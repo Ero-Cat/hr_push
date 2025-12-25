@@ -85,25 +85,31 @@ class NearbyList extends StatelessWidget {
     return Column(
       children: [
         header,
-        ClipRRect(
-          borderRadius: BorderRadius.circular(AppRadius.r12),
-          child: Container(
-            color: AppColors.bgSecondary.resolveFrom(context),
-            child: Column(
-              children: [
-                for (var i = 0; i < devices.length; i++) ...[
-                  if (i > 0)
-                     Container(
-                       height: 0.5, 
-                       margin: const EdgeInsetsDirectional.only(start: 56), 
-                       color: AppColors.separator.resolveFrom(context)
-                     ),
-                  _DeviceTile(
-                    device: devices[i],
-                    mgr: mgr,
-                  ),
+        Container(
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(AppRadius.r12),
+            boxShadow: [ AppShadows.card ],
+          ),
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(AppRadius.r12),
+            child: Container(
+              color: AppColors.bgSecondary.resolveFrom(context),
+              child: Column(
+                children: [
+                  for (var i = 0; i < devices.length; i++) ...[
+                    if (i > 0)
+                       Container(
+                         height: 0.5, 
+                         margin: const EdgeInsetsDirectional.only(start: 56), 
+                         color: AppColors.separator.resolveFrom(context)
+                       ),
+                    _DeviceTile(
+                      device: devices[i],
+                      mgr: mgr,
+                    ),
+                  ],
                 ],
-              ],
+              ),
             ),
           ),
         ),

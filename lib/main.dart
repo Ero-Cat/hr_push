@@ -105,7 +105,10 @@ class HrOscApp extends StatelessWidget {
             child: child!,
           );
         },
-        home: const HeartDashboard(),
+        home: ScrollConfiguration(
+          behavior: const ScrollBehavior().copyWith(scrollbars: false),
+          child: const HeartDashboard(),
+        ),
       ),
     );
   }
