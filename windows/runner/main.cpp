@@ -306,7 +306,7 @@ int APIENTRY wWinMain(_In_ HINSTANCE instance, _In_opt_ HINSTANCE prev,
     InstallCrashHandlers();
     
     // Version and build info
-    LogLine(&logger, L"[startup] app_version=1.5.0");
+    LogLine(&logger, L"[startup] app_version=1.5.1");
     LogLine(&logger, L"[startup] build_date=" __DATE__ L" " __TIME__);
     
     // OS version detection
