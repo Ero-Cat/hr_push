@@ -726,7 +726,20 @@ class HeartRateManager extends ChangeNotifier {
     return _isWearableHeartRateCandidate(r);
   }
 
+  /// Detects if the device is a Xiaomi/Mi Band device which may require
+  /// special handling (e.g., pairing before HR service access)
+  bool _isXiaomiDevice(String name) {
+    final lowerName = name.toLowerCase();
+    return lowerName.contains('xiaomi') ||
+        lowerName.contains('小米') ||
+        lowerName.contains('mi band') ||
+        lowerName.contains('mi smart band') ||
+        lowerName.contains('miband') ||
+        lowerName.contains('手环');
+  }
+
   bool _isWearableHeartRateCandidate(ScanResult r) {
+
     final hasHeartRateService = r.advertisementData.serviceUuids
         .map((e) => e.str.toLowerCase())
         .any((id) => id.contains('180d'));
@@ -746,10 +759,15 @@ class HeartRateManager extends ChangeNotifier {
         name.contains('fitbit') ||
         name.contains('mi smart band') ||
         name.contains('xiaomi') ||
+        name.contains('小米') ||  // Xiaomi in Chinese
+        name.contains('miband') ||
+        name.contains('mi band') ||
+        name.contains('手环') ||  // "band/bracelet" in Chinese
         name.contains('watch');
 
     return hasHeartRateService || hasHeartRateServiceData || likelyHrWearable;
   }
+
 
   bool _isLikelyPhoneOrPc(ScanResult r) {
     final name =
@@ -794,7 +812,11 @@ class HeartRateManager extends ChangeNotifier {
       'mi band',
       'smart band',
       'smartband',
+      '小米',  // Xiaomi in Chinese
+      '手环',  // "band/bracelet" in Chinese
+      '手表',  // "watch" in Chinese
     ];
+
 
     if (wearableKeywords.any(name.contains)) {
       return false;
@@ -984,11 +1006,31 @@ class HeartRateManager extends ChangeNotifier {
       await Future.delayed(delay);
 
       _log('subscribe hr attempt=$attempt');
+
+      // Xiaomi devices often require pairing before exposing Heart Rate Service
+      if (Platform.isWindows && _isXiaomiDevice(device.platformName)) {
+        _log('Xiaomi device detected, checking bond status');
+        try {
+          // Check if we need to initiate pairing
+          // Note: flutter_blue_plus_windows uses createBond() for pairing
+          _setStatus('正在配对...', force: true);
+          notifyListeners();
+          await device.createBond();
+          _log('Pairing initiated/confirmed for Xiaomi device');
+          // Give some time for pairing to complete and services to become available
+          await Future.delayed(const Duration(milliseconds: 1500));
+        } catch (e) {
+          _log('Pairing attempt failed (may already be paired)', error: e);
+          // Continue anyway - device may already be paired
+        }
+      }
+
       final services = await device.discoverServices();
       
       // Debug log all services to see what the device actually exposes
       final serviceUuids = services.map((s) => s.uuid.str).join(', ');
       _log('discovered services: [$serviceUuids]');
+
 
       bool foundHr = false;
       for (final service in services) {

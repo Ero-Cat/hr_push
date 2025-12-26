@@ -700,6 +700,24 @@ int main(Array<String ^> ^ args)
 			msg->Insert("advType", JsonValue::CreateStringValue(eventArgs->AdvertisementType.ToString()));
 			msg->Insert("localName", JsonValue::CreateStringValue(eventArgs->Advertisement->LocalName));
 
+			// Extract raw local name bytes from AD structure (Type 0x08 = Shortened, 0x09 = Complete Local Name)
+			// This preserves UTF-8 encoding for device names with non-ASCII characters (e.g., Chinese)
+			for (auto &rawAdStructure : eventArgs->Advertisement->DataSections)
+			{
+				if (rawAdStructure->DataType == 0x08 || rawAdStructure->DataType == 0x09)
+				{
+					auto nameBytes = ref new JsonArray();
+					auto rawData = rawAdStructure->Data;
+					auto dataReader = Windows::Storage::Streams::DataReader::FromBuffer(rawData);
+					while (dataReader->UnconsumedBufferLength > 0)
+					{
+						nameBytes->Append(JsonValue::CreateNumberValue(dataReader->ReadByte()));
+					}
+					msg->Insert("localNameBytes", nameBytes);
+					break;
+				}
+			}
+
 			auto manufacturerSections = eventArgs->Advertisement->ManufacturerData;
 			if (manufacturerSections->Size > 0)
 			{

@@ -304,6 +304,26 @@ int APIENTRY wWinMain(_In_ HINSTANCE instance, _In_opt_ HINSTANCE prev,
   if (logging_ready) {
     g_logger = &logger;
     InstallCrashHandlers();
+    
+    // Version and build info
+    LogLine(&logger, L"[startup] app_version=1.5.0");
+    LogLine(&logger, L"[startup] build_date=" __DATE__ L" " __TIME__);
+    
+    // OS version detection
+    OSVERSIONINFOEXW osvi = {};
+    osvi.dwOSVersionInfoSize = sizeof(osvi);
+    typedef LONG(WINAPI *RtlGetVersionPtr)(PRTL_OSVERSIONINFOW);
+    HMODULE ntdll = ::GetModuleHandleW(L"ntdll.dll");
+    if (ntdll) {
+      auto RtlGetVersion = reinterpret_cast<RtlGetVersionPtr>(
+          ::GetProcAddress(ntdll, "RtlGetVersion"));
+      if (RtlGetVersion) {
+        RtlGetVersion(reinterpret_cast<PRTL_OSVERSIONINFOW>(&osvi));
+        LogLine(&logger, L"[startup] os=Windows %lu.%lu build=%lu",
+                osvi.dwMajorVersion, osvi.dwMinorVersion, osvi.dwBuildNumber);
+      }
+    }
+    
     LogLine(&logger, L"[startup] log=%ls", logger.path.c_str());
     LogLine(&logger, L"[startup] pid=%lu", ::GetCurrentProcessId());
     wchar_t module_path[MAX_PATH] = {};
@@ -316,6 +336,7 @@ int APIENTRY wWinMain(_In_ HINSTANCE instance, _In_opt_ HINSTANCE prev,
             command_line ? command_line : L"");
     StartLogGuard(&log_guard, logger.path);
   }
+
 
   HANDLE instance_mutex =
       ::CreateMutex(nullptr, TRUE, kSingleInstanceMutexName);

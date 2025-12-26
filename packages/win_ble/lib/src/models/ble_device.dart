@@ -26,21 +26,37 @@ class BleDevice {
   List<dynamic> serviceUuids;
   List<AdStructure>? adStructures;
 
-  factory BleDevice.fromJson(Map<String, dynamic> json) => BleDevice(
-        address: json["bluetoothAddress"] ?? "",
-        rssi: json["rssi"]?.toString() ?? "",
-        timestamp: json["timestamp"]?.toString() ?? "",
-        advType: json["advType"] ?? "",
-        name: json["localName"] ?? "N/A",
-        serviceUuids: json["serviceUuids"],
-        manufacturerData: json["manufacturerData"] != null
-            ? Uint8List.fromList(List<int>.from(json["manufacturerData"]))
-            : Uint8List.fromList(List.empty()),
-        adStructures: json["adStructures"] == null
-            ? null
-            : List<AdStructure>.from(json["adStructures"].map((x) =>
-                AdStructure(type: x["type"], data: List<int>.from(x["data"])))),
-      );
+  factory BleDevice.fromJson(Map<String, dynamic> json) {
+    // Prefer raw bytes for device name to handle non-ASCII correctly (e.g., Chinese characters)
+    String deviceName = json["localName"] ?? "N/A";
+    if (json["localNameBytes"] != null) {
+      try {
+        final bytes = List<int>.from(json["localNameBytes"]);
+        if (bytes.isNotEmpty) {
+          deviceName = utf8.decode(bytes, allowMalformed: true);
+        }
+      } catch (_) {
+        // fallback to existing localName
+      }
+    }
+
+    return BleDevice(
+      address: json["bluetoothAddress"] ?? "",
+      rssi: json["rssi"]?.toString() ?? "",
+      timestamp: json["timestamp"]?.toString() ?? "",
+      advType: json["advType"] ?? "",
+      name: deviceName,
+      serviceUuids: json["serviceUuids"],
+      manufacturerData: json["manufacturerData"] != null
+          ? Uint8List.fromList(List<int>.from(json["manufacturerData"]))
+          : Uint8List.fromList(List.empty()),
+      adStructures: json["adStructures"] == null
+          ? null
+          : List<AdStructure>.from(json["adStructures"].map((x) =>
+              AdStructure(type: x["type"], data: List<int>.from(x["data"])))),
+    );
+  }
+
 
   Map<String, dynamic> toJson() => {
         "bluetoothAddress": address,
