@@ -184,7 +184,16 @@ class _SettingsPageState extends State<SettingsPage> {
                    ),
               ],
             ),
-            const SizedBox(height: 50),
+            const SizedBox(height: 20),
+            Center(
+              child: Text(
+                'v1.5.4',
+                style: AppTypography.caption.copyWith(
+                  color: AppColors.textTertiary.resolveFrom(context),
+                ),
+              ),
+            ),
+            const SizedBox(height: 30),
           ],
         ),
       ),

@@ -726,6 +726,29 @@ class HeartRateManager extends ChangeNotifier {
   }
 
   void _updateBroadcastHeartRate(ScanResult r) {
+    // Debug: Log all advertisement data for Xiaomi devices
+    final rawName = r.advertisementData.advName.isNotEmpty
+        ? r.advertisementData.advName
+        : r.device.platformName;
+    final deviceName = _fixWindowsDeviceName(rawName);
+    
+    if (_isXiaomiDevice(deviceName)) {
+      final serviceUuids = r.advertisementData.serviceUuids.map((u) => u.str).join(', ');
+      final serviceDataKeys = r.advertisementData.serviceData.keys.map((u) => u.str).join(', ');
+      final mfgData = r.advertisementData.manufacturerData;
+      _log('Xiaomi adv data: name=$deviceName, serviceUUIDs=[$serviceUuids], serviceDataKeys=[$serviceDataKeys], mfgDataLen=${mfgData.length}');
+      
+      // Log service data contents
+      r.advertisementData.serviceData.forEach((uuid, data) {
+        _log('  serviceData[${uuid.str}] = ${data.map((b) => b.toRadixString(16).padLeft(2, '0')).join(' ')}');
+      });
+      
+      // Log manufacturer data
+      mfgData.forEach((id, data) {
+        _log('  mfgData[$id] = ${data.map((b) => b.toRadixString(16).padLeft(2, '0')).join(' ')}');
+      });
+    }
+    
     final data = r.advertisementData.serviceData[_heartRateService];
     if (data == null || data.length < 2) return;
 
