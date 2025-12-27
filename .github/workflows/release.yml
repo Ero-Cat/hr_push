@@ -5,6 +5,17 @@ on:
     tags:
       - "v*"
   workflow_dispatch:
+    inputs:
+      job:
+        description: 'Job to run'
+        required: true
+        default: 'all'
+        type: choice
+        options:
+          - all
+          - android
+          - macos
+          - windows
 
 permissions:
   contents: write
@@ -20,6 +31,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Create or update release
+        if: github.event_name == 'push' || github.event.inputs.job == 'all'
         uses: ncipollo/release-action@v1
         with:
           tag: ${{ github.ref_name }}
@@ -32,7 +44,13 @@ jobs:
   build_android:
     name: Android APK
     runs-on: ubuntu-latest
+    if: (github.event_name == 'push' || github.event.inputs.job == 'all' || github.event.inputs.job == 'android')
     needs: create_release
+    # Allow running without needs if not all
+    # wait, if needs: create_release is there, and if create_release is skipped, this might be skipped.
+    # To fix this, we can make create_release NOT skipped but maybe the step inside it is.
+    # Or just make needs: [] if job != all. 
+    # Actually, if we use workflow_dispatch, we might want to skip create_release step logic if it's just a test build.
     steps:
       - uses: actions/checkout@v4
       - name: Set up Java
@@ -55,6 +73,7 @@ jobs:
           VERSION="${{ github.ref_name }}"
           mv build/app/outputs/flutter-apk/app-release.apk "app-release-${VERSION}.apk"
       - name: Upload APK to release
+        if: github.event_name == 'push' || github.event.inputs.job == 'all'
         uses: softprops/action-gh-release@v1
         with:
           files: app-release-${{ github.ref_name }}.apk
@@ -64,6 +83,7 @@ jobs:
   build_macos:
     name: macOS App Bundle
     runs-on: macos-latest
+    if: (github.event_name == 'push' || github.event.inputs.job == 'all' || github.event.inputs.job == 'macos')
     needs: create_release
     steps:
       - uses: actions/checkout@v4
@@ -89,6 +109,7 @@ jobs:
           VERSION="${{ github.ref_name }}"
           ditto -c -k --sequesterRsrc --keepParent "$APP_PATH" "hr-push-macos-${VERSION}.zip"
       - name: Upload macOS zip to release
+        if: github.event_name == 'push' || github.event.inputs.job == 'all'
         uses: softprops/action-gh-release@v1
         with:
           files: hr-push-macos-${{ github.ref_name }}.zip
@@ -98,6 +119,10 @@ jobs:
   build_windows:
     name: Windows ZIP
     runs-on: windows-latest
+    if: (github.event_name == 'push' || github.event.inputs.job == 'all' || github.event.inputs.job == 'windows')
+    # Remove 'needs' for selective manual builds to avoid skipping if create_release is skipped
+    # But wait, create_release is needed if it's a real release.
+    # Let's keep needs and make create_release always run but its main step conditional.
     needs: create_release
     steps:
       - uses: actions/checkout@v4
@@ -128,8 +153,10 @@ jobs:
           Compress-Archive -Path "build\windows\x64\runner\Release\*" -DestinationPath "hr-push-windows-$env:VERSION.zip"
         shell: pwsh
       - name: Upload Windows zip to release
+        if: github.event_name == 'push' || github.event.inputs.job == 'all'
         uses: softprops/action-gh-release@v1
         with:
           files: hr-push-windows-${{ github.ref_name }}.zip
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
