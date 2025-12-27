@@ -153,8 +153,28 @@ class WinBle {
         "address": address.replaceAll(":", ""),
       });
       WinHelper.deviceMap[address] = result;
+      
       // we have to perform an operation on device in order to make a connection
-      var services = await discoverServices(address, forceRefresh: true);
+      // Retry logic for flaky Windows BLE connections (especially Xiaomi devices)
+      List<String> services = [];
+      const maxRetries = 3;
+      
+      for (var retry = 0; retry < maxRetries; retry++) {
+        try {
+          if (retry > 0) {
+            WinHelper.printLog("discoverServices retry $retry/$maxRetries");
+            await Future.delayed(Duration(milliseconds: 500 + retry * 500));
+          }
+          services = await discoverServices(address, forceRefresh: true);
+          if (services.isNotEmpty) break;
+        } catch (e) {
+          WinHelper.printLog("discoverServices attempt ${retry + 1} failed: $e");
+          if (retry == maxRetries - 1) {
+            // Last retry failed, continue with empty services
+          }
+        }
+      }
+      
       // A temporary way of detecting connection : if services are empty then connection is failed
       bool connectionFailed = services.isEmpty;
       _connectionStreamController.add({

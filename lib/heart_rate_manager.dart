@@ -338,7 +338,7 @@ class HeartRateManager extends ChangeNotifier {
   int _reconnectAttempts = 0;
 
   static const Duration _gattStableDelay = Duration(milliseconds: 600);
-  static const Duration _gattStableDelayWindows = Duration(milliseconds: 1200);
+  static const Duration _gattStableDelayWindows = Duration(milliseconds: 2000);
 
   UnmodifiableListView<NearbyDevice> get nearbyDevices =>
       UnmodifiableListView(_nearby);
@@ -1086,22 +1086,45 @@ class HeartRateManager extends ChangeNotifier {
         }
       }
 
-      // Discover services with timeout for Windows stability
+      // Discover services with timeout and retry for Windows stability
       _log('discovering services...');
       _setStatus('发现服务中...', force: true);
       notifyListeners();
       
-      List<BluetoothService> services;
-      try {
-        services = await device.discoverServices().timeout(
-          const Duration(seconds: 10),
-          onTimeout: () {
-            throw TimeoutException('discoverServices timed out after 10s');
-          },
-        );
-      } catch (e) {
-        _log('discoverServices failed: $e');
-        rethrow;
+      List<BluetoothService> services = [];
+      const maxDiscoverRetries = 3;
+      
+      for (var retry = 0; retry < maxDiscoverRetries; retry++) {
+        try {
+          if (retry > 0) {
+            _log('discoverServices retry $retry/$maxDiscoverRetries');
+            // Wait longer between retries
+            await Future.delayed(Duration(milliseconds: 1000 + retry * 500));
+          }
+          
+          services = await device.discoverServices().timeout(
+            const Duration(seconds: 10),
+            onTimeout: () {
+              throw TimeoutException('discoverServices timed out after 10s');
+            },
+          );
+          
+          // Success - break out of retry loop
+          break;
+        } catch (e) {
+          final errorStr = e.toString().toLowerCase();
+          final isDeviceNotFound = errorStr.contains('device not found') ||
+              errorStr.contains('not found') ||
+              errorStr.contains('æ□ªæ□□');
+          
+          if (isDeviceNotFound && retry < maxDiscoverRetries - 1) {
+            _log('discoverServices "Device not found", will retry...');
+            continue;
+          }
+          
+          _log('discoverServices failed: $e');
+          rethrow;
+        }
       }
       
       // Debug log all services to see what the device actually exposes
