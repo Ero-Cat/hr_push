@@ -1,6 +1,5 @@
 
 import 'package:flutter/cupertino.dart';
-import 'package:flutter_blue_plus/flutter_blue_plus.dart';
 import '../l10n/app_localizations.dart';
 
 import '../heart_rate_manager.dart';
@@ -16,13 +15,13 @@ class NearbyList extends StatelessWidget {
         !mgr.uiScanning &&
         !mgr.isConnecting &&
         !mgr.isAutoReconnecting &&
-        mgr.connectionState != BluetoothConnectionState.connected &&
-        mgr.adapterState == BluetoothAdapterState.on;
+        !mgr.isConnected &&
+        mgr.isBluetoothOn;
   }
 
   @override
   Widget build(BuildContext context) {
-    if (mgr.adapterState != BluetoothAdapterState.on) {
+    if (!mgr.isBluetoothOn) {
        // Optional: Show empty state or hint if Bluetooth is off, 
        // but typically the HeroCard handles the primary state notice.
        // We'll keep it simple for the list.
@@ -135,8 +134,7 @@ class _DeviceTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
-    final isConnected = mgr.activeDeviceId == device.id && 
-        mgr.connectionState == BluetoothConnectionState.connected;
+    final isConnected = mgr.activeDeviceId == device.id && mgr.isConnected;
     final isConnecting = mgr.activeDeviceId == device.id &&
         (mgr.isConnecting || mgr.isAutoReconnecting);
     

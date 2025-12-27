@@ -113,6 +113,12 @@ jobs:
       - name: Install dependencies
         run: flutter pub get
         shell: pwsh
+      - name: Clean build artifacts
+        run: flutter clean
+        shell: pwsh
+      - name: Re-fetch dependencies after clean
+        run: flutter pub get
+        shell: pwsh
       - name: Build Windows release
         run: flutter build windows --release
         shell: pwsh

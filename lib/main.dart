@@ -6,7 +6,6 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
-import 'package:flutter_blue_plus/flutter_blue_plus.dart';
 import 'package:window_manager/window_manager.dart';
 
 import 'app_log.dart';
@@ -14,23 +13,9 @@ import 'heart_rate_manager.dart';
 import 'theme/design_system.dart';
 import 'pages/heart_dashboard.dart';
 
-bool get _blePluginSupported {
-  if (kIsWeb) return false;
-  return Platform.isAndroid ||
-      Platform.isIOS ||
-      Platform.isMacOS ||
-      Platform.isLinux ||
-      Platform.isWindows;
-}
-
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   AppLog.init(enabled: false);
-
-  if (_blePluginSupported) {
-    final logLevel = (!kIsWeb && Platform.isAndroid) ? LogLevel.warning : LogLevel.verbose;
-    FlutterBluePlus.setLogLevel(logLevel, color: true);
-  }
 
   // Desktop configuration for a phone-like feel
   if (!kIsWeb && (Platform.isWindows || Platform.isMacOS || Platform.isLinux)) {

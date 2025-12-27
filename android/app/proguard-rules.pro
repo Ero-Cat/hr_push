@@ -13,7 +13,6 @@
   @com.google.gson.annotations.SerializedName *;
 }
 
-# Flutter Blue and permissions plugins sometimes use reflection
+# Permission handler plugin uses reflection
 -keep class com.permissionhandler.** { *; }
 -keep class com.libserialport.** { *; }
--keep class com.win_ble.** { *; }

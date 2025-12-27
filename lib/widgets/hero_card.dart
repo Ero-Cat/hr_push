@@ -2,7 +2,6 @@
 import '../l10n/app_localizations.dart';
 
 import 'package:flutter/cupertino.dart';
-import 'package:flutter_blue_plus/flutter_blue_plus.dart';
 import 'package:provider/provider.dart';
 
 import '../heart_rate_manager.dart';
@@ -15,13 +14,12 @@ class HeroCard extends StatelessWidget {
   // Extracted logic to keep presentation clean
   bool _toggleEnabled(HeartRateManager mgr) {
     return mgr.canToggleConnection &&
-        (!mgr.isConnecting ||
-            mgr.connectionState == BluetoothConnectionState.connected);
+        (!mgr.isConnecting || mgr.isConnected);
   }
 
   String _toggleLabel(BuildContext context, HeartRateManager mgr) {
     final l10n = AppLocalizations.of(context)!;
-    if (mgr.connectionState == BluetoothConnectionState.connected) {
+    if (mgr.isConnected) {
       return l10n.disconnect;
     }
     if (mgr.isConnecting) return l10n.connecting;
@@ -30,7 +28,7 @@ class HeroCard extends StatelessWidget {
   }
 
   Color _statusColor(HeartRateManager mgr) {
-    if (mgr.connectionState == BluetoothConnectionState.connected) {
+    if (mgr.isConnected) {
       return AppColors.success;
     }
     if (mgr.isConnecting || mgr.isAutoReconnecting) {
@@ -46,7 +44,7 @@ class HeroCard extends StatelessWidget {
     
     final bpm = mgr.heartRate;
     final deviceName = mgr.connectedName.isEmpty ? l10n.noDeviceConnected : mgr.connectedName;
-    final isConnected = mgr.connectionState == BluetoothConnectionState.connected;
+    final isConnected = mgr.isConnected;
     
     // Status color logic (inline for brevity or kept in helper)
     final statusColor = CupertinoDynamicColor.resolve(_statusColor(mgr), context);
