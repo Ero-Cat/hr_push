@@ -11,6 +11,7 @@ class UniversalBleAdapter implements BleAdapter {
   final _scanController = StreamController<BleDeviceInfo>.broadcast();
   final _connectionControllers = <String, StreamController<AdapterConnectionState>>{};
   final _valueControllers = <String, StreamController<Uint8List>>{};
+  final _adapterStateController = StreamController<BleAdapterState>.broadcast();
   
   bool _isInitialized = false;
   bool _isScanning = false;
@@ -22,6 +23,11 @@ class UniversalBleAdapter implements BleAdapter {
   void _initialize() {
     if (_isInitialized) return;
     _isInitialized = true;
+
+    // Set up adapter availability handler
+    UniversalBle.onAvailabilityChange = (state) {
+      _adapterStateController.add(_mapAvailabilityState(state));
+    };
 
     // Set up scan result handler
     UniversalBle.onScanResult = (device) {
@@ -58,6 +64,22 @@ class UniversalBleAdapter implements BleAdapter {
     };
   }
 
+  BleAdapterState _mapAvailabilityState(AvailabilityState state) {
+    switch (state) {
+      case AvailabilityState.poweredOn:
+        return BleAdapterState.on;
+      case AvailabilityState.poweredOff:
+        return BleAdapterState.off;
+      case AvailabilityState.unsupported:
+        return BleAdapterState.unavailable;
+      case AvailabilityState.unauthorized:
+        return BleAdapterState.unauthorized;
+      case AvailabilityState.unknown:
+      default:
+        return BleAdapterState.unknown;
+    }
+  }
+
   StreamController<AdapterConnectionState> _getConnectionController(String deviceId) {
     _connectionControllers[deviceId] ??= StreamController<AdapterConnectionState>.broadcast();
     return _connectionControllers[deviceId]!;
@@ -86,6 +108,15 @@ class UniversalBleAdapter implements BleAdapter {
   Future<bool> isBluetoothAvailable() async {
     final state = await UniversalBle.getBluetoothAvailabilityState();
     return state == AvailabilityState.poweredOn;
+  }
+
+  @override
+  Stream<BleAdapterState> get adapterStateStream => _adapterStateController.stream;
+
+  @override
+  Future<BleAdapterState> getAdapterState() async {
+    final state = await UniversalBle.getBluetoothAvailabilityState();
+    return _mapAvailabilityState(state);
   }
 
   @override

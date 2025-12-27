@@ -3,6 +3,7 @@
 #
 
 list(APPEND FLUTTER_PLUGIN_LIST
+  flutter_blue_plus_winrt
   permission_handler_windows
   screen_retriever_windows
   tray_manager

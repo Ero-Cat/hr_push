@@ -4,7 +4,7 @@ import 'dart:convert';
 import 'dart:io' show Platform, RawDatagramSocket, InternetAddress;
 
 import 'package:flutter/foundation.dart';
-import 'package:flutter_blue_plus_windows/flutter_blue_plus_windows.dart';
+import 'package:flutter_blue_plus/flutter_blue_plus.dart';
 import 'package:flutter/services.dart';
 import 'package:http/http.dart' as http;
 import 'package:mqtt_client/mqtt_client.dart';
@@ -944,7 +944,11 @@ class HeartRateManager extends ChangeNotifier {
 
     try {
       await device
-          .connect(timeout: const Duration(seconds: 10), autoConnect: false)
+          .connect(
+            timeout: const Duration(seconds: 10),
+            autoConnect: false,
+            license: License.free,
+          )
           .timeout(const Duration(seconds: 10));
       _setStatus('已连接，订阅心率中...', force: true);
       try {

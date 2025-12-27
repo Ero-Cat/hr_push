@@ -1,6 +1,6 @@
 
 import 'package:flutter/cupertino.dart';
-import 'package:flutter_blue_plus_windows/flutter_blue_plus_windows.dart';
+import 'package:flutter_blue_plus/flutter_blue_plus.dart';
 import '../l10n/app_localizations.dart';
 
 import '../heart_rate_manager.dart';

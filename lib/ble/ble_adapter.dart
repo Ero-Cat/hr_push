@@ -58,6 +58,17 @@ enum AdapterConnectionState {
   disconnecting,
 }
 
+/// Bluetooth adapter state (matches BluetoothAdapterState from flutter_blue_plus)
+enum BleAdapterState {
+  unknown,
+  unavailable,
+  unauthorized,
+  turningOn,
+  on,
+  turningOff,
+  off,
+}
+
 /// Abstract BLE adapter interface
 /// This allows swapping between different BLE implementations
 abstract class BleAdapter {
@@ -72,6 +83,12 @@ abstract class BleAdapter {
 
   /// Check if Bluetooth is available and enabled
   Future<bool> isBluetoothAvailable();
+
+  /// Stream of Bluetooth adapter state changes
+  Stream<BleAdapterState> get adapterStateStream;
+
+  /// Get current adapter state
+  Future<BleAdapterState> getAdapterState();
 
   /// Start scanning for BLE devices
   /// [withServices] - Optional list of service UUIDs to filter by
