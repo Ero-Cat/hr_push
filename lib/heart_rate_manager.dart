@@ -1063,12 +1063,27 @@ class HeartRateManager extends ChangeNotifier {
         }
       }
 
-      final services = await device.discoverServices();
+      // Discover services with timeout for Windows stability
+      _log('discovering services...');
+      _setStatus('发现服务中...', force: true);
+      notifyListeners();
+      
+      List<BluetoothService> services;
+      try {
+        services = await device.discoverServices().timeout(
+          const Duration(seconds: 10),
+          onTimeout: () {
+            throw TimeoutException('discoverServices timed out after 10s');
+          },
+        );
+      } catch (e) {
+        _log('discoverServices failed: $e');
+        rethrow;
+      }
       
       // Debug log all services to see what the device actually exposes
       final serviceUuids = services.map((s) => s.uuid.str).join(', ');
-      _log('discovered services: [$serviceUuids]');
-
+      _log('discovered ${services.length} services: [$serviceUuids]');
 
       bool foundHr = false;
       for (final service in services) {
@@ -1091,8 +1106,8 @@ class HeartRateManager extends ChangeNotifier {
         notifyListeners();
       }
       _scheduleResubscribe(device, attempt: attempt + 1);
-    } catch (e) {
-      _log('subscribe hr failed', error: e);
+    } catch (e, stackTrace) {
+      _log('subscribe hr failed: ${e.runtimeType} - $e\nStack: $stackTrace');
       // 部分设备刚连接时立即写 CCCD/READ 可能报错，延迟重试一次
       if (e is PlatformException && attempt < 1) {
         _setStatus('订阅心率重试中...', force: true);
@@ -1128,13 +1143,17 @@ class HeartRateManager extends ChangeNotifier {
   }
 
   Future<bool> _enableHrNotifications(BluetoothCharacteristic c) async {
+    _log('enabling HR notifications for characteristic ${c.uuid.str}');
     const attempts = 2;
     for (var i = 0; i < attempts; i++) {
       try {
+        _log('setNotifyValue attempt ${i + 1}/$attempts');
         await c.setNotifyValue(true);
+        _log('setNotifyValue succeeded');
         _heartRateSub = c.lastValueStream.listen(_handleHeartRateData);
         try {
           await c.read();
+          _log('initial hr read succeeded');
         } catch (e) {
           // 部分设备读取可能失败，但通知已经开启，继续使用通知数据
           _log('hr read failed (ignored)', error: e);
@@ -1145,6 +1164,7 @@ class HeartRateManager extends ChangeNotifier {
         _setStatus('已连接', force: true);
         return true;
       } catch (e) {
+        _log('setNotifyValue failed attempt ${i + 1}', error: e);
         // 如果已经开启通知, 忽略重复错误
         if (e is PlatformException && e.code == 'setNotifyValue') {
           try {
