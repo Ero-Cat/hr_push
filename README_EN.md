@@ -132,6 +132,18 @@ All protocols use the same JSON payload.
 - On Windows, running from non-ASCII paths may fail. Prefer an ASCII-only path.
 
 ## 🧾 Changelog
+### v1.6.0
+- **BLE Architecture Upgrade**: Introduced `universal_ble` library using native WinRT API instead of unstable `win_ble`, significantly improving Windows BLE connection stability.
+- **Cross-Platform Unification**: New BLE abstraction layer (`lib/ble/`) with unified codebase for Windows/macOS/iOS/Android/Linux.
+- **Enhanced Device Compatibility**: Supports all standard BLE Heart Rate Service (0x180D) devices including Polar, Garmin, Wahoo, Xiaomi bands, etc.
+- **Code Optimization**: Removed Windows-specific connection retry logic and device name encoding fixes, now handled by unified BLE layer.
+
+### v1.5.0
+- **UI Redesign**: Home page heart animation with natural "Lub-Dub" bionic pulse and ripple effects.
+- **Feature Enhancement**: Android notification redesigned as native layout (iOS Live Activity style), supporting Android 12+ (ColorOS 14).
+- **Compatibility**: Fixed Xiaomi Smart Band 10 and devices named `Mi`/`Xiaomi` not being detected; added detailed BLE service discovery logs.
+- **Optimization**: Removed unused resources, streamlined code logic.
+
 ### v1.4.0
 - Android: status/navigation bar color sync and immersive refresh optimized (including OEM ROMs).
 - Android: persistent notification channel + style upgraded; permission and color config more stable.

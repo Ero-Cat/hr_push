@@ -1070,20 +1070,9 @@ class HeartRateManager extends ChangeNotifier {
       // Xiaomi devices often require pairing before exposing Heart Rate Service
       final deviceName = _fixWindowsDeviceName(device.platformName);
       if (Platform.isWindows && _isXiaomiDevice(deviceName)) {
-        _log('Xiaomi device detected, checking bond status');
-        try {
-          // Check if we need to initiate pairing
-          // Note: flutter_blue_plus_windows uses createBond() for pairing
-          _setStatus('正在配对...', force: true);
-          notifyListeners();
-          await device.createBond();
-          _log('Pairing initiated/confirmed for Xiaomi device');
-          // Give some time for pairing to complete and services to become available
-          await Future.delayed(const Duration(milliseconds: 1500));
-        } catch (e) {
-          _log('Pairing attempt failed (may already be paired)', error: e);
-          // Continue anyway - device may already be paired
-        }
+        _log('Xiaomi device detected, skipping explicit createBond (relying on OS pairing)');
+        // Explicit createBond() here can break the connection established by win_ble
+        await Future.delayed(const Duration(milliseconds: 500));
       }
 
       // Discover services with timeout and retry for Windows stability
