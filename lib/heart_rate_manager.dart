@@ -19,6 +19,42 @@ import 'hr_notification_service.dart';
 final Guid _heartRateService = Guid('0000180d-0000-1000-8000-00805f9b34fb');
 final Guid _heartRateMeasurement = Guid('00002a37-0000-1000-8000-00805f9b34fb');
 
+/// Fixes device name encoding issues on Windows.
+/// Windows Bluetooth stack may return device names as Latin-1 encoded UTF-8 bytes,
+/// causing garbled characters like `¿½` instead of Chinese characters.
+String _fixWindowsDeviceName(String name) {
+  if (!Platform.isWindows) return name;
+  if (name.isEmpty) return name;
+
+  // Check if the name contains replacement characters or garbled patterns
+  // Common patterns: ¿½ (U+00BF U+00BD), ï¿½, Ã, etc.
+  final hasGarbledChars = name.contains('¿') ||
+      name.contains('½') ||
+      name.contains('ï') ||
+      name.codeUnits.any((c) => c >= 0x80 && c <= 0xFF);
+
+  if (!hasGarbledChars) return name;
+
+  try {
+    // The name might be UTF-8 bytes interpreted as Latin-1.
+    // Convert Latin-1 code units back to bytes, then decode as UTF-8.
+    final bytes = name.codeUnits.map((c) => c & 0xFF).toList();
+    final decoded = utf8.decode(bytes, allowMalformed: true);
+
+    // If decoded contains actual valid characters (not just replacement chars),
+    // and it's different from the original, use it.
+    if (decoded != name &&
+        decoded.isNotEmpty &&
+        !decoded.contains('\uFFFD')) {
+      return decoded;
+    }
+  } catch (_) {
+    // Decoding failed, return original
+  }
+
+  return name;
+}
+
 class NearbyDevice {
   NearbyDevice({
     required this.id,
@@ -626,11 +662,12 @@ class HeartRateManager extends ChangeNotifier {
       if (_isLikelyPhoneOrPc(r)) continue;
       if (!_isWearableHeartRateCandidate(r)) continue;
 
-      final name = r.advertisementData.advName.isNotEmpty
+      final rawName = r.advertisementData.advName.isNotEmpty
           ? r.advertisementData.advName
           : (r.device.platformName.isNotEmpty
                 ? r.device.platformName
                 : '未命名设备');
+      final name = _fixWindowsDeviceName(rawName);
 
       final id = r.device.remoteId.str;
       // Windows 上设备长时间离线后，缓存的 BluetoothDevice 可能失效。
@@ -840,7 +877,7 @@ class HeartRateManager extends ChangeNotifier {
     _connectionState = BluetoothConnectionState.disconnected;
     final label = (_pendingConnectName?.trim().isNotEmpty ?? false)
         ? _pendingConnectName!.trim()
-        : device.platformName;
+        : _fixWindowsDeviceName(device.platformName);
     _setStatus('正在连接 $label...');
     notifyListeners();
     _log('connect start: ${device.remoteId.str} name=$label');
@@ -899,7 +936,7 @@ class HeartRateManager extends ChangeNotifier {
       notifyListeners();
       final name = (_pendingConnectName?.trim().isNotEmpty ?? false)
           ? _pendingConnectName!.trim()
-          : device.platformName.trim();
+          : _fixWindowsDeviceName(device.platformName).trim();
       _pendingConnectName = null;
       _rememberLastDevice(device.remoteId.str, name);
       _startRssiPolling(device);
@@ -1008,7 +1045,8 @@ class HeartRateManager extends ChangeNotifier {
       _log('subscribe hr attempt=$attempt');
 
       // Xiaomi devices often require pairing before exposing Heart Rate Service
-      if (Platform.isWindows && _isXiaomiDevice(device.platformName)) {
+      final deviceName = _fixWindowsDeviceName(device.platformName);
+      if (Platform.isWindows && _isXiaomiDevice(deviceName)) {
         _log('Xiaomi device detected, checking bond status');
         try {
           // Check if we need to initiate pairing
