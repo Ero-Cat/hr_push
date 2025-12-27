@@ -152,6 +152,11 @@ jobs:
           $env:VERSION="${{ github.ref_name }}"
           Compress-Archive -Path "build\windows\x64\runner\Release\*" -DestinationPath "hr-push-windows-$env:VERSION.zip"
         shell: pwsh
+      - name: Upload Windows artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: hr-push-windows
+          path: hr-push-windows-*.zip
       - name: Upload Windows zip to release
         if: github.event_name == 'push' || github.event.inputs.job == 'all'
         uses: softprops/action-gh-release@v1
