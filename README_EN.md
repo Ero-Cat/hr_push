@@ -132,6 +132,11 @@ All protocols use the same JSON payload.
 - On Windows, running from non-ASCII paths may fail. Prefer an ASCII-only path.
 
 ## 🧾 Changelog
+### v1.6.1
+- **Android Optimization**: Updated Proguard rules and optimized build minification.
+- **BLE Adapter Refinement**: Fine-tuned `universal_ble` adapter layer for better stability.
+- **Windows Build Enhancement**: Upgraded C++ standard to 20 and fixed compilation warnings; CI now uploads Windows build artifacts.
+
 ### v1.6.0
 - **BLE Architecture Upgrade**: Introduced `universal_ble` library using native WinRT API instead of unstable `win_ble`, significantly improving Windows BLE connection stability.
 - **Cross-Platform Unification**: New BLE abstraction layer (`lib/ble/`) with unified codebase for Windows/macOS/iOS/Android/Linux.

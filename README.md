@@ -137,6 +137,11 @@
 
 
 ## 🧾 更新日志
+### v1.6.1
+- **Android 优化**：更新 Proguard 规则，优化构建混淆。
+- **BLE 适配器微调**：优化 `universal_ble` 适配层，提升连接稳定性。
+- **Windows 构建增强**：升级 C++ 标准至 20，并修复编译告警；CI 现在会自动上传 Windows 构建产物。
+
 ### v1.6.0
 - **BLE 架构升级**：引入 `universal_ble` 库，使用原生 WinRT API 替代不稳定的 `win_ble`，大幅提升 Windows 平台蓝牙连接稳定性。
 - **跨平台统一**：新增 BLE 抽象层 (`lib/ble/`)，同一套代码支持 Windows/macOS/iOS/Android/Linux。

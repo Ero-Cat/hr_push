@@ -58,3 +58,9 @@ app.*.map.json
 
 # local release helper
 tag.sh
+
+# Build artifacts
+*.apk
+*.aab
+*.zip
+
