@@ -1,7 +1,7 @@
 
 import 'package:flutter/cupertino.dart';
 import '../l10n/app_localizations.dart';
-import '../heart_rate_manager.dart';
+import '../models/models.dart';
 import '../theme/design_system.dart';
 import 'log_detail_page.dart';
 

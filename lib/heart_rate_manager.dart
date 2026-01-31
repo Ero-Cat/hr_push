@@ -1,6 +1,5 @@
 import 'dart:async';
 import 'dart:collection';
-import 'dart:convert';
 import 'dart:io' show Platform;
 
 import 'package:flutter/foundation.dart';
@@ -12,6 +11,7 @@ import 'app_log.dart';
 import 'hr_notification_service.dart';
 import 'ble/ble_adapter.dart';
 import 'ble/universal_ble_adapter.dart';
+import 'models/models.dart';
 import 'services/services.dart';
 
 
@@ -19,240 +19,13 @@ import 'services/services.dart';
 const String _heartRateServiceUuid = '0000180d-0000-1000-8000-00805f9b34fb';
 const String _heartRateMeasurementUuid = '00002a37-0000-1000-8000-00805f9b34fb';
 
-/// Fixes device name encoding issues on Windows.
-/// Windows Bluetooth stack may return device names as Latin-1 encoded UTF-8 bytes,
-/// causing garbled characters like `¿½` instead of Chinese characters.
-String _fixWindowsDeviceName(String name) {
-  if (!Platform.isWindows) return name;
-  if (name.isEmpty) return name;
-
-  // Check if the name contains replacement characters or garbled patterns
-  // Common patterns: ¿½ (U+00BF U+00BD), ï¿½, Ã, etc.
-  final hasGarbledChars = name.contains('¿') ||
-      name.contains('½') ||
-      name.contains('ï') ||
-      name.codeUnits.any((c) => c >= 0x80 && c <= 0xFF);
-
-  if (!hasGarbledChars) return name;
-
-  try {
-    // The name might be UTF-8 bytes interpreted as Latin-1.
-    // Convert Latin-1 code units back to bytes, then decode as UTF-8.
-    final bytes = name.codeUnits.map((c) => c & 0xFF).toList();
-    final decoded = utf8.decode(bytes, allowMalformed: true);
-
-    // If decoded contains actual valid characters (not just replacement chars),
-    // and it's different from the original, use it.
-    if (decoded != name &&
-        decoded.isNotEmpty &&
-        !decoded.contains('\uFFFD')) {
-      return decoded;
-    }
-  } catch (_) {
-    // Decoding failed, return original
-  }
-
-  return name;
-}
-
-class NearbyDevice {
-  NearbyDevice({
-    required this.id,
-    required this.name,
-    required this.rssi,
-    required this.connectable,
-    required this.lastSeen,
-  });
-
-  final String id;
-  final String name;
-  int rssi;
-  bool connectable;
-  DateTime lastSeen;
-}
-
-class HeartRateSettings {
-  const HeartRateSettings({
-    required this.pushEndpoint,
-    required this.oscAddress,
-    required this.oscHrConnectedPath,
-    required this.oscHrValuePath,
-    required this.oscHrPercentPath,
-    required this.oscChatboxEnabled,
-    required this.oscChatboxTemplate,
-    required this.maxHeartRate,
-    required this.updateIntervalMs,
-    required this.logEnabled,
-    required this.mqttBroker,
-    required this.mqttPort,
-    required this.mqttTopic,
-    required this.mqttUsername,
-    required this.mqttPassword,
-    required this.mqttClientId,
-  });
-
-  final String pushEndpoint;
-  final String oscAddress;
-  final String oscHrConnectedPath;
-  final String oscHrValuePath;
-  final String oscHrPercentPath;
-  final bool oscChatboxEnabled;
-  final String oscChatboxTemplate;
-  final int maxHeartRate;
-  final int updateIntervalMs;
-  final bool logEnabled;
-  final String mqttBroker;
-  final int mqttPort;
-  final String mqttTopic;
-  final String mqttUsername;
-  final String mqttPassword;
-  final String mqttClientId;
-
-  static const _defaultPushEndpoint = '';
-  static const _defaultOscAddress = '';
-  static const _defaultHrConnectedPath = '/avatar/parameters/hr_connected';
-  static const _defaultHrValuePath = '/avatar/parameters/hr_val';
-  static const _defaultHrPercentPath = '/avatar/parameters/hr_percent';
-  static const _defaultOscChatboxEnabled = false;
-  static const _defaultOscChatboxTemplate = '💓{hr}';
-  static const _defaultMaxHeartRate = 200;
-  static const _defaultUpdateIntervalMs = 1000;
-  static const _defaultLogEnabled = false;
-  static const _defaultMqttBroker = '';
-  static const _defaultMqttPort = 1883;
-  static const _defaultMqttTopic = 'hr_push';
-  static const _defaultMqttUsername = '';
-  static const _defaultMqttPassword = '';
-  static const _defaultMqttClientId = '';
-
-  static const _kPushEndpointKey = 'cfg_push_endpoint';
-  static const _kOscAddressKey = 'cfg_osc_address';
-  static const _kOscConnectedKey = 'cfg_osc_connected_path';
-  static const _kOscValueKey = 'cfg_osc_value_path';
-  static const _kOscPercentKey = 'cfg_osc_percent_path';
-  static const _kOscChatboxEnabledKey = 'cfg_osc_chatbox_enabled';
-  static const _kOscChatboxTemplateKey = 'cfg_osc_chatbox_template';
-  static const _kMaxHeartRateKey = 'cfg_max_heart_rate';
-  static const _kUpdateIntervalKey = 'cfg_update_interval_ms';
-  static const _kLogEnabledKey = 'cfg_log_enabled';
-  static const _kMqttBrokerKey = 'cfg_mqtt_broker';
-  static const _kMqttPortKey = 'cfg_mqtt_port';
-  static const _kMqttTopicKey = 'cfg_mqtt_topic';
-  static const _kMqttUsernameKey = 'cfg_mqtt_username';
-  static const _kMqttPasswordKey = 'cfg_mqtt_password';
-  static const _kMqttClientIdKey = 'cfg_mqtt_client_id';
-
-  factory HeartRateSettings.defaults() {
-    return const HeartRateSettings(
-      pushEndpoint: _defaultPushEndpoint,
-      oscAddress: _defaultOscAddress,
-      oscHrConnectedPath: _defaultHrConnectedPath,
-      oscHrValuePath: _defaultHrValuePath,
-      oscHrPercentPath: _defaultHrPercentPath,
-      oscChatboxEnabled: _defaultOscChatboxEnabled,
-      oscChatboxTemplate: _defaultOscChatboxTemplate,
-      maxHeartRate: _defaultMaxHeartRate,
-      updateIntervalMs: _defaultUpdateIntervalMs,
-      logEnabled: _defaultLogEnabled,
-      mqttBroker: _defaultMqttBroker,
-      mqttPort: _defaultMqttPort,
-      mqttTopic: _defaultMqttTopic,
-      mqttUsername: _defaultMqttUsername,
-      mqttPassword: _defaultMqttPassword,
-      mqttClientId: _defaultMqttClientId,
-    );
-  }
-
-  factory HeartRateSettings.fromPrefs(SharedPreferences? prefs) {
-    if (prefs == null) return HeartRateSettings.defaults();
-
-    return HeartRateSettings(
-      pushEndpoint: prefs.getString(_kPushEndpointKey) ?? _defaultPushEndpoint,
-      oscAddress: prefs.getString(_kOscAddressKey) ?? _defaultOscAddress,
-      oscHrConnectedPath:
-          prefs.getString(_kOscConnectedKey) ?? _defaultHrConnectedPath,
-      oscHrValuePath: prefs.getString(_kOscValueKey) ?? _defaultHrValuePath,
-      oscHrPercentPath:
-          prefs.getString(_kOscPercentKey) ?? _defaultHrPercentPath,
-      oscChatboxEnabled:
-          prefs.getBool(_kOscChatboxEnabledKey) ?? _defaultOscChatboxEnabled,
-      oscChatboxTemplate:
-          prefs.getString(_kOscChatboxTemplateKey) ??
-          _defaultOscChatboxTemplate,
-      maxHeartRate: prefs.getInt(_kMaxHeartRateKey) ?? _defaultMaxHeartRate,
-      updateIntervalMs:
-          prefs.getInt(_kUpdateIntervalKey) ?? _defaultUpdateIntervalMs,
-      logEnabled: prefs.getBool(_kLogEnabledKey) ?? _defaultLogEnabled,
-      mqttBroker: prefs.getString(_kMqttBrokerKey) ?? _defaultMqttBroker,
-      mqttPort: prefs.getInt(_kMqttPortKey) ?? _defaultMqttPort,
-      mqttTopic: prefs.getString(_kMqttTopicKey) ?? _defaultMqttTopic,
-      mqttUsername: prefs.getString(_kMqttUsernameKey) ?? _defaultMqttUsername,
-      mqttPassword: prefs.getString(_kMqttPasswordKey) ?? _defaultMqttPassword,
-      mqttClientId: prefs.getString(_kMqttClientIdKey) ?? _defaultMqttClientId,
-    );
-  }
-
-  Future<void> save(SharedPreferences? prefs) async {
-    if (prefs == null) return;
-    await prefs.setString(_kPushEndpointKey, pushEndpoint);
-    await prefs.setString(_kOscAddressKey, oscAddress);
-    await prefs.setString(_kOscConnectedKey, oscHrConnectedPath);
-    await prefs.setString(_kOscValueKey, oscHrValuePath);
-    await prefs.setString(_kOscPercentKey, oscHrPercentPath);
-    await prefs.setBool(_kOscChatboxEnabledKey, oscChatboxEnabled);
-    await prefs.setString(_kOscChatboxTemplateKey, oscChatboxTemplate);
-    await prefs.setInt(_kMaxHeartRateKey, maxHeartRate);
-    await prefs.setInt(_kUpdateIntervalKey, updateIntervalMs);
-    await prefs.setBool(_kLogEnabledKey, logEnabled);
-    await prefs.setString(_kMqttBrokerKey, mqttBroker);
-    await prefs.setInt(_kMqttPortKey, mqttPort);
-    await prefs.setString(_kMqttTopicKey, mqttTopic);
-    await prefs.setString(_kMqttUsernameKey, mqttUsername);
-    await prefs.setString(_kMqttPasswordKey, mqttPassword);
-    await prefs.setString(_kMqttClientIdKey, mqttClientId);
-  }
-
-  HeartRateSettings copyWith({
-    String? pushEndpoint,
-    String? oscAddress,
-    String? oscHrConnectedPath,
-    String? oscHrValuePath,
-    String? oscHrPercentPath,
-    bool? oscChatboxEnabled,
-    String? oscChatboxTemplate,
-    int? maxHeartRate,
-    int? updateIntervalMs,
-    bool? logEnabled,
-    String? mqttBroker,
-    int? mqttPort,
-    String? mqttTopic,
-    String? mqttUsername,
-    String? mqttPassword,
-    String? mqttClientId,
-  }) {
-    return HeartRateSettings(
-      pushEndpoint: pushEndpoint ?? this.pushEndpoint,
-      oscAddress: oscAddress ?? this.oscAddress,
-      oscHrConnectedPath: oscHrConnectedPath ?? this.oscHrConnectedPath,
-      oscHrValuePath: oscHrValuePath ?? this.oscHrValuePath,
-      oscHrPercentPath: oscHrPercentPath ?? this.oscHrPercentPath,
-      oscChatboxEnabled: oscChatboxEnabled ?? this.oscChatboxEnabled,
-      oscChatboxTemplate: oscChatboxTemplate ?? this.oscChatboxTemplate,
-      maxHeartRate: maxHeartRate ?? this.maxHeartRate,
-      updateIntervalMs: updateIntervalMs ?? this.updateIntervalMs,
-      logEnabled: logEnabled ?? this.logEnabled,
-      mqttBroker: mqttBroker ?? this.mqttBroker,
-      mqttPort: mqttPort ?? this.mqttPort,
-      mqttTopic: mqttTopic ?? this.mqttTopic,
-      mqttUsername: mqttUsername ?? this.mqttUsername,
-      mqttPassword: mqttPassword ?? this.mqttPassword,
-      mqttClientId: mqttClientId ?? this.mqttClientId,
-    );
-  }
-}
-
 class HeartRateManager extends ChangeNotifier {
-  HeartRateManager();
+  HeartRateManager() : _pushCoordinator = PushCoordinator(onLog: _staticLog);
+
+  static void _staticLog(String message, {Object? error}) {
+    AppLog.info(message);
+    if (error != null) AppLog.error('$message: $error');
+  }
 
   // BLE Adapter for cross-platform support
   final BleAdapter _bleAdapter = UniversalBleAdapter();
@@ -266,10 +39,8 @@ class HeartRateManager extends ChangeNotifier {
   StreamSubscription<AdapterConnectionState>? _deviceStateSub;
   StreamSubscription<Uint8List>? _heartRateSub;
 
-  // Push services (lazy initialized)
-  HttpWsService? _httpWsService;
-  MqttService? _mqttService;
-  OscService? _oscService;
+  // Push coordinator for all push services
+  late final PushCoordinator _pushCoordinator;
 
   Timer? _reconnectTimer;
   Timer? _scanUiHoldTimer;
@@ -644,7 +415,7 @@ class HeartRateManager extends ChangeNotifier {
 
     final now = DateTime.now();
 
-    final name = _fixWindowsDeviceName(r.name.trim().isNotEmpty ? r.name : '未命名设备');
+    final name = NearbyDevice.fixWindowsDeviceName(r.name.trim().isNotEmpty ? r.name : '未命名设备');
     final id = r.id;
 
     final existingIndex = _nearby.indexWhere((d) => d.id == id);
@@ -697,7 +468,7 @@ class HeartRateManager extends ChangeNotifier {
   }
 
   void _updateBroadcastHeartRate(BleDeviceInfo r) {
-    final deviceName = _fixWindowsDeviceName(r.name);
+    final deviceName = NearbyDevice.fixWindowsDeviceName(r.name);
     
     if (_isXiaomiDevice(deviceName)) {
       final serviceUuids = r.serviceUuids.join(', ');
@@ -874,7 +645,7 @@ class HeartRateManager extends ChangeNotifier {
 
     final label = (_pendingConnectName?.trim().isNotEmpty ?? false)
         ? _pendingConnectName!.trim()
-        : _fixWindowsDeviceName(knownDevice.name);
+        : NearbyDevice.fixWindowsDeviceName(knownDevice.name);
     _setStatus('正在连接 $label...');
     notifyListeners();
     _log('connect start: $deviceId name=$label');
@@ -927,7 +698,7 @@ class HeartRateManager extends ChangeNotifier {
       
       final name = (_pendingConnectName?.trim().isNotEmpty ?? false)
           ? _pendingConnectName!.trim()
-          : _fixWindowsDeviceName(knownDevice.name).trim();
+          : NearbyDevice.fixWindowsDeviceName(knownDevice.name).trim();
       _pendingConnectName = null;
       _rememberLastDevice(deviceId, name);
       // RSSI polling removed for now as UniversalBle/BleAdapter interface simplification
@@ -1037,7 +808,7 @@ class HeartRateManager extends ChangeNotifier {
       _log('subscribe hr attempt=$attempt');
 
       // Xiaomi devices often require pairing before exposing Heart Rate Service
-      final deviceName = _fixWindowsDeviceName(_connectedDeviceName ?? '');
+      final deviceName = NearbyDevice.fixWindowsDeviceName(_connectedDeviceName ?? '');
       if (Platform.isWindows && _isXiaomiDevice(deviceName)) {
         _log('Xiaomi device detected, skipping explicit createBond (relying on OS pairing)');
         await Future.delayed(const Duration(milliseconds: 500));
@@ -1477,54 +1248,28 @@ class HeartRateManager extends ChangeNotifier {
   }
 
   Future<void> _sendPushPayload(Map<String, dynamic> payload) async {
-    // HTTP/WebSocket push via service
-    final endpoint = _settings.pushEndpoint.trim();
-    if (endpoint.isNotEmpty) {
-      _httpWsService ??= HttpWsService(endpoint: endpoint, onLog: _log);
-      await _httpWsService!.send(payload);
-    }
-
-    // MQTT push via service
-    final broker = _settings.mqttBroker.trim();
-    if (broker.isNotEmpty) {
-      _mqttService ??= MqttService(
-        broker: broker,
-        port: _settings.mqttPort,
-        topic: _settings.mqttTopic,
-        username: _settings.mqttUsername,
-        password: _settings.mqttPassword,
-        clientId: _settings.mqttClientId,
-        onLog: _log,
-      );
-      await _mqttService!.send(payload);
-    }
-  }
-
-  OscService _getOscService() {
-    return _oscService ??= OscService(
-      oscAddress: _settings.oscAddress,
-      hrConnectedPath: _settings.oscHrConnectedPath,
-      hrValuePath: _settings.oscHrValuePath,
-      hrPercentPath: _settings.oscHrPercentPath,
-      chatboxEnabled: _settings.oscChatboxEnabled,
-      chatboxTemplate: _settings.oscChatboxTemplate,
-      onLog: _log,
+    final bpm = payload['heart_rate'] as int?;
+    final timestamp = DateTime.tryParse(payload['timestamp'] as String? ?? '');
+    final percent = payload['percent'] as double?;
+    if (bpm == null || timestamp == null) return;
+    
+    await _pushCoordinator.sendHeartRate(
+      bpm: bpm,
+      percent: percent,
+      timestamp: timestamp,
     );
   }
 
   Future<void> _sendOscConnectedIfNeeded(bool connected, {bool force = false}) async {
-    if (_settings.oscAddress.trim().isEmpty) return;
-    await _getOscService().sendConnectedStatus(connected, force: force);
+    await _pushCoordinator.sendConnectionStatus(connected, force: force);
   }
 
   Future<void> _sendOscHeartRate(int bpm, double? percent) async {
-    if (_settings.oscAddress.trim().isEmpty) return;
-    await _getOscService().sendHeartRate(bpm, percent);
+    // Now handled by _sendPushPayload via PushCoordinator
   }
 
   Future<void> _sendOscChatboxIfNeeded(int bpm, double? percent) async {
-    if (_settings.oscAddress.trim().isEmpty) return;
-    await _getOscService().sendChatbox(bpm, percent);
+    await _pushCoordinator.sendChatbox(bpm, percent);
   }
 
   Future<void> updateSettings(HeartRateSettings value) async {
@@ -1533,15 +1278,8 @@ class HeartRateManager extends ChangeNotifier {
     notifyListeners();
     await _settings.save(_prefs);
 
-    if (old.pushEndpoint != value.pushEndpoint) {
-      _httpWsService?.dispose();
-      _httpWsService = null;
-    }
-
-    if (old.oscAddress != value.oscAddress) {
-      _oscService?.dispose();
-      _oscService = null;
-    }
+    // Update push coordinator settings
+    _pushCoordinator.updateSettings(value);
 
     // Refresh OSC connected status if relevant settings changed
     final oscConnectedChanged =
@@ -1551,24 +1289,6 @@ class HeartRateManager extends ChangeNotifier {
         old.oscChatboxTemplate != value.oscChatboxTemplate;
     if (oscConnectedChanged) {
       _syncHrOnline(now: DateTime.now(), forceOsc: true);
-    }
-
-    final mqttChanged =
-        old.mqttBroker != value.mqttBroker ||
-        old.mqttPort != value.mqttPort ||
-        old.mqttTopic != value.mqttTopic ||
-        old.mqttUsername != value.mqttUsername ||
-        old.mqttPassword != value.mqttPassword ||
-        old.mqttClientId != value.mqttClientId;
-    if (mqttChanged) {
-      _mqttService?.dispose();
-      _mqttService = null;
-    }
-
-    if (old.updateIntervalMs != value.updateIntervalMs &&
-        _connectionState == AdapterConnectionState.connected &&
-        _connectedDeviceId != null) {
-      // RSSI logic removed
     }
 
     if (old.logEnabled != value.logEnabled) {
@@ -1589,9 +1309,7 @@ class HeartRateManager extends ChangeNotifier {
     _rssiPollTimer?.cancel();
     _scanLoopTimer?.cancel();
     _uiNotifyTimer?.cancel();
-    _httpWsService?.dispose();
-    _oscService?.dispose();
-    _mqttService?.dispose();
+    _pushCoordinator.dispose();
     unawaited(_notificationService.cancel());
     super.dispose();
   }

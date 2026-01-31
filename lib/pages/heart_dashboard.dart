@@ -8,6 +8,7 @@ import 'package:provider/provider.dart';
 import 'package:window_manager/window_manager.dart';
 
 import '../heart_rate_manager.dart';
+import '../models/models.dart';
 import '../theme/design_system.dart';
 import '../widgets/hero_card.dart';
 import '../widgets/nearby_list.dart';
