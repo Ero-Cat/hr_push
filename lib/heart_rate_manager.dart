@@ -1,21 +1,18 @@
 import 'dart:async';
 import 'dart:collection';
 import 'dart:convert';
-import 'dart:io' show Platform, RawDatagramSocket, InternetAddress;
+import 'dart:io' show Platform;
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
-import 'package:http/http.dart' as http;
-import 'package:mqtt_client/mqtt_client.dart';
-import 'package:mqtt_client/mqtt_server_client.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:web_socket_channel/io.dart';
 
 import 'app_log.dart';
 import 'hr_notification_service.dart';
 import 'ble/ble_adapter.dart';
 import 'ble/universal_ble_adapter.dart';
+import 'services/services.dart';
 
 
 
@@ -269,12 +266,10 @@ class HeartRateManager extends ChangeNotifier {
   StreamSubscription<AdapterConnectionState>? _deviceStateSub;
   StreamSubscription<Uint8List>? _heartRateSub;
 
-  IOWebSocketChannel? _wsChannel;
-  bool _wsConnecting = false;
-  RawDatagramSocket? _oscSocket;
-  MqttServerClient? _mqttClient;
-  bool _mqttConnecting = false;
-  bool _mqttConnected = false;
+  // Push services (lazy initialized)
+  HttpWsService? _httpWsService;
+  MqttService? _mqttService;
+  OscService? _oscService;
 
   Timer? _reconnectTimer;
   Timer? _scanUiHoldTimer;
@@ -296,7 +291,6 @@ class HeartRateManager extends ChangeNotifier {
   bool _autoConnectEnabled = false; // 首次启动不自动连接，等待用户操作
   bool _hrSubscribed = false;
   bool _hrOnline = false;
-  String? _lastOscHrConnectedKey;
   bool _missingHrNotified = false;
   String? _savedDeviceId;
   String? _savedDeviceName;
@@ -312,8 +306,6 @@ class HeartRateManager extends ChangeNotifier {
   String _status = '等待蓝牙...';
   BleAdapterState _adapterState = BleAdapterState.unknown;
   DateTime? _connectedAt;
-  DateTime? _lastChatboxSentAt;
-  String? _lastChatboxMessage;
 
   final List<NearbyDevice> _nearby = [];
   DateTime? _lastStatusChange;
@@ -328,7 +320,6 @@ class HeartRateManager extends ChangeNotifier {
   static const Duration _nearbyTtl = Duration(seconds: 8);
   static const Duration _hrStaleThreshold = Duration(seconds: 6);
   static const Duration _hrInitialOnlineGrace = Duration(seconds: 3);
-  static const Duration _oscChatboxMinInterval = Duration(seconds: 2);
   DateTime? _prevHeartRateAt;
   DateTime? _lastActionAt;
   static const Duration _actionCooldown = Duration(seconds: 2);
@@ -1486,356 +1477,54 @@ class HeartRateManager extends ChangeNotifier {
   }
 
   Future<void> _sendPushPayload(Map<String, dynamic> payload) async {
+    // HTTP/WebSocket push via service
     final endpoint = _settings.pushEndpoint.trim();
     if (endpoint.isNotEmpty) {
-      final uri = Uri.tryParse(endpoint);
-      if (uri != null) {
-        if (uri.scheme.startsWith('ws')) {
-          _log('push ws start: ${_formatEndpoint(uri)}');
-          await _sendWs(uri, payload);
-        } else if (uri.scheme.startsWith('http')) {
-          _log('push http start: ${_formatEndpoint(uri)}');
-          await _sendHttp(uri, payload);
-        }
-      } else {
-        _log('push endpoint invalid: $endpoint');
-      }
+      _httpWsService ??= HttpWsService(endpoint: endpoint, onLog: _log);
+      await _httpWsService!.send(payload);
     }
 
-    await _sendMqtt(payload);
-  }
-
-  Future<void> _sendHttp(Uri uri, Map<String, dynamic> payload) async {
-    try {
-      await http
-          .post(
-            uri,
-            headers: {'content-type': 'application/json'},
-            body: jsonEncode(payload),
-          )
-          .timeout(const Duration(seconds: 3));
-      _log('push http ok: ${_formatEndpoint(uri)}');
-    } catch (e) {
-      _log('push http failed: ${_formatEndpoint(uri)}', error: e);
-      // 发送失败静默忽略，避免打断主流程
-    }
-  }
-
-  Future<void> _sendWs(Uri uri, Map<String, dynamic> payload) async {
-    if (_wsChannel == null || _wsChannel!.closeCode != null) {
-      if (_wsConnecting) return;
-      _wsConnecting = true;
-      try {
-        _wsChannel = IOWebSocketChannel.connect(
-          uri,
-          pingInterval: const Duration(seconds: 10),
-        );
-        _wsChannel!.stream.listen(
-          (_) {},
-          onError: (_) {
-            _log('push ws error: ${_formatEndpoint(uri)}');
-            _wsChannel = null;
-          },
-          onDone: () {
-            _log('push ws closed: ${_formatEndpoint(uri)}');
-            _wsChannel = null;
-          },
-        );
-        _log('push ws connected: ${_formatEndpoint(uri)}');
-      } catch (e) {
-        _log('push ws connect failed: ${_formatEndpoint(uri)}', error: e);
-        _wsChannel = null;
-      } finally {
-        _wsConnecting = false;
-      }
-    }
-
-    if (_wsChannel != null) {
-      try {
-        _wsChannel!.sink.add(jsonEncode(payload));
-        _log('push ws sent: ${_formatEndpoint(uri)}');
-      } catch (_) {}
-    }
-  }
-
-  Future<void> _sendMqtt(Map<String, dynamic> payload) async {
+    // MQTT push via service
     final broker = _settings.mqttBroker.trim();
-    final topic = _settings.mqttTopic.trim();
-    if (broker.isEmpty || topic.isEmpty) return;
-
-    await _ensureMqttConnected();
-    final client = _mqttClient;
-    if (client == null || !_mqttConnected) return;
-
-    try {
-      final builder = MqttClientPayloadBuilder();
-      builder.addString(jsonEncode(payload));
-      client.publishMessage(topic, MqttQos.atLeastOnce, builder.payload!);
-      _log('push mqtt published: $topic');
-    } catch (e) {
-      _log('push mqtt publish failed: $topic', error: e);
-      _mqttConnected = false;
-      _mqttClient?.disconnect();
-      _mqttClient = null;
+    if (broker.isNotEmpty) {
+      _mqttService ??= MqttService(
+        broker: broker,
+        port: _settings.mqttPort,
+        topic: _settings.mqttTopic,
+        username: _settings.mqttUsername,
+        password: _settings.mqttPassword,
+        clientId: _settings.mqttClientId,
+        onLog: _log,
+      );
+      await _mqttService!.send(payload);
     }
   }
 
-  Future<void> _ensureMqttConnected() async {
-    if (_mqttConnected && _mqttClient != null) return;
-    if (_mqttConnecting) return;
-
-    _mqttConnecting = true;
-    try {
-      final broker = _settings.mqttBroker.trim();
-      if (broker.isEmpty) return;
-      var host = broker;
-      var port = _settings.mqttPort > 0
-          ? _settings.mqttPort
-          : HeartRateSettings.defaults().mqttPort;
-      if (broker.contains('://')) {
-        final uri = Uri.tryParse(broker);
-        if (uri != null && uri.host.isNotEmpty) {
-          host = uri.host;
-          if (_settings.mqttPort <= 0 && uri.port > 0) {
-            port = uri.port;
-          }
-        }
-      }
-      final username = _settings.mqttUsername.trim();
-      final password = _settings.mqttPassword;
-      final rawClientId = _settings.mqttClientId.trim();
-      final clientId = rawClientId.isNotEmpty
-          ? rawClientId
-          : 'hr_push_${DateTime.now().millisecondsSinceEpoch}';
-
-      _log('push mqtt connecting: $host:$port clientId=$clientId');
-      final client = MqttServerClient(host, clientId)
-        ..port = port
-        ..keepAlivePeriod = 20
-        ..logging(on: false)
-        ..onDisconnected = () {
-          _log('push mqtt disconnected: $host:$port');
-          _mqttConnected = false;
-          _mqttClient = null;
-        };
-
-      final connMess = MqttConnectMessage()
-          .withClientIdentifier(clientId)
-          .withWillQos(MqttQos.atLeastOnce)
-          .startClean();
-
-      client.connectionMessage = connMess;
-
-      try {
-        await client.connect(
-          username.isEmpty ? null : username,
-          username.isEmpty ? null : password,
-        );
-      } catch (e) {
-        _log('push mqtt connect failed: $host:$port', error: e);
-        client.disconnect();
-        return;
-      }
-
-      if (client.connectionStatus?.state == MqttConnectionState.connected) {
-        _mqttClient = client;
-        _mqttConnected = true;
-        _log('push mqtt connected: $host:$port');
-      } else {
-        client.disconnect();
-      }
-    } finally {
-      _mqttConnecting = false;
-    }
+  OscService _getOscService() {
+    return _oscService ??= OscService(
+      oscAddress: _settings.oscAddress,
+      hrConnectedPath: _settings.oscHrConnectedPath,
+      hrValuePath: _settings.oscHrValuePath,
+      hrPercentPath: _settings.oscHrPercentPath,
+      chatboxEnabled: _settings.oscChatboxEnabled,
+      chatboxTemplate: _settings.oscChatboxTemplate,
+      onLog: _log,
+    );
   }
 
-  Future<void> _sendOscConnectedIfNeeded(
-    bool connected, {
-    bool force = false,
-  }) async {
-    final key =
-        '${_settings.oscAddress.trim()}|${_settings.oscHrConnectedPath}|$connected';
-    if (!force && _lastOscHrConnectedKey == key) return;
-
-    final ok = await _sendOscMessage(_settings.oscHrConnectedPath, connected);
-    if (ok) {
-      _lastOscHrConnectedKey = key;
-    }
+  Future<void> _sendOscConnectedIfNeeded(bool connected, {bool force = false}) async {
+    if (_settings.oscAddress.trim().isEmpty) return;
+    await _getOscService().sendConnectedStatus(connected, force: force);
   }
 
   Future<void> _sendOscHeartRate(int bpm, double? percent) async {
-    await _sendOscMessage(_settings.oscHrValuePath, bpm);
-    if (percent != null) {
-      await _sendOscMessage(_settings.oscHrPercentPath, percent);
-    }
+    if (_settings.oscAddress.trim().isEmpty) return;
+    await _getOscService().sendHeartRate(bpm, percent);
   }
 
   Future<void> _sendOscChatboxIfNeeded(int bpm, double? percent) async {
-    if (!_settings.oscChatboxEnabled) return;
-
-    final text = _buildChatboxText(bpm, percent);
-    if (text.trim().isEmpty) return;
-    if (text == _lastChatboxMessage) return;
-
-    final now = DateTime.now();
-    if (_lastChatboxSentAt != null &&
-        now.difference(_lastChatboxSentAt!) < _oscChatboxMinInterval) {
-      return;
-    }
-
-    final ok = await _sendOscMessageWithArgs('/chatbox/input', [
-      text,
-      true, // send immediately
-      false, // disable notification SFX
-    ]);
-    if (ok) {
-      _lastChatboxSentAt = now;
-      _lastChatboxMessage = text;
-    }
-  }
-
-  String _buildChatboxText(int bpm, double? percent) {
-    final template = _settings.oscChatboxTemplate.trim();
-    if (template.isEmpty) return '';
-
-    final percentValue = percent == null ? null : (percent * 100).round();
-    var text = template
-        .replaceAll('{hr}', bpm.toString())
-        .replaceAll('{percent}', percentValue?.toString() ?? '');
-
-    text = text.replaceAll('\r\n', '\n').replaceAll('\r', '\n');
-    final lines = text.split('\n');
-    if (lines.length > 9) {
-      text = lines.take(9).join('\n');
-    }
-    if (text.length > 144) {
-      text = text.substring(0, 144);
-    }
-
-    return text;
-  }
-
-  Future<bool> _sendOscMessage(String address, Object value) async {
-    final target = await _resolveOscTarget();
-    if (target == null) {
-      _log('push osc target invalid: $address');
-      return false;
-    }
-    final socket = await _ensureOscSocket();
-    if (socket == null) {
-      _log('push osc socket unavailable: $address');
-      return false;
-    }
-
-    final msg = _encodeOscMessage(address, [_oscArgFromValue(value)]);
-    try {
-      socket.send(msg, target.address, target.port);
-      _log('push osc sent: $address -> ${target.address.address}:${target.port}');
-      return true;
-    } catch (_) {}
-    _log('push osc failed: $address -> ${target.address.address}:${target.port}');
-    return false;
-  }
-
-  Future<bool> _sendOscMessageWithArgs(
-    String address,
-    List<Object> args,
-  ) async {
-    final target = await _resolveOscTarget();
-    if (target == null) {
-      _log('push osc target invalid: $address');
-      return false;
-    }
-    final socket = await _ensureOscSocket();
-    if (socket == null) {
-      _log('push osc socket unavailable: $address');
-      return false;
-    }
-
-    final oscArgs = args.map(_oscArgFromValue).toList();
-    final msg = _encodeOscMessage(address, oscArgs);
-    try {
-      socket.send(msg, target.address, target.port);
-      _log('push osc sent: $address -> ${target.address.address}:${target.port}');
-      return true;
-    } catch (_) {}
-    _log('push osc failed: $address -> ${target.address.address}:${target.port}');
-    return false;
-  }
-
-  Future<_OscTarget?> _resolveOscTarget() async {
-    final raw = _settings.oscAddress.trim();
-    if (raw.isEmpty) return null;
-
-    final parts = raw.split(':');
-    if (parts.length < 2) return null;
-
-    final port = int.tryParse(parts.last);
-    final hostStr = parts.sublist(0, parts.length - 1).join(':');
-    final host = hostStr.isEmpty ? '127.0.0.1' : hostStr;
-
-    InternetAddress? ip = InternetAddress.tryParse(host);
-    if (ip == null) {
-      try {
-        final res = await InternetAddress.lookup(host);
-        if (res.isNotEmpty) ip = res.first;
-      } catch (_) {
-        return null;
-      }
-    }
-
-    if (ip == null || port == null) return null;
-    return _OscTarget(ip, port);
-  }
-
-  Future<RawDatagramSocket?> _ensureOscSocket() async {
-    if (_oscSocket != null) return _oscSocket;
-    try {
-      _oscSocket = await RawDatagramSocket.bind(InternetAddress.anyIPv4, 0);
-      return _oscSocket;
-    } catch (_) {
-      return null;
-    }
-  }
-
-  List<int> _encodeOscMessage(String address, List<_OscArg> args) {
-    final data = <int>[];
-    data.addAll(_oscString(address));
-
-    final typeTags = StringBuffer(',');
-    for (final a in args) {
-      typeTags.write(a.tag);
-    }
-    data.addAll(_oscString(typeTags.toString()));
-
-    for (final a in args) {
-      if (a.data != null) {
-        data.addAll(a.data!);
-      }
-    }
-    return data;
-  }
-
-  List<int> _oscString(String value) {
-    final bytes = utf8.encode(value);
-    final out = <int>[...bytes, 0];
-    while (out.length % 4 != 0) {
-      out.add(0);
-    }
-    return out;
-  }
-
-  _OscArg _oscArgFromValue(Object value) {
-    if (value is String) {
-      return _OscArg('s', _oscString(value));
-    }
-    if (value is bool) {
-      return _OscArg(value ? 'T' : 'F', null);
-    }
-
-    final data = ByteData(4)
-      ..setFloat32(0, (value as num).toDouble(), Endian.big);
-    return _OscArg('f', data.buffer.asUint8List());
+    if (_settings.oscAddress.trim().isEmpty) return;
+    await _getOscService().sendChatbox(bpm, percent);
   }
 
   Future<void> updateSettings(HeartRateSettings value) async {
@@ -1845,27 +1534,22 @@ class HeartRateManager extends ChangeNotifier {
     await _settings.save(_prefs);
 
     if (old.pushEndpoint != value.pushEndpoint) {
-      _wsChannel?.sink.close();
-      _wsChannel = null;
-      _wsConnecting = false;
+      _httpWsService?.dispose();
+      _httpWsService = null;
     }
 
     if (old.oscAddress != value.oscAddress) {
-      _oscSocket?.close();
-      _oscSocket = null;
+      _oscService?.dispose();
+      _oscService = null;
     }
 
-    if (old.oscChatboxEnabled != value.oscChatboxEnabled ||
-        old.oscChatboxTemplate != value.oscChatboxTemplate) {
-      _lastChatboxMessage = null;
-      _lastChatboxSentAt = null;
-    }
-
+    // Refresh OSC connected status if relevant settings changed
     final oscConnectedChanged =
         old.oscAddress != value.oscAddress ||
-        old.oscHrConnectedPath != value.oscHrConnectedPath;
+        old.oscHrConnectedPath != value.oscHrConnectedPath ||
+        old.oscChatboxEnabled != value.oscChatboxEnabled ||
+        old.oscChatboxTemplate != value.oscChatboxTemplate;
     if (oscConnectedChanged) {
-      _lastOscHrConnectedKey = null;
       _syncHrOnline(now: DateTime.now(), forceOsc: true);
     }
 
@@ -1877,10 +1561,8 @@ class HeartRateManager extends ChangeNotifier {
         old.mqttPassword != value.mqttPassword ||
         old.mqttClientId != value.mqttClientId;
     if (mqttChanged) {
-      _mqttClient?.disconnect();
-      _mqttClient = null;
-      _mqttConnected = false;
-      _mqttConnecting = false;
+      _mqttService?.dispose();
+      _mqttService = null;
     }
 
     if (old.updateIntervalMs != value.updateIntervalMs &&
@@ -1907,9 +1589,9 @@ class HeartRateManager extends ChangeNotifier {
     _rssiPollTimer?.cancel();
     _scanLoopTimer?.cancel();
     _uiNotifyTimer?.cancel();
-    _wsChannel?.sink.close();
-    _oscSocket?.close();
-    _mqttClient?.disconnect();
+    _httpWsService?.dispose();
+    _oscService?.dispose();
+    _mqttService?.dispose();
     unawaited(_notificationService.cancel());
     super.dispose();
   }
@@ -1930,12 +1612,6 @@ class HeartRateManager extends ChangeNotifier {
     AppLog.info(message);
   }
 
-  String _formatEndpoint(Uri uri) {
-    final port = uri.hasPort ? ':${uri.port}' : '';
-    final path = uri.path.isEmpty ? '' : uri.path;
-    return '${uri.scheme}://${uri.host}$port$path';
-  }
-
   String _formatErrorForStatus(Object error, {required String fallback}) {
     if (error is PlatformException) {
       if (!kIsWeb && Platform.isWindows) {
@@ -1952,20 +1628,3 @@ class HeartRateManager extends ChangeNotifier {
     return '$fallback: $error';
   }
 }
-
-class _OscArg {
-  _OscArg(this.tag, this.data);
-
-  final String tag;
-  final List<int>? data;
-}
-
-class _OscTarget {
-  _OscTarget(this.address, this.port);
-
-  final InternetAddress address;
-  final int port;
-}
-
-
-
