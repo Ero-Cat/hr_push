@@ -326,8 +326,6 @@ class HeartRateManager extends ChangeNotifier {
   static const Duration _scanUiMinVisible = Duration(seconds: 3);
 
   static const Duration _nearbyTtl = Duration(seconds: 8);
-  static const Duration _reconnectBaseDelay = Duration(seconds: 2);
-  static const Duration _reconnectMaxDelay = Duration(seconds: 30);
   static const Duration _hrStaleThreshold = Duration(seconds: 6);
   static const Duration _hrInitialOnlineGrace = Duration(seconds: 3);
   static const Duration _oscChatboxMinInterval = Duration(seconds: 2);
@@ -1249,17 +1247,6 @@ class HeartRateManager extends ChangeNotifier {
       await Future.delayed(const Duration(milliseconds: 300));
       await restartScan();
     }
-  }
-
-  Duration _computeReconnectDelay() {
-    final factor = 1 << _reconnectAttempts;
-    final ms = (_reconnectBaseDelay.inMilliseconds * factor)
-        .clamp(
-          _reconnectBaseDelay.inMilliseconds,
-          _reconnectMaxDelay.inMilliseconds,
-        )
-        .toInt();
-    return Duration(milliseconds: ms);
   }
 
 
