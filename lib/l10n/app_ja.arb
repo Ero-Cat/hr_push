@@ -49,5 +49,27 @@
   "unknownDevice": "不明なデバイス",
   "signalStrong": "強い信号",
   "signalMedium": "良好な信号",
-  "signalWeak": "弱い信号"
+  "signalWeak": "弱い信号",
+  "waitingForBluetooth": "Bluetooth待機中...",
+  "platformNotSupported": "このプラットフォームはBluetoothに対応していません",
+  "notificationPermissionDenied": "通知権限が拒否されました",
+  "pleaseEnableBluetooth": "Bluetoothをオンにしてください",
+  "bluetoothNotSupported": "Bluetooth非対応",
+  "bluetoothUnavailable": "Bluetoothは利用できません",
+  "permissionDenied": "Bluetooth/位置情報の権限が拒否されました",
+  "staleConnectionReconnecting": "接続がタイムアウト、再接続中...",
+  "scanningDevices": "デバイスをスキャン中...",
+  "disconnected": "未接続",
+  "scanNotSupported": "スキャン非対応",
+  "unnamedDevice": "名前のないデバイス",
+  "connectNotSupported": "接続非対応",
+  "connectingTo": "{device}に接続中...",
+  "@connectingTo": {
+    "placeholders": {
+      "device": {
+        "type": "String"
+      }
+    }
+  },
+  "deviceConnected": "接続済み"
 }

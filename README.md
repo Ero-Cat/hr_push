@@ -114,12 +114,41 @@
 1. Garmin Enduro 2（佳明手表，蓝牙广播推送）
 2. Xiaomi Smart Band 10 / 9（小米手环9/10，更新固件后开启心率广播）
 3. HuaWei Watch GT 4
+4. Apple Watch（需配合第三方 App，见下方说明）
 
 **蓝牙广播接收端**
 1. iPhone 15 Pro（无证书可自行签名）
 2. OnePlus Ace / ColorOS 14 (Android 14)
 3. MacBook Pro M5（macOS Tahoe 26.1）
 4. Windows（蓝牙适配器需支持 BLE）
+
+### ⌚ Apple Watch 准备工作
+
+> ⚠️ **重要提示：** Apple Watch **不原生支持**标准 BLE 心率广播协议。你需要安装第三方 App 将心率数据转发为标准 BLE 信号后，HR PUSH 才能接收。
+
+#### 为什么需要第三方 App？
+HR PUSH 通过标准 BLE 心率服务（UUID: `0x180D`）接收心率数据。Apple Watch 默认不广播此服务，而是将心率数据保留在 Apple HealthKit 生态内。因此需要借助第三方 App 将心率转发为标准 BLE 信号。
+
+#### 推荐方案：HeartCast（免费）
+[HeartCast](https://apps.apple.com/app/heartcast-heart-rate-monitor/id1499771124) 是一款免费 App，可将 Apple Watch 心率通过 iPhone 以标准 BLE 心率服务广播出去。
+
+**设置步骤：**
+1. 在 iPhone 和 Apple Watch 上安装 [HeartCast](https://apps.apple.com/app/heartcast-heart-rate-monitor/id1499771124)
+2. 确保 iPhone 和 Apple Watch 已配对并正常连接
+3. 在 Apple Watch 上打开 HeartCast，点击 **Start** 开始广播
+4. 在运行 HR PUSH 的设备上点击"重新扫描"
+5. 在设备列表中找到类似 `HeartCast` 或 `iPhone (xxx)` 的设备并连接
+
+**注意事项：**
+- HeartCast 通过 iPhone 中转广播，因此 HR PUSH 实际连接的是 iPhone 而非 Apple Watch
+- 需保持 HeartCast 在 Apple Watch 前台运行，或开启后台模式
+- iPhone 需开启蓝牙且与 HR PUSH 接收端在同一范围内
+
+#### 其他可选方案
+| 应用 | 类型 | 说明 |
+| --- | --- | --- |
+| [WATCH LINK](https://apps.apple.com/app/watch-link/id1565977702) | 付费（需硬件） | 需配合 WATCH LINK Pod/USB 硬件，支持 ANT+ 和 BLE |
+| [ECHO BLE](https://apps.apple.com/app/echo-ble/id1572440703) | 免费 | 功能与 HeartCast 类似 |
 
 ## 🛡️ 平台支持与权限
 - **Android**：需要 BLE 扫描/连接权限（Android 12+ 无需定位，11 及以下需定位权限）。若想显示状态栏卡片，请允许通知权限。

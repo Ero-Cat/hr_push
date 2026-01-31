@@ -157,4 +157,51 @@ class AppLocalizationsJa extends AppLocalizations {
 
   @override
   String get signalWeak => '弱い信号';
+
+  @override
+  String get waitingForBluetooth => 'Bluetooth待機中...';
+
+  @override
+  String get platformNotSupported => 'このプラットフォームはBluetoothに対応していません';
+
+  @override
+  String get notificationPermissionDenied => '通知権限が拒否されました';
+
+  @override
+  String get pleaseEnableBluetooth => 'Bluetoothをオンにしてください';
+
+  @override
+  String get bluetoothNotSupported => 'Bluetooth非対応';
+
+  @override
+  String get bluetoothUnavailable => 'Bluetoothは利用できません';
+
+  @override
+  String get permissionDenied => 'Bluetooth/位置情報の権限が拒否されました';
+
+  @override
+  String get staleConnectionReconnecting => '接続がタイムアウト、再接続中...';
+
+  @override
+  String get scanningDevices => 'デバイスをスキャン中...';
+
+  @override
+  String get disconnected => '未接続';
+
+  @override
+  String get scanNotSupported => 'スキャン非対応';
+
+  @override
+  String get unnamedDevice => '名前のないデバイス';
+
+  @override
+  String get connectNotSupported => '接続非対応';
+
+  @override
+  String connectingTo(String device) {
+    return '$deviceに接続中...';
+  }
+
+  @override
+  String get deviceConnected => '接続済み';
 }

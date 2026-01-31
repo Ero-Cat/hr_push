@@ -399,6 +399,96 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Weak Signal'**
   String get signalWeak;
+
+  /// No description provided for @waitingForBluetooth.
+  ///
+  /// In en, this message translates to:
+  /// **'Waiting for Bluetooth...'**
+  String get waitingForBluetooth;
+
+  /// No description provided for @platformNotSupported.
+  ///
+  /// In en, this message translates to:
+  /// **'Bluetooth not supported on this platform'**
+  String get platformNotSupported;
+
+  /// No description provided for @notificationPermissionDenied.
+  ///
+  /// In en, this message translates to:
+  /// **'Notification permission denied'**
+  String get notificationPermissionDenied;
+
+  /// No description provided for @pleaseEnableBluetooth.
+  ///
+  /// In en, this message translates to:
+  /// **'Please enable Bluetooth'**
+  String get pleaseEnableBluetooth;
+
+  /// No description provided for @bluetoothNotSupported.
+  ///
+  /// In en, this message translates to:
+  /// **'Bluetooth not supported'**
+  String get bluetoothNotSupported;
+
+  /// No description provided for @bluetoothUnavailable.
+  ///
+  /// In en, this message translates to:
+  /// **'Bluetooth unavailable'**
+  String get bluetoothUnavailable;
+
+  /// No description provided for @permissionDenied.
+  ///
+  /// In en, this message translates to:
+  /// **'Bluetooth/Location permission denied'**
+  String get permissionDenied;
+
+  /// No description provided for @staleConnectionReconnecting.
+  ///
+  /// In en, this message translates to:
+  /// **'Connection stale, reconnecting...'**
+  String get staleConnectionReconnecting;
+
+  /// No description provided for @scanningDevices.
+  ///
+  /// In en, this message translates to:
+  /// **'Scanning for devices...'**
+  String get scanningDevices;
+
+  /// No description provided for @disconnected.
+  ///
+  /// In en, this message translates to:
+  /// **'Disconnected'**
+  String get disconnected;
+
+  /// No description provided for @scanNotSupported.
+  ///
+  /// In en, this message translates to:
+  /// **'Scanning not supported'**
+  String get scanNotSupported;
+
+  /// No description provided for @unnamedDevice.
+  ///
+  /// In en, this message translates to:
+  /// **'Unnamed Device'**
+  String get unnamedDevice;
+
+  /// No description provided for @connectNotSupported.
+  ///
+  /// In en, this message translates to:
+  /// **'Connection not supported'**
+  String get connectNotSupported;
+
+  /// No description provided for @connectingTo.
+  ///
+  /// In en, this message translates to:
+  /// **'Connecting to {device}...'**
+  String connectingTo(String device);
+
+  /// No description provided for @deviceConnected.
+  ///
+  /// In en, this message translates to:
+  /// **'Connected'**
+  String get deviceConnected;
 }
 
 class _AppLocalizationsDelegate

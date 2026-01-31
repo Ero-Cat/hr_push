@@ -49,5 +49,27 @@
   "unknownDevice": "未知设备",
   "signalStrong": "信号极佳",
   "signalMedium": "信号良好",
-  "signalWeak": "信号较弱"
+  "signalWeak": "信号较弱",
+  "waitingForBluetooth": "等待蓝牙...",
+  "platformNotSupported": "当前平台暂不支持蓝牙扫描",
+  "notificationPermissionDenied": "通知权限未授予，无法显示常驻心率卡片",
+  "pleaseEnableBluetooth": "请开启蓝牙",
+  "bluetoothNotSupported": "当前平台暂不支持蓝牙",
+  "bluetoothUnavailable": "蓝牙不可用",
+  "permissionDenied": "蓝牙/定位权限未授予",
+  "staleConnectionReconnecting": "连接失活，自动重连...",
+  "scanningDevices": "扫描附近设备...",
+  "disconnected": "未连接",
+  "scanNotSupported": "当前平台不支持蓝牙扫描",
+  "unnamedDevice": "未命名设备",
+  "connectNotSupported": "当前平台不支持蓝牙连接",
+  "connectingTo": "正在连接 {device}...",
+  "@connectingTo": {
+    "placeholders": {
+      "device": {
+        "type": "String"
+      }
+    }
+  },
+  "deviceConnected": "已连接"
 }

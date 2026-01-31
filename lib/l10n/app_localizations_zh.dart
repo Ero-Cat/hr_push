@@ -157,4 +157,51 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get signalWeak => '信号较弱';
+
+  @override
+  String get waitingForBluetooth => '等待蓝牙...';
+
+  @override
+  String get platformNotSupported => '当前平台暂不支持蓝牙扫描';
+
+  @override
+  String get notificationPermissionDenied => '通知权限未授予，无法显示常驻心率卡片';
+
+  @override
+  String get pleaseEnableBluetooth => '请开启蓝牙';
+
+  @override
+  String get bluetoothNotSupported => '当前平台暂不支持蓝牙';
+
+  @override
+  String get bluetoothUnavailable => '蓝牙不可用';
+
+  @override
+  String get permissionDenied => '蓝牙/定位权限未授予';
+
+  @override
+  String get staleConnectionReconnecting => '连接失活，自动重连...';
+
+  @override
+  String get scanningDevices => '扫描附近设备...';
+
+  @override
+  String get disconnected => '未连接';
+
+  @override
+  String get scanNotSupported => '当前平台不支持蓝牙扫描';
+
+  @override
+  String get unnamedDevice => '未命名设备';
+
+  @override
+  String get connectNotSupported => '当前平台不支持蓝牙连接';
+
+  @override
+  String connectingTo(String device) {
+    return '正在连接 $device...';
+  }
+
+  @override
+  String get deviceConnected => '已连接';
 }

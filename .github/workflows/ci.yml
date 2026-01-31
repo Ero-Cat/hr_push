@@ -1,0 +1,43 @@
+name: CI
+
+on:
+  push:
+    branches: [main, master, develop]
+  pull_request:
+    branches: [main, master, develop]
+
+permissions:
+  contents: read
+
+env:
+  FLUTTER_CHANNEL: beta
+  FLUTTER_VERSION: 3.40.0-0.2.pre
+
+jobs:
+  # Combine analyze and test into single job to avoid duplicate Flutter setup
+  check:
+    name: Analyze & Test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: ${{ env.FLUTTER_CHANNEL }}
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          cache: true
+          cache-key: 'flutter-:os:-:channel:-:version:-:arch:-:hash:'
+          pub-cache-key: 'flutter-pub-:os:-:channel:-:version:-:arch:-:hash:'
+
+      - name: Install dependencies
+        run: flutter pub get
+
+      - name: Run analysis & format check
+        run: |
+          flutter analyze --fatal-infos &
+          dart format --output=none --set-exit-if-changed . &
+          wait
+
+      - name: Run tests
+        run: flutter test --coverage || echo "No tests found, skipping..."

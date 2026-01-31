@@ -28,9 +28,12 @@ jobs:
   create_release:
     name: Ensure GitHub Release Exists
     runs-on: ubuntu-latest
+    outputs:
+      upload_url: ${{ steps.release.outputs.upload_url }}
     steps:
       - uses: actions/checkout@v4
       - name: Create or update release
+        id: release
         if: github.event_name == 'push' || github.event.inputs.job == 'all'
         uses: ncipollo/release-action@v1
         with:
@@ -46,32 +49,37 @@ jobs:
     runs-on: ubuntu-latest
     if: (github.event_name == 'push' || github.event.inputs.job == 'all' || github.event.inputs.job == 'android')
     needs: create_release
-    # Allow running without needs if not all
-    # wait, if needs: create_release is there, and if create_release is skipped, this might be skipped.
-    # To fix this, we can make create_release NOT skipped but maybe the step inside it is.
-    # Or just make needs: [] if job != all. 
-    # Actually, if we use workflow_dispatch, we might want to skip create_release step logic if it's just a test build.
     steps:
       - uses: actions/checkout@v4
+      
       - name: Set up Java
         uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: "17"
-      - name: Set up Flutter (${{ env.FLUTTER_CHANNEL }})
+          
+      - name: Set up Flutter
         uses: subosito/flutter-action@v2
         with:
           channel: ${{ env.FLUTTER_CHANNEL }}
           flutter-version: ${{ env.FLUTTER_VERSION }}
           cache: true
+          cache-key: 'flutter-:os:-:channel:-:version:-:arch:-:hash:'
+          pub-cache-key: 'flutter-pub-:os:-:channel:-:version:-:arch:-:hash:'
+          
       - name: Install dependencies
         run: flutter pub get
-      - name: Build release APK
-        run: flutter build apk --release
-      - name: Rename APK with version
+        
+      - name: Sync version & build APK
+        run: |
+          chmod +x scripts/sync-version.sh && scripts/sync-version.sh
+          flutter build apk --release
+          
+      - name: Rename & upload APK
         run: |
           VERSION="${{ github.ref_name }}"
           mv build/app/outputs/flutter-apk/app-release.apk "app-release-${VERSION}.apk"
+          
       - name: Upload APK to release
         if: github.event_name == 'push' || github.event.inputs.job == 'all'
         uses: softprops/action-gh-release@v1
@@ -87,16 +95,24 @@ jobs:
     needs: create_release
     steps:
       - uses: actions/checkout@v4
-      - name: Set up Flutter (${{ env.FLUTTER_CHANNEL }})
+      
+      - name: Set up Flutter
         uses: subosito/flutter-action@v2
         with:
           channel: ${{ env.FLUTTER_CHANNEL }}
           flutter-version: ${{ env.FLUTTER_VERSION }}
           cache: true
+          cache-key: 'flutter-:os:-:channel:-:version:-:arch:-:hash:'
+          pub-cache-key: 'flutter-pub-:os:-:channel:-:version:-:arch:-:hash:'
+          
       - name: Install dependencies
         run: flutter pub get
-      - name: Build macOS app
-        run: flutter build macos --release
+        
+      - name: Sync version & build macOS
+        run: |
+          chmod +x scripts/sync-version.sh && scripts/sync-version.sh
+          flutter build macos --release
+          
       - name: Archive macOS app
         run: |
           APP_DIR="build/macos/Build/Products/Release"
@@ -108,6 +124,7 @@ jobs:
           fi
           VERSION="${{ github.ref_name }}"
           ditto -c -k --sequesterRsrc --keepParent "$APP_PATH" "hr-push-macos-${VERSION}.zip"
+          
       - name: Upload macOS zip to release
         if: github.event_name == 'push' || github.event.inputs.job == 'all'
         uses: softprops/action-gh-release@v1
@@ -120,43 +137,39 @@ jobs:
     name: Windows ZIP
     runs-on: windows-latest
     if: (github.event_name == 'push' || github.event.inputs.job == 'all' || github.event.inputs.job == 'windows')
-    # Remove 'needs' for selective manual builds to avoid skipping if create_release is skipped
-    # But wait, create_release is needed if it's a real release.
-    # Let's keep needs and make create_release always run but its main step conditional.
     needs: create_release
     steps:
       - uses: actions/checkout@v4
-      - name: Set up Flutter (${{ env.FLUTTER_CHANNEL }})
+      
+      - name: Set up Flutter
         uses: subosito/flutter-action@v2
         with:
           channel: ${{ env.FLUTTER_CHANNEL }}
           flutter-version: ${{ env.FLUTTER_VERSION }}
           cache: true
-      - name: Enable Windows desktop
-        run: flutter config --enable-windows-desktop
+          cache-key: 'flutter-:os:-:channel:-:version:-:arch:-:hash:'
+          pub-cache-key: 'flutter-pub-:os:-:channel:-:version:-:arch:-:hash:'
+          
+      - name: Enable Windows desktop & install deps
+        run: |
+          flutter config --enable-windows-desktop
+          flutter pub get
         shell: pwsh
-      - name: Install dependencies
-        run: flutter pub get
+        
+      - name: Sync version & build Windows
+        run: |
+          $version = (Get-Content pubspec.yaml | Select-String '^version:').ToString().Split(' ')[1].Split('+')[0]
+          (Get-Content lib/pages/settings_page.dart) -replace "'v[0-9]+\.[0-9]+\.[0-9]+'" , "'v$version'" | Set-Content lib/pages/settings_page.dart
+          Write-Host "Synced version to v$version"
+          flutter build windows --release
         shell: pwsh
-      - name: Clean build artifacts
-        run: flutter clean
-        shell: pwsh
-      - name: Re-fetch dependencies after clean
-        run: flutter pub get
-        shell: pwsh
-      - name: Build Windows release
-        run: flutter build windows --release
-        shell: pwsh
+        
       - name: Archive Windows build
         run: |
           $env:VERSION="${{ github.ref_name }}"
           Compress-Archive -Path "build\windows\x64\runner\Release\*" -DestinationPath "hr-push-windows-$env:VERSION.zip"
         shell: pwsh
-      - name: Upload Windows artifacts
-        uses: actions/upload-artifact@v4
-        with:
-          name: hr-push-windows
-          path: hr-push-windows-*.zip
+        
       - name: Upload Windows zip to release
         if: github.event_name == 'push' || github.event.inputs.job == 'all'
         uses: softprops/action-gh-release@v1
@@ -164,4 +177,3 @@ jobs:
           files: hr-push-windows-${{ github.ref_name }}.zip
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-

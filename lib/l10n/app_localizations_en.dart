@@ -157,4 +157,51 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get signalWeak => 'Weak Signal';
+
+  @override
+  String get waitingForBluetooth => 'Waiting for Bluetooth...';
+
+  @override
+  String get platformNotSupported => 'Bluetooth not supported on this platform';
+
+  @override
+  String get notificationPermissionDenied => 'Notification permission denied';
+
+  @override
+  String get pleaseEnableBluetooth => 'Please enable Bluetooth';
+
+  @override
+  String get bluetoothNotSupported => 'Bluetooth not supported';
+
+  @override
+  String get bluetoothUnavailable => 'Bluetooth unavailable';
+
+  @override
+  String get permissionDenied => 'Bluetooth/Location permission denied';
+
+  @override
+  String get staleConnectionReconnecting => 'Connection stale, reconnecting...';
+
+  @override
+  String get scanningDevices => 'Scanning for devices...';
+
+  @override
+  String get disconnected => 'Disconnected';
+
+  @override
+  String get scanNotSupported => 'Scanning not supported';
+
+  @override
+  String get unnamedDevice => 'Unnamed Device';
+
+  @override
+  String get connectNotSupported => 'Connection not supported';
+
+  @override
+  String connectingTo(String device) {
+    return 'Connecting to $device...';
+  }
+
+  @override
+  String get deviceConnected => 'Connected';
 }

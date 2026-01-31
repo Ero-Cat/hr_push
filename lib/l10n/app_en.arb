@@ -49,5 +49,27 @@
   "unknownDevice": "Unknown Device",
   "signalStrong": "Strong Signal",
   "signalMedium": "Medium Signal",
-  "signalWeak": "Weak Signal"
+  "signalWeak": "Weak Signal",
+  "waitingForBluetooth": "Waiting for Bluetooth...",
+  "platformNotSupported": "Bluetooth not supported on this platform",
+  "notificationPermissionDenied": "Notification permission denied",
+  "pleaseEnableBluetooth": "Please enable Bluetooth",
+  "bluetoothNotSupported": "Bluetooth not supported",
+  "bluetoothUnavailable": "Bluetooth unavailable",
+  "permissionDenied": "Bluetooth/Location permission denied",
+  "staleConnectionReconnecting": "Connection stale, reconnecting...",
+  "scanningDevices": "Scanning for devices...",
+  "disconnected": "Disconnected",
+  "scanNotSupported": "Scanning not supported",
+  "unnamedDevice": "Unnamed Device",
+  "connectNotSupported": "Connection not supported",
+  "connectingTo": "Connecting to {device}...",
+  "@connectingTo": {
+    "placeholders": {
+      "device": {
+        "type": "String"
+      }
+    }
+  },
+  "deviceConnected": "Connected"
 }
