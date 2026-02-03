@@ -4,7 +4,6 @@ import 'dart:io' show Platform;
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
-import 'package:permission_handler/permission_handler.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'app_log.dart';
@@ -14,6 +13,7 @@ import 'ble/ble_scanner.dart';
 import 'ble/universal_ble_adapter.dart';
 import 'models/models.dart';
 import 'services/services.dart';
+import 'utils/utils.dart';
 
 
 
@@ -209,14 +209,7 @@ class HeartRateManager extends ChangeNotifier {
     return now.difference(_lastPublished!) >= interval;
   }
 
-  bool get _isBleSupportedPlatform {
-    if (kIsWeb) return false;
-    return Platform.isAndroid ||
-        Platform.isIOS ||
-        Platform.isMacOS ||
-        Platform.isLinux ||
-        Platform.isWindows;
-  }
+  bool get _isBleSupportedPlatform => PermissionHelper.isBleSupportedPlatform;
 
   Future<void> start() async {
     _isTestEnv = !kIsWeb && Platform.environment['FLUTTER_TEST'] == 'true';
@@ -278,41 +271,16 @@ class HeartRateManager extends ChangeNotifier {
   }
 
   Future<bool> _ensurePermissionsAndBluetooth() async {
-    if (!_isBleSupportedPlatform) {
-      _setStatus('当前平台暂不支持蓝牙');
+    final helper = PermissionHelper(
+      bleAdapter: _bleAdapter,
+      onLog: _log,
+    );
+    final result = await helper.ensurePermissionsAndBluetooth();
+    if (!result.success) {
+      _setStatus(result.errorMessage ?? '权限检查失败');
       notifyListeners();
       return false;
     }
-
-    if (!await _bleAdapter.isBluetoothAvailable()) {
-      _setStatus('蓝牙不可用');
-      notifyListeners();
-      return false;
-    }
-
-    if (Platform.isAndroid) {
-      final androidVersion = _androidMajorVersion();
-      final needsLocation = androidVersion != null && androidVersion <= 11;
-
-      final requests = <Permission>[
-        Permission.bluetoothScan,
-        Permission.bluetoothConnect,
-        if (needsLocation) Permission.location,
-      ];
-
-      final results = await requests.request();
-
-      final denied = results.values.any(
-        (s) => s.isDenied || s.isPermanentlyDenied || s.isRestricted,
-      );
-      if (denied) {
-        _setStatus('蓝牙/定位权限未授予');
-        notifyListeners();
-        return false;
-      }
-    }
-
-    _log('permissions ok, adapter ready');
     return true;
   }
 
@@ -1194,14 +1162,6 @@ class HeartRateManager extends ChangeNotifier {
     _pushCoordinator.dispose();
     unawaited(_notificationService.cancel());
     super.dispose();
-  }
-
-  int? _androidMajorVersion() {
-    final match = RegExp(
-      r'Android (\d+)',
-    ).firstMatch(Platform.operatingSystemVersion);
-    if (match == null) return null;
-    return int.tryParse(match.group(1)!);
   }
 
   void _log(String message, {Object? error, StackTrace? stackTrace}) {
