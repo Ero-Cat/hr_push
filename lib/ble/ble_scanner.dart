@@ -111,7 +111,7 @@ class BleScanner {
   }
 
   /// Check if device should be preferred for auto-connect
-  bool shouldPrefer(BleDeviceInfo r) {
+  static bool shouldPrefer(BleDeviceInfo r) {
     if (isLikelyPhoneOrPc(r)) return false;
     return isWearableHeartRateCandidate(r);
   }

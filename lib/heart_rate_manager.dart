@@ -10,6 +10,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'app_log.dart';
 import 'hr_notification_service.dart';
 import 'ble/ble_adapter.dart';
+import 'ble/ble_scanner.dart';
 import 'ble/universal_ble_adapter.dart';
 import 'models/models.dart';
 import 'services/services.dart';
@@ -502,117 +503,14 @@ class HeartRateManager extends ChangeNotifier {
     _notifyHeartRateUpdate();
   }
 
-  int? _parseHeartRateValue(Uint8List data) {
-    if (data.isEmpty) return null;
-
-    final flags = data[0];
-    final hr16 = (flags & 0x01) == 0x01;
-    if (hr16 && data.length < 3) return null;
-
-    return hr16 ? data[1] | (data[2] << 8) : data[1];
-  }
+  int? _parseHeartRateValue(Uint8List data) => BleScanner.parseHeartRateValue(data);
 
 
 
-  bool _shouldPrefer(BleDeviceInfo r) {
-    if (_isLikelyPhoneOrPc(r)) return false;
-    return _isWearableHeartRateCandidate(r);
-  }
-
-  /// Detects if the device is a Xiaomi/Mi Band device which may require
-  /// special handling (e.g., pairing before HR service access)
-  bool _isXiaomiDevice(String name) {
-    final lowerName = name.toLowerCase();
-    return lowerName.contains('xiaomi') ||
-        lowerName.contains('小米') ||
-        lowerName.contains('mi band') ||
-        lowerName.contains('mi smart band') ||
-        lowerName.contains('miband') ||
-        lowerName.contains('手环');
-  }
-
-  bool _isWearableHeartRateCandidate(BleDeviceInfo r) {
-
-    final hasHeartRateService = r.serviceUuids
-        .map((e) => e.toLowerCase())
-        .any((id) => id.contains('180d'));
-    
-    final hasHeartRateServiceData = r.serviceData.containsKey(_heartRateServiceUuid) ||
-                                    r.serviceData.containsKey(_heartRateServiceUuid.toLowerCase());
-
-    final name = r.name.toLowerCase();
-    final likelyHrWearable =
-        name.contains('garmin') ||
-        name.contains('enduro') ||
-        name.contains('hrm') ||
-        name.contains('polar') ||
-        name.contains('wahoo') ||
-        name.contains('coros') ||
-        name.contains('suunto') ||
-        name.contains('fitbit') ||
-        name.contains('mi smart band') ||
-        name.contains('xiaomi') ||
-        name.contains('小米') ||  // Xiaomi in Chinese
-        name.contains('miband') ||
-        name.contains('mi band') ||
-        name.contains('手环') ||  // "band/bracelet" in Chinese
-        name.contains('watch');
-
-    return hasHeartRateService || hasHeartRateServiceData || likelyHrWearable;
-  }
-
-
-  bool _isLikelyPhoneOrPc(BleDeviceInfo r) {
-    final name = r.name.toLowerCase();
-
-    const phoneKeywords = [
-      'iphone',
-      'ipad',
-      'android',
-      'pixel',
-      'samsung',
-      'galaxy',
-      'huawei',
-      'honor',
-      'honor',
-      'oneplus',
-      'oppo',
-      'vivo',
-    ];
-
-    const pcKeywords = [
-      'macbook',
-      'mac ',
-      'imac',
-      'windows',
-      'pc',
-      'laptop',
-      'desktop',
-      'computer'
-    ];
-
-    const wearableKeywords = [
-      'band',
-      'watch',
-      'hrm',
-      'heart',
-      'fit',
-      'wear',
-      'miband',
-      'mi band',
-      'smart band',
-      'smartband',
-      '小米',  // Xiaomi in Chinese
-      '手环',  // "band/bracelet" in Chinese
-      '手表',  // "watch" in Chinese
-    ];
-
-
-    if (wearableKeywords.any(name.contains)) {
-      return false;
-    }
-    return phoneKeywords.any(name.contains) || pcKeywords.any(name.contains);
-  }
+  bool _shouldPrefer(BleDeviceInfo r) => BleScanner.shouldPrefer(r);
+  bool _isXiaomiDevice(String name) => BleScanner.isXiaomiDevice(name);
+  bool _isWearableHeartRateCandidate(BleDeviceInfo r) => BleScanner.isWearableHeartRateCandidate(r);
+  bool _isLikelyPhoneOrPc(BleDeviceInfo r) => BleScanner.isLikelyPhoneOrPc(r);
 
 
   Future<void> _connectTo(String deviceId) async {
