@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'dart:collection';
 import 'dart:io' show Platform;
 
 import 'package:flutter/foundation.dart';
@@ -9,6 +8,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'app_log.dart';
 import 'hr_notification_service.dart';
 import 'ble/ble_adapter.dart';
+import 'ble/ble_connection_service.dart';
 import 'ble/ble_scanner.dart';
 import 'ble/universal_ble_adapter.dart';
 import 'models/models.dart';
@@ -17,9 +17,6 @@ import 'utils/utils.dart';
 
 
 
-const String _heartRateServiceUuid = '0000180d-0000-1000-8000-00805f9b34fb';
-const String _heartRateMeasurementUuid = '00002a37-0000-1000-8000-00805f9b34fb';
-
 class HeartRateManager extends ChangeNotifier {
   HeartRateManager() : _pushCoordinator = PushCoordinator(onLog: _staticLog) {
     // Initialize BleScanner with callbacks
@@ -27,6 +24,14 @@ class HeartRateManager extends ChangeNotifier {
       onLog: _log,
       onDeviceFound: _onDeviceFound,
       onBroadcastHeartRate: _onBroadcastHeartRate,
+    );
+    // Initialize BleConnectionService
+    _connectionService = BleConnectionService(
+      adapter: _bleAdapter,
+      onLog: _log,
+      onStatusChange: _setStatus,
+      onHeartRateData: _handleHeartRateData,
+      onConnectionStateChange: _onConnectionStateChange,
     );
   }
 
@@ -37,25 +42,24 @@ class HeartRateManager extends ChangeNotifier {
 
   // BLE Scanner for device discovery
   late final BleScanner _scanner;
+  
+  // BLE Connection Service for connection management
+  late final BleConnectionService _connectionService;
 
   // BLE Adapter for cross-platform support
   final BleAdapter _bleAdapter = UniversalBleAdapter();
   String? _connectedDeviceId;
   String? _connectedDeviceName;
   AdapterConnectionState _connectionState = AdapterConnectionState.disconnected;
-  // Live Activities (Dynamic Island) removed per latest requirements.
 
   StreamSubscription<BleDeviceInfo>? _scanResultsSub;
   StreamSubscription<BleAdapterState>? _adapterStateSub;
-  StreamSubscription<AdapterConnectionState>? _deviceStateSub;
-  StreamSubscription<Uint8List>? _heartRateSub;
 
   // Push coordinator for all push services
   late final PushCoordinator _pushCoordinator;
 
   Timer? _reconnectTimer;
   Timer? _scanUiHoldTimer;
-  Timer? _resubscribeTimer;
 
   Timer? _uiNotifyTimer;
   DateTime _lastUiNotifyAt = DateTime.fromMillisecondsSinceEpoch(0);
@@ -73,7 +77,6 @@ class HeartRateManager extends ChangeNotifier {
   bool _autoConnectEnabled = false; // 首次启动不自动连接，等待用户操作
   bool _hrSubscribed = false;
   bool _hrOnline = false;
-  bool _missingHrNotified = false;
   String? _savedDeviceId;
   String? _savedDeviceName;
   String? _pendingConnectName;
@@ -107,9 +110,6 @@ class HeartRateManager extends ChangeNotifier {
   Timer? _scanLoopTimer;
   bool _scanLoopStarting = false;
   int _reconnectAttempts = 0;
-
-  static const Duration _gattStableDelay = Duration(milliseconds: 600);
-  static const Duration _gattStableDelayWindows = Duration(milliseconds: 2000);
 
   List<NearbyDevice> get nearbyDevices => _scanner.nearbyDevices;
 
@@ -441,107 +441,78 @@ class HeartRateManager extends ChangeNotifier {
       notifyListeners();
       return;
     }
-    if (_connecting) {
-      return;
-    }
+    if (_connecting) return;
+    
     _connecting = true;
     _connectedDeviceId = deviceId;
     _userInitiatedDisconnect = false;
     _connectionState = AdapterConnectionState.disconnected;
     
-    // Attempt to find device name from memory if possible
-    final knownDevice = nearbyDevices.where((d) => d.id == deviceId).firstOrNull ?? 
-      NearbyDevice(
-        id: deviceId, 
-        name: _savedDeviceName ?? 'Unknown', 
-        rssi: 0, 
-        connectable: true, 
-        lastSeen: DateTime.now()
-      );
-    _connectedDeviceName = knownDevice.name;
-
-    final label = (_pendingConnectName?.trim().isNotEmpty ?? false)
+    // Get device display name
+    final knownDevice = nearbyDevices.where((d) => d.id == deviceId).firstOrNull;
+    final displayName = (_pendingConnectName?.trim().isNotEmpty ?? false)
         ? _pendingConnectName!.trim()
-        : NearbyDevice.fixWindowsDeviceName(knownDevice.name);
-    _setStatus('正在连接 $label...');
+        : NearbyDevice.fixWindowsDeviceName(knownDevice?.name ?? _savedDeviceName ?? 'Unknown');
+    _connectedDeviceName = displayName;
+    _pendingConnectName = null;
+    
     notifyListeners();
-    _log('connect start: $deviceId name=$label');
-
-    await _bleAdapter.stopScan();
-
-    await _deviceStateSub?.cancel();
-    _deviceStateSub = _bleAdapter.connectionStateStream(deviceId).listen((state) {
-      _connectionState = state;
-      if (state == AdapterConnectionState.connected) {
-        _connectedAt = DateTime.now();
-        _setStatus('已连接', force: true);
-      }
-      if (state == AdapterConnectionState.disconnected) {
-        _connectedAt = null;
-        _heartRateSub?.cancel();
-        _hrSubscribed = false;
-        _heartRate = null;
-        _rssi = null;
-        _lastUpdated = null;
-        _prevHeartRateAt = null;
-        _autoConnectEnabled = !_userInitiatedDisconnect;
-        if (_userInitiatedDisconnect) {
-          _autoReconnect = false;
-          _connectedDeviceId = null;
-          _connectedDeviceName = null;
-          _deviceStateSub?.cancel();
-        }
-      }
-      _log('connection state=$state');
-      _notifyConnectionState();
-      notifyListeners();
-      if (state == AdapterConnectionState.disconnected &&
-          !_userInitiatedDisconnect) {
-        _reconnectAttempts = 0; // 重置退避，优先立即重连
-        _scheduleReconnect(immediate: true);
-      }
-    });
 
     try {
-      await _bleAdapter.connect(deviceId, timeout: const Duration(seconds: 10));
+      final success = await _connectionService.connect(deviceId, displayName: displayName);
       
-      _setStatus('已连接，订阅心率中...', force: true);
-      
-      _connectionState = AdapterConnectionState.connected;
-      _connectedAt = DateTime.now();
-      _reconnectTimer?.cancel();
-      _reconnectAttempts = 0;
-      notifyListeners();
-      
-      final name = (_pendingConnectName?.trim().isNotEmpty ?? false)
-          ? _pendingConnectName!.trim()
-          : NearbyDevice.fixWindowsDeviceName(knownDevice.name).trim();
-      _pendingConnectName = null;
-      _rememberLastDevice(deviceId, name);
-      // RSSI polling removed for now as UniversalBle/BleAdapter interface simplification
-      
-      await _subscribeHeartRate(deviceId);
+      if (success) {
+        _connectionState = AdapterConnectionState.connected;
+        _connectedAt = DateTime.now();
+        _hrSubscribed = true;
+        _reconnectTimer?.cancel();
+        _reconnectAttempts = 0;
+        _rememberLastDevice(deviceId, displayName);
+      } else {
+        _connectionState = AdapterConnectionState.disconnected;
+        _scheduleReconnect();
+      }
     } catch (e) {
       _log('connect failed', error: e);
       _setStatus(_formatErrorForStatus(e, fallback: '连接失败'), force: true);
       _connectionState = AdapterConnectionState.disconnected;
       _connectedAt = null;
-      notifyListeners();
       await restartScan();
     } finally {
       _connecting = false;
-      if (_connectionState != AdapterConnectionState.connected) {
-        _pendingConnectName = null;
-      }
-      if (_connectionState != AdapterConnectionState.connected &&
-          !_userInitiatedDisconnect &&
-          _autoReconnect &&
-          _connectedDeviceId != null &&
-          !(_reconnectTimer?.isActive ?? false)) {
-        _scheduleReconnect();
-      }
       notifyListeners();
     }
+  }
+  
+  /// Handle connection state changes from BleConnectionService
+  void _onConnectionStateChange(AdapterConnectionState state) {
+    _connectionState = state;
+    
+    if (state == AdapterConnectionState.connected) {
+      _connectedAt = DateTime.now();
+    }
+    
+    if (state == AdapterConnectionState.disconnected) {
+      _connectedAt = null;
+      _hrSubscribed = false;
+      _heartRate = null;
+      _rssi = null;
+      _lastUpdated = null;
+      _prevHeartRateAt = null;
+      _autoConnectEnabled = !_userInitiatedDisconnect;
+      
+      if (_userInitiatedDisconnect) {
+        _autoReconnect = false;
+        _connectedDeviceId = null;
+        _connectedDeviceName = null;
+      } else if (_autoReconnect && _connectedDeviceId != null) {
+        _reconnectAttempts = 0;
+        _scheduleReconnect(immediate: true);
+      }
+    }
+    
+    _notifyConnectionState();
+    notifyListeners();
   }
 
   Future<void> manualConnect(NearbyDevice target) async {
@@ -589,162 +560,6 @@ class HeartRateManager extends ChangeNotifier {
     return _scanner.selectPreferredDevice(savedDeviceId: _savedDeviceId);
   }
 
-  Future<void> _subscribeHeartRate(
-    String deviceId, {
-    int attempt = 0,
-  }) async {
-    if (!_isBleSupportedPlatform) return;
-    await _heartRateSub?.cancel();
-    _resubscribeTimer?.cancel();
-    _hrSubscribed = false;
-    _missingHrNotified = false;
-    _prevHeartRateAt = null;
-
-    try {
-      // 给设备短暂时间稳定 GATT，避免立即写 CCCD 报错
-      final delay = Platform.isWindows
-          ? _gattStableDelayWindows
-          : _gattStableDelay;
-      if (attempt == 0) {
-        _setStatus('订阅心率中...', force: true);
-      }
-      await Future.delayed(delay);
-
-      _log('subscribe hr attempt=$attempt');
-
-      // Xiaomi devices often require pairing before exposing Heart Rate Service
-      final deviceName = NearbyDevice.fixWindowsDeviceName(_connectedDeviceName ?? '');
-      if (Platform.isWindows && BleScanner.isXiaomiDevice(deviceName)) {
-        _log('Xiaomi device detected, skipping explicit createBond (relying on OS pairing)');
-        await Future.delayed(const Duration(milliseconds: 500));
-      }
-
-      // Discover services
-      _log('discovering services...');
-      _setStatus('发现服务中...', force: true);
-      notifyListeners();
-      
-      List<BleServiceInfo> services = [];
-      const maxDiscoverRetries = 3;
-      
-      for (var retry = 0; retry < maxDiscoverRetries; retry++) {
-        try {
-          if (retry > 0) {
-            _log('discoverServices retry $retry/$maxDiscoverRetries');
-            await Future.delayed(Duration(milliseconds: 1000 + retry * 500));
-          }
-          
-          services = await _bleAdapter.discoverServices(deviceId).timeout(
-            const Duration(seconds: 10),
-            onTimeout: () {
-              throw TimeoutException('discoverServices timed out after 10s');
-            },
-          );
-          break;
-        } catch (e) {
-          final errorStr = e.toString().toLowerCase();
-          final isDeviceNotFound = errorStr.contains('device not found') ||
-              errorStr.contains('not found');
-          
-          if (isDeviceNotFound && retry < maxDiscoverRetries - 1) {
-            _log('discoverServices "Device not found", will retry...');
-            continue;
-          }
-          _log('discoverServices failed: $e');
-          rethrow;
-        }
-      }
-      
-      final serviceUuids = services.map((s) => s.uuid).join(', ');
-      _log('discovered ${services.length} services: [$serviceUuids]');
-
-      bool foundHr = false;
-      for (final service in services) {
-        // UniversalBle usually returns normalized UUIDs, but we should be careful with case
-        if (service.uuid.toLowerCase() != _heartRateServiceUuid.toLowerCase()) continue;
-        foundHr = true;
-        
-        for (final c in service.characteristics) {
-          if (c.uuid.toLowerCase() == _heartRateMeasurementUuid.toLowerCase()) {
-            final ok = await _enableHrNotifications(deviceId, c);
-            if (ok) return;
-          }
-        }
-      }
-      
-      if (!foundHr) {
-         _log('HR service not found! Available services: $serviceUuids');
-      }
-
-      if (!_missingHrNotified) {
-        _missingHrNotified = true;
-        notifyListeners();
-      }
-      _scheduleResubscribe(deviceId, attempt: attempt + 1);
-    } catch (e, stackTrace) {
-      _log('subscribe hr failed: ${e.runtimeType} - $e\nStack: $stackTrace');
-      if (e is PlatformException && attempt < 1) {
-        _setStatus('订阅心率重试中...', force: true);
-        notifyListeners();
-        await Future.delayed(const Duration(milliseconds: 800));
-        if (_connectedDeviceId == deviceId &&
-            _connectionState == AdapterConnectionState.connected) {
-          await _subscribeHeartRate(deviceId, attempt: attempt + 1);
-        }
-        return;
-      }
-
-      _setStatus(_formatErrorForStatus(e, fallback: '订阅心率失败'), force: true);
-      notifyListeners();
-      _scheduleResubscribe(deviceId, attempt: attempt + 1);
-    }
-  }
-
-  void _scheduleResubscribe(String deviceId, {required int attempt}) {
-    if (attempt > 3) {
-      _forceReconnect(reason: 'subscribe failed');
-      return;
-    }
-
-    _resubscribeTimer?.cancel();
-    _resubscribeTimer = Timer(const Duration(seconds: 2), () {
-      if (_connectedDeviceId == deviceId &&
-          _connectionState == AdapterConnectionState.connected) {
-        _subscribeHeartRate(deviceId, attempt: attempt);
-      }
-    });
-  }
-
-  Future<bool> _enableHrNotifications(String deviceId, BleCharacteristicInfo c) async {
-    _log('enabling HR notifications for characteristic ${c.uuid}');
-    const attempts = 2;
-    for (var i = 0; i < attempts; i++) {
-      try {
-        _log('setNotifyValue attempt ${i + 1}/$attempts');
-        
-        // Setup listener first
-        _heartRateSub = _bleAdapter.valueStream(deviceId, c.serviceUuid, c.uuid).listen(_handleHeartRateData);
-        
-        // Then enable notifications
-        await _bleAdapter.subscribeToCharacteristic(deviceId, c.serviceUuid, c.uuid);
-        
-        _log('setNotifyValue succeeded');
-        
-        _resubscribeTimer?.cancel();
-        _hrSubscribed = true;
-        _missingHrNotified = false;
-        _setStatus('已连接', force: true);
-        return true;
-      } catch (e) {
-        _log('setNotifyValue failed attempt ${i + 1}', error: e);
-        if (i < attempts - 1) {
-          await Future.delayed(const Duration(milliseconds: 400));
-        }
-      }
-    }
-    return false;
-  }
-
   void _handleHeartRateData(Uint8List data) {
     if (data.isEmpty) return;
     final bpm = BleScanner.parseHeartRateValue(data);
@@ -774,46 +589,36 @@ class HeartRateManager extends ChangeNotifier {
     _lastActionAt = DateTime.now();
     _userInitiatedDisconnect = true;
     _reconnectTimer?.cancel();
-    // RSSI Polling stopped
-    _autoReconnect = false; // 手动断开后不再自动重连
+    _autoReconnect = false;
     _autoConnectEnabled = false;
     _reconnectAttempts = 0;
     _connecting = false;
-    _resubscribeTimer?.cancel();
-    _setStatus('断开中...');
+    
+    // Delegate to connection service
+    await _connectionService.disconnect();
+    
+    // Clean up local state
+    _hrSubscribed = false;
+    _connectedDeviceId = null;
+    _connectedDeviceName = null;
+    _rssi = null;
+    _heartRate = null;
+    _lastUpdated = null;
+    _lastHrSeenAt = null;
+    _prevHeartRateAt = null;
+    _savedDeviceId = null;
+    await _prefs?.remove('last_device_id');
+    _savedDeviceName = null;
+    await _prefs?.remove('last_device_name');
+    _connectionState = AdapterConnectionState.disconnected;
+    _connectedAt = null;
+    
     _syncHrOnline(now: DateTime.now(), forceOsc: true);
+    _notifyConnectionState();
+    notifyListeners();
     
-    final deviceId = _connectedDeviceId;
-    
-    try {
-      if (deviceId != null) {
-        await _bleAdapter.disconnect(deviceId);
-      }
-      _connectionState = AdapterConnectionState.disconnected;
-      _connectedAt = null;
-    } finally {
-      await _deviceStateSub?.cancel();
-      await _heartRateSub?.cancel();
-      _hrSubscribed = false;
-      _connectedDeviceId = null;
-      _connectedDeviceName = null;
-      _rssi = null;
-      _heartRate = null;
-      _lastUpdated = null;
-      _lastHrSeenAt = null;
-      _prevHeartRateAt = null;
-      _savedDeviceId = null;
-      await _prefs?.remove('last_device_id');
-      _savedDeviceName = null;
-      await _prefs?.remove('last_device_name');
-      _connectionState = AdapterConnectionState.disconnected;
-      _connectedAt = null;
-      _setStatus('已断开', force: true);
-      _notifyConnectionState();
-      notifyListeners();
-      await Future.delayed(const Duration(milliseconds: 300));
-      await restartScan();
-    }
+    await Future.delayed(const Duration(milliseconds: 300));
+    await restartScan();
   }
 
 
@@ -959,28 +764,6 @@ class HeartRateManager extends ChangeNotifier {
     });
   }
 
-  Future<void> _forceReconnect({required String reason}) async {
-    _log('force reconnect: $reason');
-    if (_connectedDeviceId == null) return;
-    _setStatus('订阅心率失败，正在重连...', force: true);
-    notifyListeners();
-
-    try {
-      await _bleAdapter.disconnect(_connectedDeviceId!);
-    } catch (e) {
-      _log('disconnect during force reconnect failed', error: e);
-    }
-
-    _connectionState = AdapterConnectionState.disconnected;
-    _connectedAt = null;
-    // RSSI stop removed
-    await _heartRateSub?.cancel();
-    _hrSubscribed = false;
-    _notifyConnectionState();
-    notifyListeners();
-    _scheduleReconnect(immediate: true);
-  }
-
   void _rememberLastDevice(String id, String name) {
     _savedDeviceId = id;
     _savedDeviceName = name;
@@ -1100,12 +883,10 @@ class HeartRateManager extends ChangeNotifier {
   void dispose() {
     _log('dispose');
     _scanResultsSub?.cancel();
-    _deviceStateSub?.cancel();
-    _heartRateSub?.cancel();
     _adapterStateSub?.cancel();
     _reconnectTimer?.cancel();
     _scanUiHoldTimer?.cancel();
-    _resubscribeTimer?.cancel();
+    _connectionService.dispose();
 
     _scanLoopTimer?.cancel();
     _uiNotifyTimer?.cancel();
