@@ -21,12 +21,22 @@ const String _heartRateServiceUuid = '0000180d-0000-1000-8000-00805f9b34fb';
 const String _heartRateMeasurementUuid = '00002a37-0000-1000-8000-00805f9b34fb';
 
 class HeartRateManager extends ChangeNotifier {
-  HeartRateManager() : _pushCoordinator = PushCoordinator(onLog: _staticLog);
+  HeartRateManager() : _pushCoordinator = PushCoordinator(onLog: _staticLog) {
+    // Initialize BleScanner with callbacks
+    _scanner = BleScanner(
+      onLog: _log,
+      onDeviceFound: _onDeviceFound,
+      onBroadcastHeartRate: _onBroadcastHeartRate,
+    );
+  }
 
   static void _staticLog(String message, {Object? error}) {
     AppLog.info(message);
     if (error != null) AppLog.error('$message: $error');
   }
+
+  // BLE Scanner for device discovery
+  late final BleScanner _scanner;
 
   // BLE Adapter for cross-platform support
   final BleAdapter _bleAdapter = UniversalBleAdapter();
@@ -79,7 +89,7 @@ class HeartRateManager extends ChangeNotifier {
   BleAdapterState _adapterState = BleAdapterState.unknown;
   DateTime? _connectedAt;
 
-  final List<NearbyDevice> _nearby = [];
+
   DateTime? _lastStatusChange;
 
 
@@ -89,7 +99,6 @@ class HeartRateManager extends ChangeNotifier {
   // 为避免按钮闪烁，至少保持 3s 的"扫描中"显示
   static const Duration _scanUiMinVisible = Duration(seconds: 3);
 
-  static const Duration _nearbyTtl = Duration(seconds: 8);
   static const Duration _hrStaleThreshold = Duration(seconds: 6);
   static const Duration _hrInitialOnlineGrace = Duration(seconds: 3);
   DateTime? _prevHeartRateAt;
@@ -102,8 +111,7 @@ class HeartRateManager extends ChangeNotifier {
   static const Duration _gattStableDelay = Duration(milliseconds: 600);
   static const Duration _gattStableDelayWindows = Duration(milliseconds: 2000);
 
-  UnmodifiableListView<NearbyDevice> get nearbyDevices =>
-      UnmodifiableListView(_nearby);
+  List<NearbyDevice> get nearbyDevices => _scanner.nearbyDevices;
 
   bool get isScanning => _isScanning;
   bool get uiScanning => _uiScanning;
@@ -372,84 +380,50 @@ class HeartRateManager extends ChangeNotifier {
       return;
     }
     await _bleAdapter.stopScan();
-    _nearby.clear();
+    _scanner.clearNearby();
     notifyListeners();
     await _startScan();
   }
 
   void _handleScanResult(BleDeviceInfo r) {
-    if (_isLikelyPhoneOrPc(r)) return;
-    if (!_isWearableHeartRateCandidate(r)) return;
-
-    final now = DateTime.now();
-
-    final name = NearbyDevice.fixWindowsDeviceName(r.name.trim().isNotEmpty ? r.name : '未命名设备');
-    final id = r.id;
-
-    final existingIndex = _nearby.indexWhere((d) => d.id == id);
-    if (existingIndex >= 0) {
-      _nearby[existingIndex]
-        ..rssi = r.rssi
-        ..connectable = r.connectable
-        ..lastSeen = now;
-    } else {
-      _nearby.add(
-        NearbyDevice(
-          id: id,
-          name: name,
-          rssi: r.rssi,
-          connectable: r.connectable,
-          lastSeen: now,
-        ),
-      );
-      _log(
-        'scan found: $name ($id) rssi=${r.rssi} connectable=${r.connectable}',
-      );
-    }
-
-    _updateBroadcastHeartRate(r);
-
-    if (_userInitiatedDisconnect) {
-      _pruneNearby(now);
-      _nearby.sort((a, b) => b.rssi.compareTo(a.rssi));
-      _notifyUi();
-      return;
-    }
-
-    if (_autoConnectEnabled &&
-        _shouldPrefer(r) &&
-        (_savedDeviceId == null || _savedDeviceId == id) &&
+    // Delegate to BleScanner for device tracking
+    _scanner.handleScanResult(r);
+    
+    // Check for auto-connect
+    if (!_userInitiatedDisconnect &&
+        _autoConnectEnabled &&
+        BleScanner.shouldPrefer(r) &&
+        (_savedDeviceId == null || _savedDeviceId == r.id) &&
         _connectionState != AdapterConnectionState.connected &&
-        r.connectable) {
+        r.connectable &&
+        !_connecting) {
+      final name = NearbyDevice.fixWindowsDeviceName(
+        r.name.trim().isNotEmpty ? r.name : '未命名设备'
+      );
       _pendingConnectName = name;
-      _log('auto connect: $name ($id)');
-      _connectTo(id);
+      _log('auto connect: $name (${r.id})');
+      _connectTo(r.id);
     }
 
-    _pruneNearby(now);
-    _nearby.sort((a, b) => b.rssi.compareTo(a.rssi));
+    _scanner.pruneNearby();
+    _scanner.sortByRssi();
     _notifyUi();
   }
 
   void _pruneNearby(DateTime now) {
-    _nearby.removeWhere((d) => now.difference(d.lastSeen) > _nearbyTtl);
+    _scanner.pruneNearby();
   }
 
-  void _updateBroadcastHeartRate(BleDeviceInfo r) {
-    final deviceName = NearbyDevice.fixWindowsDeviceName(r.name);
-    
-    if (_isXiaomiDevice(deviceName)) {
-      _log('Xiaomi adv: name=$deviceName, uuids=[${r.serviceUuids.join(', ')}]');
-    }
-    
-    final bpm = BleScanner.extractBroadcastHeartRate(r);
-    if (bpm == null) return;
+  // BleScanner callbacks
+  void _onDeviceFound(NearbyDevice device, bool isNew) {
+    // Device tracking handled by BleScanner
+  }
 
+  void _onBroadcastHeartRate(int bpm, int rssi, String deviceName) {
     final now = DateTime.now();
-    _log('hr rx broadcast: bpm=$bpm rssi=${r.rssi} name=${r.name}');
     _prevHeartRateAt = _lastUpdated;
     _heartRate = bpm;
-    _rssi = r.rssi;
+    _rssi = rssi;
     _lastUpdated = now;
     _lastHrSeenAt = now;
     _syncHrOnline(now: now);
@@ -458,11 +432,6 @@ class HeartRateManager extends ChangeNotifier {
     _lastPublished = now;
     _notifyHeartRateUpdate();
   }
-
-  bool _shouldPrefer(BleDeviceInfo r) => BleScanner.shouldPrefer(r);
-  bool _isXiaomiDevice(String name) => BleScanner.isXiaomiDevice(name);
-  bool _isWearableHeartRateCandidate(BleDeviceInfo r) => BleScanner.isWearableHeartRateCandidate(r);
-  bool _isLikelyPhoneOrPc(BleDeviceInfo r) => BleScanner.isLikelyPhoneOrPc(r);
 
 
   Future<void> _connectTo(String deviceId) async {
@@ -481,16 +450,14 @@ class HeartRateManager extends ChangeNotifier {
     _connectionState = AdapterConnectionState.disconnected;
     
     // Attempt to find device name from memory if possible
-    final knownDevice = _nearby.firstWhere(
-      (d) => d.id == deviceId, 
-      orElse: () => NearbyDevice(
+    final knownDevice = nearbyDevices.where((d) => d.id == deviceId).firstOrNull ?? 
+      NearbyDevice(
         id: deviceId, 
         name: _savedDeviceName ?? 'Unknown', 
         rssi: 0, 
         connectable: true, 
         lastSeen: DateTime.now()
-      )
-    );
+      );
     _connectedDeviceName = knownDevice.name;
 
     final label = (_pendingConnectName?.trim().isNotEmpty ?? false)
@@ -619,19 +586,7 @@ class HeartRateManager extends ChangeNotifier {
   }
 
   NearbyDevice? _selectPreferredDevice() {
-    if (_savedDeviceId != null) {
-      for (final d in _nearby) {
-        if (d.id == _savedDeviceId) return d;
-      }
-    }
-
-    if (_savedDeviceName?.trim().isNotEmpty ?? false) {
-      for (final d in _nearby) {
-        if (d.name.trim() == _savedDeviceName!.trim()) return d;
-      }
-    }
-
-    return _nearby.isNotEmpty ? _nearby.first : null;
+    return _scanner.selectPreferredDevice(savedDeviceId: _savedDeviceId);
   }
 
   Future<void> _subscribeHeartRate(
@@ -659,7 +614,7 @@ class HeartRateManager extends ChangeNotifier {
 
       // Xiaomi devices often require pairing before exposing Heart Rate Service
       final deviceName = NearbyDevice.fixWindowsDeviceName(_connectedDeviceName ?? '');
-      if (Platform.isWindows && _isXiaomiDevice(deviceName)) {
+      if (Platform.isWindows && BleScanner.isXiaomiDevice(deviceName)) {
         _log('Xiaomi device detected, skipping explicit createBond (relying on OS pairing)');
         await Future.delayed(const Duration(milliseconds: 500));
       }
@@ -915,16 +870,11 @@ class HeartRateManager extends ChangeNotifier {
 
       await _ensureScanAlive();
 
-      NearbyDevice? nearby;
-      try {
-        nearby = _nearby.firstWhere((d) => d.id == targetId);
-      } catch (_) {}
+      NearbyDevice? nearby = nearbyDevices.where((d) => d.id == targetId).firstOrNull;
 
       if (nearby == null && (_savedDeviceName?.trim().isNotEmpty ?? false)) {
-        final matches = _nearby
-            .where(
-              (d) => d.connectable && d.name.trim() == _savedDeviceName!.trim(),
-            )
+        final matches = nearbyDevices
+            .where((d) => d.connectable && d.name.trim() == _savedDeviceName!.trim())
             .toList();
         if (matches.length == 1) {
           nearby = matches.first;
