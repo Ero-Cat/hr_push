@@ -94,6 +94,17 @@ class BleScanner {
     return hr16 ? data[1] | (data[2] << 8) : data[1];
   }
 
+  /// Extract broadcast heart rate from BLE device service data
+  /// Returns the heart rate value if found in service data, null otherwise
+  static int? extractBroadcastHeartRate(BleDeviceInfo r) {
+    final data = r.serviceData[_heartRateServiceUuid] ?? 
+                 r.serviceData[_heartRateServiceUuid.toLowerCase()] ??
+                 r.serviceData[_heartRateServiceUuid.toUpperCase()];
+
+    if (data == null || data.length < 2) return null;
+    return parseHeartRateValue(data);
+  }
+
   /// Prune devices not seen recently
   void pruneNearby() {
     final now = DateTime.now();

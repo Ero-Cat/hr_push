@@ -46,7 +46,7 @@ class HeartRateManager extends ChangeNotifier {
   Timer? _reconnectTimer;
   Timer? _scanUiHoldTimer;
   Timer? _resubscribeTimer;
-  Timer? _rssiPollTimer;
+
   Timer? _uiNotifyTimer;
   DateTime _lastUiNotifyAt = DateTime.fromMillisecondsSinceEpoch(0);
   bool _uiNotifyScheduled = false;
@@ -145,7 +145,6 @@ class HeartRateManager extends ChangeNotifier {
     return percent.clamp(0, 1).toDouble();
   }
 
-  @visibleForTesting
   @visibleForTesting
   static bool computeHrOnline({
     required bool userInitiatedDisconnect,
@@ -472,20 +471,10 @@ class HeartRateManager extends ChangeNotifier {
     final deviceName = NearbyDevice.fixWindowsDeviceName(r.name);
     
     if (_isXiaomiDevice(deviceName)) {
-      final serviceUuids = r.serviceUuids.join(', ');
-      final serviceDataKeys = r.serviceData.keys.join(', ');
-      final mfgData = r.manufacturerData;
-      _log('Xiaomi adv data: name=$deviceName, serviceUUIDs=[$serviceUuids], serviceDataKeys=[$serviceDataKeys], mfgDataLen=${mfgData.length}');
+      _log('Xiaomi adv: name=$deviceName, uuids=[${r.serviceUuids.join(', ')}]');
     }
     
-    // Look for Heart Rate Service UUID (0x180D) in service data
-    final data = r.serviceData[_heartRateServiceUuid] ?? 
-                 r.serviceData[_heartRateServiceUuid.toLowerCase()] ??
-                 r.serviceData[_heartRateServiceUuid.toUpperCase()];
-
-    if (data == null || data.length < 2) return;
-
-    final bpm = _parseHeartRateValue(data);
+    final bpm = BleScanner.extractBroadcastHeartRate(r);
     if (bpm == null) return;
 
     final now = DateTime.now();
@@ -496,16 +485,11 @@ class HeartRateManager extends ChangeNotifier {
     _lastUpdated = now;
     _lastHrSeenAt = now;
     _syncHrOnline(now: now);
-    final shouldPublish = _shouldPublishNow(now);
-    if (!shouldPublish) return;
-
+    
+    if (!_shouldPublishNow(now)) return;
     _lastPublished = now;
     _notifyHeartRateUpdate();
   }
-
-  int? _parseHeartRateValue(Uint8List data) => BleScanner.parseHeartRateValue(data);
-
-
 
   bool _shouldPrefer(BleDeviceInfo r) => BleScanner.shouldPrefer(r);
   bool _isXiaomiDevice(String name) => BleScanner.isXiaomiDevice(name);
@@ -840,7 +824,7 @@ class HeartRateManager extends ChangeNotifier {
 
   void _handleHeartRateData(Uint8List data) {
     if (data.isEmpty) return;
-    final bpm = _parseHeartRateValue(data);
+    final bpm = BleScanner.parseHeartRateValue(data);
     if (bpm == null) return;
     final now = DateTime.now();
     _log('hr rx notify: bpm=$bpm');
@@ -1204,7 +1188,7 @@ class HeartRateManager extends ChangeNotifier {
     _reconnectTimer?.cancel();
     _scanUiHoldTimer?.cancel();
     _resubscribeTimer?.cancel();
-    _rssiPollTimer?.cancel();
+
     _scanLoopTimer?.cancel();
     _uiNotifyTimer?.cancel();
     _pushCoordinator.dispose();
