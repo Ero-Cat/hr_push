@@ -239,6 +239,7 @@ class HeartRateManager extends ChangeNotifier {
 
     _prefs = await SharedPreferences.getInstance();
     _settings = HeartRateSettings.fromPrefs(_prefs);
+    _pushCoordinator.updateSettings(_settings);
     AppLog.setEnabled(_settings.logEnabled);
     _savedDeviceId = _prefs?.getString('last_device_id');
     _savedDeviceName = _prefs?.getString('last_device_name');
@@ -831,7 +832,7 @@ class HeartRateManager extends ChangeNotifier {
   }
 
   Future<void> _sendPushPayload(Map<String, dynamic> payload) async {
-    final bpm = payload['heart_rate'] as int?;
+    final bpm = payload['heartRate'] as int?;
     final timestamp = DateTime.tryParse(payload['timestamp'] as String? ?? '');
     final percent = payload['percent'] as double?;
     if (bpm == null || timestamp == null) return;
