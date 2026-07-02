@@ -1,4 +1,3 @@
-
 import 'package:flutter/cupertino.dart';
 import '../l10n/app_localizations.dart';
 import '../models/models.dart';
@@ -30,7 +29,7 @@ class _SettingsPageState extends State<SettingsPage> {
   late final TextEditingController _mqttUsernameCtrl;
   late final TextEditingController _mqttPasswordCtrl;
   late final TextEditingController _mqttClientIdCtrl;
-  
+
   bool _oscChatboxEnabled = false;
   bool _logEnabled = false;
 
@@ -40,30 +39,60 @@ class _SettingsPageState extends State<SettingsPage> {
     // Initialize with values
     _pushCtrl = TextEditingController(text: widget.initial.pushEndpoint);
     _oscCtrl = TextEditingController(text: widget.initial.oscAddress);
-    _oscConnectedCtrl = TextEditingController(text: widget.initial.oscHrConnectedPath);
+    _oscConnectedCtrl = TextEditingController(
+      text: widget.initial.oscHrConnectedPath,
+    );
     _oscValueCtrl = TextEditingController(text: widget.initial.oscHrValuePath);
-    _oscPercentCtrl = TextEditingController(text: widget.initial.oscHrPercentPath);
-    _oscChatboxTemplateCtrl = TextEditingController(text: widget.initial.oscChatboxTemplate);
-    _maxHrCtrl = TextEditingController(text: widget.initial.maxHeartRate.toString());
-    _intervalCtrl = TextEditingController(text: widget.initial.updateIntervalMs.toString());
-    
+    _oscPercentCtrl = TextEditingController(
+      text: widget.initial.oscHrPercentPath,
+    );
+    _oscChatboxTemplateCtrl = TextEditingController(
+      text: widget.initial.oscChatboxTemplate,
+    );
+    _maxHrCtrl = TextEditingController(
+      text: widget.initial.maxHeartRate.toString(),
+    );
+    _intervalCtrl = TextEditingController(
+      text: widget.initial.updateIntervalMs.toString(),
+    );
+
     _oscChatboxEnabled = widget.initial.oscChatboxEnabled;
     _logEnabled = widget.initial.logEnabled;
 
     _mqttBrokerCtrl = TextEditingController(text: widget.initial.mqttBroker);
-    _mqttPortCtrl = TextEditingController(text: widget.initial.mqttPort.toString());
+    _mqttPortCtrl = TextEditingController(
+      text: widget.initial.mqttPort.toString(),
+    );
     _mqttTopicCtrl = TextEditingController(text: widget.initial.mqttTopic);
-    _mqttUsernameCtrl = TextEditingController(text: widget.initial.mqttUsername);
-    _mqttPasswordCtrl = TextEditingController(text: widget.initial.mqttPassword);
-    _mqttClientIdCtrl = TextEditingController(text: widget.initial.mqttClientId);
-    
+    _mqttUsernameCtrl = TextEditingController(
+      text: widget.initial.mqttUsername,
+    );
+    _mqttPasswordCtrl = TextEditingController(
+      text: widget.initial.mqttPassword,
+    );
+    _mqttClientIdCtrl = TextEditingController(
+      text: widget.initial.mqttClientId,
+    );
+
     // Set defaults if empty
-    if (_oscCtrl.text.isEmpty) _oscCtrl.text = '127.0.0.1:9000';
-    if (_mqttTopicCtrl.text.isEmpty) _mqttTopicCtrl.text = 'hr_push';
-    if (_oscConnectedCtrl.text.isEmpty) _oscConnectedCtrl.text = '/avatar/parameters/hr_connected';
-    if (_oscValueCtrl.text.isEmpty) _oscValueCtrl.text = '/avatar/parameters/hr_val';
-    if (_oscPercentCtrl.text.isEmpty) _oscPercentCtrl.text = '/avatar/parameters/hr_percent';
-    if (_oscChatboxTemplateCtrl.text.isEmpty) _oscChatboxTemplateCtrl.text = '💓{hr}';
+    if (_oscCtrl.text.isEmpty) {
+      _oscCtrl.text = '127.0.0.1:9000';
+    }
+    if (_mqttTopicCtrl.text.isEmpty) {
+      _mqttTopicCtrl.text = 'hr_push';
+    }
+    if (_oscConnectedCtrl.text.isEmpty) {
+      _oscConnectedCtrl.text = '/avatar/parameters/hr_connected';
+    }
+    if (_oscValueCtrl.text.isEmpty) {
+      _oscValueCtrl.text = '/avatar/parameters/hr_val';
+    }
+    if (_oscPercentCtrl.text.isEmpty) {
+      _oscPercentCtrl.text = '/avatar/parameters/hr_percent';
+    }
+    if (_oscChatboxTemplateCtrl.text.isEmpty) {
+      _oscChatboxTemplateCtrl.text = '💓{hr}';
+    }
   }
 
   @override
@@ -118,47 +147,82 @@ class _SettingsPageState extends State<SettingsPage> {
                 ),
               ],
             ),
-            
+
             _buildSection(
               header: l10n.sectionVrchatOsc,
               children: [
-                _buildInput(controller: _oscCtrl, label: l10n.fieldAddress, placeholder: '127.0.0.1:9000'),
-                _buildInput(controller: _oscConnectedCtrl, label: l10n.fieldConnectedParam),
-                _buildInput(controller: _oscValueCtrl, label: l10n.fieldHrValueParam),
-                _buildInput(controller: _oscPercentCtrl, label: l10n.fieldHrPercentParam),
-                _buildInput(controller: _maxHrCtrl, label: l10n.fieldMaxHr, keyboardType: TextInputType.number),
+                _buildInput(
+                  controller: _oscCtrl,
+                  label: l10n.fieldAddress,
+                  placeholder: '127.0.0.1:9000',
+                ),
+                _buildInput(
+                  controller: _oscConnectedCtrl,
+                  label: l10n.fieldConnectedParam,
+                ),
+                _buildInput(
+                  controller: _oscValueCtrl,
+                  label: l10n.fieldHrValueParam,
+                ),
+                _buildInput(
+                  controller: _oscPercentCtrl,
+                  label: l10n.fieldHrPercentParam,
+                ),
+                _buildInput(
+                  controller: _maxHrCtrl,
+                  label: l10n.fieldMaxHr,
+                  keyboardType: TextInputType.number,
+                ),
               ],
             ),
 
             _buildSection(
               header: l10n.sectionOscChatbox,
               children: [
-                 CupertinoFormRow(
-                   prefix: Text(l10n.fieldEnabled),
-                   child: CupertinoSwitch(
-                     value: _oscChatboxEnabled,
-                     activeTrackColor: AppColors.accent,
-                     onChanged: (v) => setState(() => _oscChatboxEnabled = v),
-                   ),
-                 ),
-                 if (_oscChatboxEnabled)
-                   _buildInput(
-                     controller: _oscChatboxTemplateCtrl,
-                     label: l10n.fieldTemplate,
-                     placeholder: '💓{hr}',
-                   ),
+                CupertinoFormRow(
+                  prefix: Text(l10n.fieldEnabled),
+                  child: CupertinoSwitch(
+                    value: _oscChatboxEnabled,
+                    activeTrackColor: AppColors.accent,
+                    onChanged: (v) => setState(() => _oscChatboxEnabled = v),
+                  ),
+                ),
+                if (_oscChatboxEnabled)
+                  _buildInput(
+                    controller: _oscChatboxTemplateCtrl,
+                    label: l10n.fieldTemplate,
+                    placeholder: '💓{hr}',
+                  ),
               ],
             ),
 
             _buildSection(
               header: l10n.sectionMqtt,
               children: [
-                _buildInput(controller: _mqttBrokerCtrl, label: l10n.fieldBroker, placeholder: 'broker.hivemq.com'),
-                _buildInput(controller: _mqttPortCtrl, label: l10n.fieldPort, keyboardType: TextInputType.number),
+                _buildInput(
+                  controller: _mqttBrokerCtrl,
+                  label: l10n.fieldBroker,
+                  placeholder: 'broker.hivemq.com',
+                ),
+                _buildInput(
+                  controller: _mqttPortCtrl,
+                  label: l10n.fieldPort,
+                  keyboardType: TextInputType.number,
+                ),
                 _buildInput(controller: _mqttTopicCtrl, label: l10n.fieldTopic),
-                _buildInput(controller: _mqttUsernameCtrl, label: l10n.fieldUsername),
-                _buildInput(controller: _mqttPasswordCtrl, label: l10n.fieldPassword, obscureText: true),
-                _buildInput(controller: _mqttClientIdCtrl, label: l10n.fieldClientId),
+                _buildInput(
+                  controller: _mqttUsernameCtrl,
+                  label: l10n.fieldUsername,
+                ),
+                _buildInput(
+                  controller: _mqttPasswordCtrl,
+                  label: l10n.fieldPassword,
+                  obscureText: true,
+                ),
+                _buildInput(
+                  controller: _mqttClientIdCtrl,
+                  label: l10n.fieldClientId,
+                ),
               ],
             ),
 
@@ -166,28 +230,30 @@ class _SettingsPageState extends State<SettingsPage> {
               header: l10n.sectionDebugging,
               children: [
                 CupertinoFormRow(
-                   prefix: Text(l10n.fieldEnableLogs),
-                   child: CupertinoSwitch(
-                     value: _logEnabled,
-                     activeTrackColor: AppColors.accent,
-                     onChanged: (v) => setState(() => _logEnabled = v),
-                   ),
-                 ),
-                 if (_logEnabled)
-                   CupertinoButton(
-                     child: Text(l10n.btnViewLogs),
-                     onPressed: () {
-                       Navigator.of(context).push(
-                         CupertinoPageRoute(builder: (_) => const LogDetailPage()),
-                       );
-                     },
-                   ),
+                  prefix: Text(l10n.fieldEnableLogs),
+                  child: CupertinoSwitch(
+                    value: _logEnabled,
+                    activeTrackColor: AppColors.accent,
+                    onChanged: (v) => setState(() => _logEnabled = v),
+                  ),
+                ),
+                if (_logEnabled)
+                  CupertinoButton(
+                    child: Text(l10n.btnViewLogs),
+                    onPressed: () {
+                      Navigator.of(context).push(
+                        CupertinoPageRoute(
+                          builder: (_) => const LogDetailPage(),
+                        ),
+                      );
+                    },
+                  ),
               ],
             ),
             const SizedBox(height: 20),
             Center(
               child: Text(
-                'v1.6.1',
+                'v1.7.2',
                 style: AppTypography.caption.copyWith(
                   color: AppColors.textTertiary.resolveFrom(context),
                 ),
@@ -200,7 +266,10 @@ class _SettingsPageState extends State<SettingsPage> {
     );
   }
 
-  Widget _buildSection({required String header, required List<Widget> children}) {
+  Widget _buildSection({
+    required String header,
+    required List<Widget> children,
+  }) {
     return CupertinoFormSection.insetGrouped(
       header: Text(header.toUpperCase()),
       backgroundColor: AppColors.bgPrimary,
@@ -213,9 +282,9 @@ class _SettingsPageState extends State<SettingsPage> {
   }
 
   Widget _buildInput({
-    required TextEditingController controller, 
-    required String label, 
-    String? placeholder, 
+    required TextEditingController controller,
+    required String label,
+    String? placeholder,
     TextInputType? keyboardType,
     bool obscureText = false,
   }) {

@@ -27,10 +27,7 @@ class BleServiceInfo {
   final String uuid;
   final List<BleCharacteristicInfo> characteristics;
 
-  BleServiceInfo({
-    required this.uuid,
-    this.characteristics = const [],
-  });
+  BleServiceInfo({required this.uuid, this.characteristics = const []});
 }
 
 /// Represents a BLE characteristic
@@ -40,6 +37,7 @@ class BleCharacteristicInfo {
   final bool canRead;
   final bool canWrite;
   final bool canNotify;
+  final bool canIndicate;
 
   BleCharacteristicInfo({
     required this.uuid,
@@ -47,8 +45,11 @@ class BleCharacteristicInfo {
     this.canRead = false,
     this.canWrite = false,
     this.canNotify = false,
+    this.canIndicate = false,
   });
 }
+
+enum BleSubscriptionMode { notification, indication }
 
 /// Connection state enum (renamed to avoid conflict with universal_ble)
 enum AdapterConnectionState {
@@ -79,7 +80,11 @@ abstract class BleAdapter {
   Stream<AdapterConnectionState> connectionStateStream(String deviceId);
 
   /// Stream of values received from subscribed characteristics
-  Stream<Uint8List> valueStream(String deviceId, String serviceUuid, String characteristicUuid);
+  Stream<Uint8List> valueStream(
+    String deviceId,
+    String serviceUuid,
+    String characteristicUuid,
+  );
 
   /// Check if Bluetooth is available and enabled
   Future<bool> isBluetoothAvailable();
@@ -110,8 +115,9 @@ abstract class BleAdapter {
   Future<void> subscribeToCharacteristic(
     String deviceId,
     String serviceUuid,
-    String characteristicUuid,
-  );
+    String characteristicUuid, {
+    BleSubscriptionMode mode = BleSubscriptionMode.notification,
+  });
 
   /// Unsubscribe from characteristic notifications
   Future<void> unsubscribeFromCharacteristic(

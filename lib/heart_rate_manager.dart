@@ -15,8 +15,6 @@ import 'models/models.dart';
 import 'services/services.dart';
 import 'utils/utils.dart';
 
-
-
 class HeartRateManager extends ChangeNotifier {
   HeartRateManager() : _pushCoordinator = PushCoordinator(onLog: _staticLog) {
     // Initialize BleScanner with callbacks
@@ -42,7 +40,7 @@ class HeartRateManager extends ChangeNotifier {
 
   // BLE Scanner for device discovery
   late final BleScanner _scanner;
-  
+
   // BLE Connection Service for connection management
   late final BleConnectionService _connectionService;
 
@@ -71,7 +69,7 @@ class HeartRateManager extends ChangeNotifier {
 
   bool _autoReconnect = true;
   bool _userInitiatedDisconnect = false;
-  bool _isScanning = false;
+  final bool _isScanning = false;
   bool _uiScanning = false;
   bool _isTestEnv = false;
   bool _autoConnectEnabled = false; // 首次启动不自动连接，等待用户操作
@@ -85,6 +83,7 @@ class HeartRateManager extends ChangeNotifier {
   HeartRateSettings _settings = HeartRateSettings.defaults();
 
   int? _heartRate;
+  int? _publishedHeartRate;
   int? _rssi;
   DateTime? _lastUpdated;
   DateTime? _lastHrSeenAt;
@@ -92,9 +91,7 @@ class HeartRateManager extends ChangeNotifier {
   BleAdapterState _adapterState = BleAdapterState.unknown;
   DateTime? _connectedAt;
 
-
   DateTime? _lastStatusChange;
-
 
   // 扫描周期 1000ms
   static const Duration _scanInterval = Duration(milliseconds: 1000);
@@ -127,7 +124,7 @@ class HeartRateManager extends ChangeNotifier {
     return DateTime.now().difference(_lastActionAt!) >= _actionCooldown;
   }
 
-  int? get heartRate => isHeartRateFresh ? _heartRate : null;
+  int? get heartRate => isHeartRateFresh ? _publishedHeartRate : null;
   int? get rssi =>
       _connectionState == AdapterConnectionState.connected ? _rssi : null;
   int? get lastIntervalMs => _lastUpdated != null && _prevHeartRateAt != null
@@ -139,20 +136,14 @@ class HeartRateManager extends ChangeNotifier {
     if (_connectionState != AdapterConnectionState.connected) return '';
     return _connectedDeviceName ?? '';
   }
+
   String? get activeDeviceId => _connectedDeviceId;
 
   AdapterConnectionState get connectionState => _connectionState;
   BleAdapterState get adapterState => _adapterState;
   HeartRateSettings get settings => _settings;
-  bool get isConnected =>
-      _connectionState == AdapterConnectionState.connected;
+  bool get isConnected => _connectionState == AdapterConnectionState.connected;
   bool get isBluetoothOn => _adapterState == BleAdapterState.on;
-  double? get _heartRatePercent {
-    if (_heartRate == null || _settings.maxHeartRate <= 0) return null;
-    final percent = _heartRate! / _settings.maxHeartRate;
-    return percent.clamp(0, 1).toDouble();
-  }
-
   @visibleForTesting
   static bool computeHrOnline({
     required bool userInitiatedDisconnect,
@@ -280,10 +271,7 @@ class HeartRateManager extends ChangeNotifier {
   }
 
   Future<bool> _ensurePermissionsAndBluetooth() async {
-    final helper = PermissionHelper(
-      bleAdapter: _bleAdapter,
-      onLog: _log,
-    );
+    final helper = PermissionHelper(bleAdapter: _bleAdapter, onLog: _log);
     final result = await helper.ensurePermissionsAndBluetooth();
     if (!result.success) {
       _setStatus(result.errorMessage ?? '权限检查失败');
@@ -352,7 +340,6 @@ class HeartRateManager extends ChangeNotifier {
     if (_isTestEnv) return;
     if (!_isBleSupportedPlatform) return;
     try {
-
       _setStatus('扫描附近设备...');
       _setUiScanning(true);
       notifyListeners();
@@ -389,7 +376,7 @@ class HeartRateManager extends ChangeNotifier {
   void _handleScanResult(BleDeviceInfo r) {
     // Delegate to BleScanner for device tracking
     _scanner.handleScanResult(r);
-    
+
     // Check for auto-connect
     if (!_userInitiatedDisconnect &&
         _autoConnectEnabled &&
@@ -399,7 +386,7 @@ class HeartRateManager extends ChangeNotifier {
         r.connectable &&
         !_connecting) {
       final name = NearbyDevice.fixWindowsDeviceName(
-        r.name.trim().isNotEmpty ? r.name : '未命名设备'
+        r.name.trim().isNotEmpty ? r.name : '未命名设备',
       );
       _pendingConnectName = name;
       _log('auto connect: $name (${r.id})');
@@ -428,12 +415,11 @@ class HeartRateManager extends ChangeNotifier {
     _lastUpdated = now;
     _lastHrSeenAt = now;
     _syncHrOnline(now: now);
-    
+
     if (!_shouldPublishNow(now)) return;
     _lastPublished = now;
     _notifyHeartRateUpdate();
   }
-
 
   Future<void> _connectTo(String deviceId) async {
     if (_isTestEnv) return;
@@ -443,25 +429,32 @@ class HeartRateManager extends ChangeNotifier {
       return;
     }
     if (_connecting) return;
-    
+
     _connecting = true;
     _connectedDeviceId = deviceId;
     _userInitiatedDisconnect = false;
     _connectionState = AdapterConnectionState.disconnected;
-    
+
     // Get device display name
-    final knownDevice = nearbyDevices.where((d) => d.id == deviceId).firstOrNull;
+    final knownDevice = nearbyDevices
+        .where((d) => d.id == deviceId)
+        .firstOrNull;
     final displayName = (_pendingConnectName?.trim().isNotEmpty ?? false)
         ? _pendingConnectName!.trim()
-        : NearbyDevice.fixWindowsDeviceName(knownDevice?.name ?? _savedDeviceName ?? 'Unknown');
+        : NearbyDevice.fixWindowsDeviceName(
+            knownDevice?.name ?? _savedDeviceName ?? 'Unknown',
+          );
     _connectedDeviceName = displayName;
     _pendingConnectName = null;
-    
+
     notifyListeners();
 
     try {
-      final success = await _connectionService.connect(deviceId, displayName: displayName);
-      
+      final success = await _connectionService.connect(
+        deviceId,
+        displayName: displayName,
+      );
+
       if (success) {
         _connectionState = AdapterConnectionState.connected;
         _connectedAt = DateTime.now();
@@ -484,24 +477,25 @@ class HeartRateManager extends ChangeNotifier {
       notifyListeners();
     }
   }
-  
+
   /// Handle connection state changes from BleConnectionService
   void _onConnectionStateChange(AdapterConnectionState state) {
     _connectionState = state;
-    
+
     if (state == AdapterConnectionState.connected) {
       _connectedAt = DateTime.now();
     }
-    
+
     if (state == AdapterConnectionState.disconnected) {
       _connectedAt = null;
       _hrSubscribed = false;
       _heartRate = null;
+      _publishedHeartRate = null;
       _rssi = null;
       _lastUpdated = null;
       _prevHeartRateAt = null;
       _autoConnectEnabled = !_userInitiatedDisconnect;
-      
+
       if (_userInitiatedDisconnect) {
         _autoReconnect = false;
         _connectedDeviceId = null;
@@ -511,7 +505,7 @@ class HeartRateManager extends ChangeNotifier {
         _scheduleReconnect(immediate: true);
       }
     }
-    
+
     _notifyConnectionState();
     notifyListeners();
   }
@@ -594,16 +588,17 @@ class HeartRateManager extends ChangeNotifier {
     _autoConnectEnabled = false;
     _reconnectAttempts = 0;
     _connecting = false;
-    
+
     // Delegate to connection service
     await _connectionService.disconnect();
-    
+
     // Clean up local state
     _hrSubscribed = false;
     _connectedDeviceId = null;
     _connectedDeviceName = null;
     _rssi = null;
     _heartRate = null;
+    _publishedHeartRate = null;
     _lastUpdated = null;
     _lastHrSeenAt = null;
     _prevHeartRateAt = null;
@@ -613,16 +608,14 @@ class HeartRateManager extends ChangeNotifier {
     await _prefs?.remove('last_device_name');
     _connectionState = AdapterConnectionState.disconnected;
     _connectedAt = null;
-    
+
     _syncHrOnline(now: DateTime.now(), forceOsc: true);
     _notifyConnectionState();
     notifyListeners();
-    
+
     await Future.delayed(const Duration(milliseconds: 300));
     await restartScan();
   }
-
-
 
   Future<void> _ensureScanAlive() async {
     if (!_isBleSupportedPlatform) return;
@@ -630,12 +623,12 @@ class HeartRateManager extends ChangeNotifier {
     if (_connectionState == AdapterConnectionState.connected || _connecting) {
       return;
     }
-    
+
     // We don't have isScanning check from adapter, rely on internal state or just restart
     // If not connecting/connected and adapter on, ensure we are scanning if supposed to
     // But restartScan already handles checks.
-    
-    // For universal_ble, maybe we don't need aggressive restart? 
+
+    // For universal_ble, maybe we don't need aggressive restart?
     // Just stop and start to be safe.
     await _bleAdapter.stopScan();
     await _startScan();
@@ -644,10 +637,10 @@ class HeartRateManager extends ChangeNotifier {
   void _scheduleReconnect({bool immediate = false}) {
     if (!_autoReconnect || _userInitiatedDisconnect) return;
     if (_reconnectTimer?.isActive ?? false) return;
-    if (_connectedDeviceId != null) return; // Already connected logic handles re-connection?
-    // Actually if _connectedDeviceId is not null but state is disconnected, we might need reconnect.
-    // But usually we clear _connectedDeviceId on disconnect.
-    
+    if (_connectionState == AdapterConnectionState.connected || _connecting) {
+      return;
+    }
+
     // Logic: find target device ID and try to connect.
     final targetId = _savedDeviceId;
     if (targetId == null) return;
@@ -657,11 +650,11 @@ class HeartRateManager extends ChangeNotifier {
     final delaySeconds = immediate
         ? 0
         : (_reconnectAttempts > 5
-            ? 30
-            : (_reconnectAttempts > 3 ? 10 : 3 * _reconnectAttempts));
-    
+              ? 30
+              : (_reconnectAttempts > 3 ? 10 : 3 * _reconnectAttempts));
+
     _log('scheduleReconnect in ${delaySeconds}s (attempt $_reconnectAttempts)');
-    
+
     _reconnectTimer = Timer(Duration(seconds: delaySeconds), () async {
       _reconnectTimer = null;
       if (!_autoReconnect || _userInitiatedDisconnect) return;
@@ -670,17 +663,21 @@ class HeartRateManager extends ChangeNotifier {
       }
       if (_adapterState != BleAdapterState.on) {
         // Bluetooth off, wait but keep attempts?
-        _scheduleReconnect(); 
+        _scheduleReconnect();
         return;
       }
 
       await _ensureScanAlive();
 
-      NearbyDevice? nearby = nearbyDevices.where((d) => d.id == targetId).firstOrNull;
+      NearbyDevice? nearby = nearbyDevices
+          .where((d) => d.id == targetId)
+          .firstOrNull;
 
       if (nearby == null && (_savedDeviceName?.trim().isNotEmpty ?? false)) {
         final matches = nearbyDevices
-            .where((d) => d.connectable && d.name.trim() == _savedDeviceName!.trim())
+            .where(
+              (d) => d.connectable && d.name.trim() == _savedDeviceName!.trim(),
+            )
             .toList();
         if (matches.length == 1) {
           nearby = matches.first;
@@ -716,15 +713,15 @@ class HeartRateManager extends ChangeNotifier {
       }
       _scanUiHoldTimer?.cancel();
       _scanUiHoldTimer = Timer(_scanUiMinVisible, () {
-        // _isScanning is not tracked directly from stream anymore, 
-        // rely on manual setting in _startScan/stopScan? 
-        // Actually we set _uiScanning=true in _startScan. 
+        // _isScanning is not tracked directly from stream anymore,
+        // rely on manual setting in _startScan/stopScan?
+        // Actually we set _uiScanning=true in _startScan.
         // We need to unset it when scan stops.
-        
+
         // For now, let UI scanning indicator turn off if we are connected.
         if (isConnected && _uiScanning) {
-           _uiScanning = false;
-           notifyListeners();
+          _uiScanning = false;
+          notifyListeners();
         }
       });
     } else {
@@ -777,8 +774,9 @@ class HeartRateManager extends ChangeNotifier {
   void _notifyHeartRateUpdate() {
     final bpm = _heartRate;
     if (bpm == null) return;
-    final percent = _heartRatePercent;
+    final percent = _percentFor(bpm);
     final connected = isConnected;
+    _publishedHeartRate = bpm;
 
     final payload = <String, dynamic>{
       'event': 'heartRate',
@@ -822,7 +820,7 @@ class HeartRateManager extends ChangeNotifier {
       unawaited(
         _notificationService.showConnected(
           deviceName: _connectedDeviceName ?? '',
-          bpm: _heartRate,
+          bpm: heartRate,
           lastUpdated: _lastUpdated,
         ),
       );
@@ -836,7 +834,7 @@ class HeartRateManager extends ChangeNotifier {
     final timestamp = DateTime.tryParse(payload['timestamp'] as String? ?? '');
     final percent = payload['percent'] as double?;
     if (bpm == null || timestamp == null) return;
-    
+
     await _pushCoordinator.sendHeartRate(
       bpm: bpm,
       percent: percent,
@@ -844,7 +842,10 @@ class HeartRateManager extends ChangeNotifier {
     );
   }
 
-  Future<void> _sendOscConnectedIfNeeded(bool connected, {bool force = false}) async {
+  Future<void> _sendOscConnectedIfNeeded(
+    bool connected, {
+    bool force = false,
+  }) async {
     await _pushCoordinator.sendConnectionStatus(connected, force: force);
   }
 
@@ -918,5 +919,11 @@ class HeartRateManager extends ChangeNotifier {
       return '$fallback (code: ${error.code})';
     }
     return '$fallback: $error';
+  }
+
+  double? _percentFor(int? bpm) {
+    if (bpm == null || _settings.maxHeartRate <= 0) return null;
+    final percent = bpm / _settings.maxHeartRate;
+    return percent.clamp(0, 1).toDouble();
   }
 }

@@ -1,5 +1,6 @@
 import 'dart:io';
 import 'dart:typed_data';
+import 'dart:convert';
 
 import '../app_log.dart';
 
@@ -214,7 +215,7 @@ class OscService {
   }
 
   List<int> _oscString(String value) {
-    final bytes = value.codeUnits;
+    final bytes = utf8.encode(value);
     final padded = <int>[...bytes, 0];
     while (padded.length % 4 != 0) {
       padded.add(0);

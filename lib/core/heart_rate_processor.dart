@@ -51,6 +51,7 @@ class HeartRateProcessor {
   HeartRateSettings _settings = HeartRateSettings.defaults();
 
   int? _heartRate;
+  int? _publishedHeartRate;
   int? _rssi;
   DateTime? _lastUpdated;
   DateTime? _lastHrSeenAt;
@@ -61,7 +62,7 @@ class HeartRateProcessor {
   static const Duration _hrStaleThreshold = Duration(seconds: 6);
 
   // Getters
-  int? get heartRate => isHeartRateFresh ? _heartRate : null;
+  int? get heartRate => isHeartRateFresh ? _publishedHeartRate : null;
   int? get rawHeartRate => _heartRate;
   int? get rssi => _rssi;
   DateTime? get lastUpdated => _lastUpdated;
@@ -73,10 +74,10 @@ class HeartRateProcessor {
       DateTime.now().difference(_lastUpdated!) <= _hrStaleThreshold;
 
   double? get heartRatePercent {
-    if (_heartRate == null || _settings.maxHeartRate <= 0) return null;
-    final percent = _heartRate! / _settings.maxHeartRate;
-    return percent.clamp(0, 1).toDouble();
+    return _percentFor(_heartRate);
   }
+
+  double? get publishedHeartRatePercent => _percentFor(_publishedHeartRate);
 
   int? get lastIntervalMs => _lastUpdated != null && _prevHeartRateAt != null
       ? _lastUpdated!.difference(_prevHeartRateAt!).inMilliseconds
@@ -89,13 +90,17 @@ class HeartRateProcessor {
   }
 
   /// Process heart rate data from BLE notification
-  void handleHeartRateData(Uint8List data, {bool connected = true, String? deviceName}) {
+  void handleHeartRateData(
+    Uint8List data, {
+    bool connected = true,
+    String? deviceName,
+  }) {
     if (data.isEmpty) return;
     final bpm = BleScanner.parseHeartRateValue(data);
     if (bpm == null) return;
-    
+
     _processHeartRate(
-      bpm: bpm, 
+      bpm: bpm,
       rssi: null,
       connected: connected,
       deviceName: deviceName,
@@ -106,9 +111,9 @@ class HeartRateProcessor {
   void handleBroadcastHeartRate(BleDeviceInfo device) {
     final bpm = BleScanner.extractBroadcastHeartRate(device);
     if (bpm == null) return;
-    
+
     _processHeartRate(
-      bpm: bpm, 
+      bpm: bpm,
       rssi: device.rssi,
       connected: false,
       deviceName: device.name,
@@ -123,7 +128,7 @@ class HeartRateProcessor {
   }) {
     final now = DateTime.now();
     onLog('hr rx: bpm=$bpm rssi=$rssi');
-    
+
     _prevHeartRateAt = _lastUpdated;
     _heartRate = bpm;
     _rssi = rssi ?? _rssi;
@@ -131,7 +136,7 @@ class HeartRateProcessor {
     _lastHrSeenAt = now;
 
     syncHrOnline(now: now, connected: connected);
-    
+
     if (!_shouldPublishNow(now)) return;
     _lastPublished = now;
     _publishHeartRate(connected: connected, deviceName: deviceName);
@@ -146,32 +151,42 @@ class HeartRateProcessor {
   void _publishHeartRate({required bool connected, String? deviceName}) {
     final bpm = _heartRate;
     if (bpm == null) return;
+    final percent = _percentFor(bpm);
+    _publishedHeartRate = bpm;
 
     final event = HeartRateEvent(
       bpm: bpm,
-      percent: heartRatePercent,
+      percent: percent,
       rssi: _rssi,
       timestamp: DateTime.now(),
       connected: connected,
       deviceName: deviceName,
     );
 
-    onLog('publish hr: bpm=$bpm percent=${heartRatePercent != null ? (heartRatePercent! * 100).round() : '-'}%');
-    
+    onLog(
+      'publish hr: bpm=$bpm percent=${percent != null ? (percent * 100).round() : '-'}%',
+    );
+
     // Send to push services
-    unawaited(_pushCoordinator.sendHeartRate(
-      bpm: bpm,
-      percent: heartRatePercent,
-      timestamp: event.timestamp,
-    ));
+    unawaited(
+      _pushCoordinator.sendHeartRate(
+        bpm: bpm,
+        percent: percent,
+        timestamp: event.timestamp,
+      ),
+    );
     unawaited(_pushCoordinator.sendConnectionStatus(_hrOnline, force: true));
-    unawaited(_pushCoordinator.sendChatbox(bpm, heartRatePercent));
+    unawaited(_pushCoordinator.sendChatbox(bpm, percent));
 
     onHeartRateUpdate(event);
   }
 
   /// Sync heart rate online status
-  void syncHrOnline({DateTime? now, bool forceOsc = false, bool connected = true}) {
+  void syncHrOnline({
+    DateTime? now,
+    bool forceOsc = false,
+    bool connected = true,
+  }) {
     now ??= DateTime.now();
     final wasOnline = _hrOnline;
 
@@ -184,7 +199,9 @@ class HeartRateProcessor {
 
     if (_hrOnline != wasOnline || forceOsc) {
       onHrOnlineChange(_hrOnline);
-      unawaited(_pushCoordinator.sendConnectionStatus(_hrOnline, force: forceOsc));
+      unawaited(
+        _pushCoordinator.sendConnectionStatus(_hrOnline, force: forceOsc),
+      );
     }
   }
 
@@ -209,10 +226,17 @@ class HeartRateProcessor {
   /// Reset all heart rate state
   void reset() {
     _heartRate = null;
+    _publishedHeartRate = null;
     _rssi = null;
     _lastUpdated = null;
     _lastHrSeenAt = null;
     _prevHeartRateAt = null;
     _hrOnline = false;
+  }
+
+  double? _percentFor(int? bpm) {
+    if (bpm == null || _settings.maxHeartRate <= 0) return null;
+    final percent = bpm / _settings.maxHeartRate;
+    return percent.clamp(0, 1).toDouble();
   }
 }

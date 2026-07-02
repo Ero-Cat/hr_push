@@ -166,6 +166,12 @@ HR PUSH 通过标准 BLE 心率服务（UUID: `0x180D`）接收心率数据。Ap
 
 
 ## 🧾 更新日志
+### v1.7.2
+- **OSC 编码修复**：OSC ChatBox 文本改为 UTF-8 编码，修复 Windows/VRChat 下中文、emoji 或模板文本乱码问题。
+- **显示与推送同步**：心率 UI 显示改为跟随最后一次发布快照，确保本机显示值与 VRChat OSC 参数刷新节奏一致。
+- **BLE 稳定性增强**：修复部分断连场景下自动重连被阻断的问题；新增 notification 失败后 fallback 到 indication 的订阅策略，提升小米手环等设备兼容性。
+- **测试覆盖**：新增 OSC 编码、心率发布快照同步、BLE indication fallback 单元测试。
+
 ### v1.7.0
 - **CI/CD 优化**：新增 CI 工作流（代码分析 + 测试）；优化 Release 构建时间，合并步骤并移除冗余操作。
 - **版本自动同步**：新增 `sync-version.sh` 脚本，发布时自动同步版本号到代码中。

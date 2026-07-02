@@ -30,8 +30,10 @@ class BleConnectionService {
   final OnHeartRateData onHeartRateData;
   final OnConnectionStateChange onConnectionStateChange;
 
-  static const String _heartRateServiceUuid = '0000180d-0000-1000-8000-00805f9b34fb';
-  static const String _heartRateMeasurementUuid = '00002a37-0000-1000-8000-00805f9b34fb';
+  static const String _heartRateServiceUuid =
+      '0000180d-0000-1000-8000-00805f9b34fb';
+  static const String _heartRateMeasurementUuid =
+      '00002a37-0000-1000-8000-00805f9b34fb';
   static const Duration _gattStableDelay = Duration(milliseconds: 600);
   static const Duration _gattStableDelayWindows = Duration(milliseconds: 2000);
 
@@ -56,41 +58,43 @@ class BleConnectionService {
   /// Connect to a BLE device
   Future<bool> connect(String deviceId, {String? displayName}) async {
     if (_connecting) return false;
-    
+
     _connecting = true;
     _connectedDeviceId = deviceId;
     _connectedDeviceName = displayName;
-    
+
     final label = displayName ?? deviceId;
     onStatusChange('正在连接 $label...');
     onLog('connect start: $deviceId name=$label');
 
     await _adapter.stopScan();
-    
+
     // Setup connection state listener
     await _connectionStateSub?.cancel();
-    _connectionStateSub = _adapter.connectionStateStream(deviceId).listen((state) {
+    _connectionStateSub = _adapter.connectionStateStream(deviceId).listen((
+      state,
+    ) {
       onConnectionStateChange(state);
-      
+
       if (state == AdapterConnectionState.connected) {
         _connectedAt = DateTime.now();
         onStatusChange('已连接', force: true);
       }
-      
+
       if (state == AdapterConnectionState.disconnected) {
         _handleDisconnection();
       }
-      
+
       onLog('connection state=$state');
     });
 
     try {
       await _adapter.connect(deviceId, timeout: const Duration(seconds: 10));
-      
+
       _connectedAt = DateTime.now();
       onStatusChange('已连接，订阅心率中...', force: true);
       onLog('connected to $deviceId');
-      
+
       // Subscribe to heart rate
       final subscribeSuccess = await _subscribeHeartRate(deviceId);
       _connecting = false;
@@ -114,11 +118,11 @@ class BleConnectionService {
   Future<void> disconnect() async {
     onLog('disconnect requested');
     onStatusChange('断开中...');
-    
+
     _resubscribeTimer?.cancel();
-    
+
     final deviceId = _connectedDeviceId;
-    
+
     try {
       if (deviceId != null) {
         await _adapter.disconnect(deviceId);
@@ -139,7 +143,7 @@ class BleConnectionService {
   Future<void> forceReconnect(String reason) async {
     onLog('force reconnect: $reason');
     if (_connectedDeviceId == null) return;
-    
+
     onStatusChange('订阅心率失败，正在重连...', force: true);
 
     try {
@@ -161,7 +165,9 @@ class BleConnectionService {
 
     try {
       // Give device time to stabilize GATT
-      final delay = Platform.isWindows ? _gattStableDelayWindows : _gattStableDelay;
+      final delay = Platform.isWindows
+          ? _gattStableDelayWindows
+          : _gattStableDelay;
       if (attempt == 0) {
         onStatusChange('订阅心率中...', force: true);
       }
@@ -170,7 +176,9 @@ class BleConnectionService {
       onLog('subscribe hr attempt=$attempt');
 
       // Handle Xiaomi devices
-      final deviceName = NearbyDevice.fixWindowsDeviceName(_connectedDeviceName ?? '');
+      final deviceName = NearbyDevice.fixWindowsDeviceName(
+        _connectedDeviceName ?? '',
+      );
       if (Platform.isWindows && BleScanner.isXiaomiDevice(deviceName)) {
         onLog('Xiaomi device detected, waiting for OS pairing');
         await Future.delayed(const Duration(milliseconds: 500));
@@ -187,7 +195,9 @@ class BleConnectionService {
       // Find and subscribe to HR characteristic
       bool foundHr = false;
       for (final service in services) {
-        if (service.uuid.toLowerCase() != _heartRateServiceUuid.toLowerCase()) continue;
+        if (service.uuid.toLowerCase() != _heartRateServiceUuid.toLowerCase()) {
+          continue;
+        }
         foundHr = true;
 
         for (final c in service.characteristics) {
@@ -205,12 +215,12 @@ class BleConnectionService {
       if (!_missingHrNotified) {
         _missingHrNotified = true;
       }
-      
+
       _scheduleResubscribe(deviceId, attempt: attempt + 1);
       return false;
     } catch (e, stackTrace) {
       onLog('subscribe hr failed: $e\nStack: $stackTrace');
-      
+
       if (e is PlatformException && attempt < 1) {
         onStatusChange('订阅心率重试中...', force: true);
         await Future.delayed(const Duration(milliseconds: 800));
@@ -223,9 +233,11 @@ class BleConnectionService {
     }
   }
 
-  Future<List<BleServiceInfo>> _discoverServicesWithRetry(String deviceId) async {
+  Future<List<BleServiceInfo>> _discoverServicesWithRetry(
+    String deviceId,
+  ) async {
     const maxRetries = 3;
-    
+
     for (var retry = 0; retry < maxRetries; retry++) {
       try {
         if (retry > 0) {
@@ -233,13 +245,17 @@ class BleConnectionService {
           await Future.delayed(Duration(milliseconds: 1000 + retry * 500));
         }
 
-        return await _adapter.discoverServices(deviceId).timeout(
-          const Duration(seconds: 10),
-          onTimeout: () => throw TimeoutException('discoverServices timed out'),
-        );
+        return await _adapter
+            .discoverServices(deviceId)
+            .timeout(
+              const Duration(seconds: 10),
+              onTimeout: () =>
+                  throw TimeoutException('discoverServices timed out'),
+            );
       } catch (e) {
         final errorStr = e.toString().toLowerCase();
-        final isDeviceNotFound = errorStr.contains('device not found') ||
+        final isDeviceNotFound =
+            errorStr.contains('device not found') ||
             errorStr.contains('not found');
 
         if (isDeviceNotFound && retry < maxRetries - 1) {
@@ -250,7 +266,7 @@ class BleConnectionService {
         rethrow;
       }
     }
-    
+
     return [];
   }
 
@@ -268,20 +284,36 @@ class BleConnectionService {
     });
   }
 
-  Future<bool> _enableHrNotifications(String deviceId, BleCharacteristicInfo c) async {
+  Future<bool> _enableHrNotifications(
+    String deviceId,
+    BleCharacteristicInfo c,
+  ) async {
     onLog('enabling HR notifications for ${c.uuid}');
-    const attempts = 2;
-    
-    for (var i = 0; i < attempts; i++) {
+    final modes = <BleSubscriptionMode>[
+      if (c.canNotify) BleSubscriptionMode.notification,
+      if (c.canIndicate) BleSubscriptionMode.indication,
+    ];
+    if (modes.isEmpty) {
+      modes.add(BleSubscriptionMode.notification);
+    }
+
+    for (final mode in modes) {
       try {
-        onLog('setNotifyValue attempt ${i + 1}/$attempts');
+        onLog('setNotifyValue mode=$mode');
 
         // Setup listener first
-        _heartRateSub = _adapter.valueStream(deviceId, c.serviceUuid, c.uuid)
+        await _heartRateSub?.cancel();
+        _heartRateSub = _adapter
+            .valueStream(deviceId, c.serviceUuid, c.uuid)
             .listen(onHeartRateData);
 
         // Enable notifications
-        await _adapter.subscribeToCharacteristic(deviceId, c.serviceUuid, c.uuid);
+        await _adapter.subscribeToCharacteristic(
+          deviceId,
+          c.serviceUuid,
+          c.uuid,
+          mode: mode,
+        );
 
         onLog('setNotifyValue succeeded');
         _resubscribeTimer?.cancel();
@@ -290,10 +322,10 @@ class BleConnectionService {
         onStatusChange('已连接', force: true);
         return true;
       } catch (e) {
-        onLog('setNotifyValue failed attempt ${i + 1}', error: e);
-        if (i < attempts - 1) {
-          await Future.delayed(const Duration(milliseconds: 400));
-        }
+        await _heartRateSub?.cancel();
+        _heartRateSub = null;
+        onLog('setNotifyValue failed mode=$mode', error: e);
+        await Future.delayed(const Duration(milliseconds: 400));
       }
     }
     return false;
