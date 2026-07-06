@@ -253,7 +253,7 @@ class _SettingsPageState extends State<SettingsPage> {
             const SizedBox(height: 20),
             Center(
               child: Text(
-                'v1.7.2',
+                'v1.7.3',
                 style: AppTypography.caption.copyWith(
                   color: AppColors.textTertiary.resolveFrom(context),
                 ),

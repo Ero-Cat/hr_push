@@ -6,9 +6,7 @@ import 'osc_service.dart';
 /// Coordinates all push services (HTTP/WebSocket, MQTT, OSC)
 /// Provides a unified interface for sending heart rate data to all configured endpoints
 class PushCoordinator {
-  PushCoordinator({
-    required this.onLog,
-  });
+  PushCoordinator({required this.onLog});
 
   final void Function(String message, {Object? error}) onLog;
 
@@ -29,14 +27,24 @@ class PushCoordinator {
       _httpWsService = null;
     }
 
-    // Reset OSC service if address changed
-    if (old.oscAddress != value.oscAddress) {
+    // Reset OSC service if any OSC setting changed. OscService stores paths
+    // and ChatBox options in final fields, so keeping the instance would keep
+    // sending with stale settings until app restart.
+    final oscChanged =
+        old.oscAddress != value.oscAddress ||
+        old.oscHrConnectedPath != value.oscHrConnectedPath ||
+        old.oscHrValuePath != value.oscHrValuePath ||
+        old.oscHrPercentPath != value.oscHrPercentPath ||
+        old.oscChatboxEnabled != value.oscChatboxEnabled ||
+        old.oscChatboxTemplate != value.oscChatboxTemplate;
+    if (oscChanged) {
       _oscService?.dispose();
       _oscService = null;
     }
 
     // Reset MQTT service if any MQTT settings changed
-    final mqttChanged = old.mqttBroker != value.mqttBroker ||
+    final mqttChanged =
+        old.mqttBroker != value.mqttBroker ||
         old.mqttPort != value.mqttPort ||
         old.mqttTopic != value.mqttTopic ||
         old.mqttUsername != value.mqttUsername ||
@@ -71,7 +79,10 @@ class PushCoordinator {
   }
 
   /// Send connection status via OSC
-  Future<void> sendConnectionStatus(bool connected, {bool force = false}) async {
+  Future<void> sendConnectionStatus(
+    bool connected, {
+    bool force = false,
+  }) async {
     if (_settings.oscAddress.trim().isEmpty) return;
     await _getOscService().sendConnectedStatus(connected, force: force);
   }
