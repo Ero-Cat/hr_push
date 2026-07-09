@@ -20,6 +20,9 @@ class _SettingsPageState extends State<SettingsPage> {
   late final TextEditingController _oscConnectedCtrl;
   late final TextEditingController _oscValueCtrl;
   late final TextEditingController _oscPercentCtrl;
+  late final TextEditingController _oscHeartbeatIntCtrl;
+  late final TextEditingController _oscHeartbeatPulseCtrl;
+  late final TextEditingController _oscHeartbeatToggleCtrl;
   late final TextEditingController _oscChatboxTemplateCtrl;
   late final TextEditingController _maxHrCtrl;
   late final TextEditingController _intervalCtrl;
@@ -45,6 +48,15 @@ class _SettingsPageState extends State<SettingsPage> {
     _oscValueCtrl = TextEditingController(text: widget.initial.oscHrValuePath);
     _oscPercentCtrl = TextEditingController(
       text: widget.initial.oscHrPercentPath,
+    );
+    _oscHeartbeatIntCtrl = TextEditingController(
+      text: widget.initial.oscHeartbeatIntPath,
+    );
+    _oscHeartbeatPulseCtrl = TextEditingController(
+      text: widget.initial.oscHeartbeatPulsePath,
+    );
+    _oscHeartbeatToggleCtrl = TextEditingController(
+      text: widget.initial.oscHeartbeatTogglePath,
     );
     _oscChatboxTemplateCtrl = TextEditingController(
       text: widget.initial.oscChatboxTemplate,
@@ -90,6 +102,15 @@ class _SettingsPageState extends State<SettingsPage> {
     if (_oscPercentCtrl.text.isEmpty) {
       _oscPercentCtrl.text = '/avatar/parameters/hr_percent';
     }
+    if (_oscHeartbeatIntCtrl.text.isEmpty) {
+      _oscHeartbeatIntCtrl.text = '/avatar/parameters/HeartBeatInt';
+    }
+    if (_oscHeartbeatPulseCtrl.text.isEmpty) {
+      _oscHeartbeatPulseCtrl.text = '/avatar/parameters/HeartBeatPulse';
+    }
+    if (_oscHeartbeatToggleCtrl.text.isEmpty) {
+      _oscHeartbeatToggleCtrl.text = '/avatar/parameters/HeartBeatToggle';
+    }
     if (_oscChatboxTemplateCtrl.text.isEmpty) {
       _oscChatboxTemplateCtrl.text = '💓{hr}';
     }
@@ -102,6 +123,9 @@ class _SettingsPageState extends State<SettingsPage> {
     _oscConnectedCtrl.dispose();
     _oscValueCtrl.dispose();
     _oscPercentCtrl.dispose();
+    _oscHeartbeatIntCtrl.dispose();
+    _oscHeartbeatPulseCtrl.dispose();
+    _oscHeartbeatToggleCtrl.dispose();
     _oscChatboxTemplateCtrl.dispose();
     _maxHrCtrl.dispose();
     _intervalCtrl.dispose();
@@ -167,6 +191,18 @@ class _SettingsPageState extends State<SettingsPage> {
                 _buildInput(
                   controller: _oscPercentCtrl,
                   label: l10n.fieldHrPercentParam,
+                ),
+                _buildInput(
+                  controller: _oscHeartbeatIntCtrl,
+                  label: l10n.fieldHeartbeatIntParam,
+                ),
+                _buildInput(
+                  controller: _oscHeartbeatPulseCtrl,
+                  label: l10n.fieldHeartbeatPulseParam,
+                ),
+                _buildInput(
+                  controller: _oscHeartbeatToggleCtrl,
+                  label: l10n.fieldHeartbeatToggleParam,
                 ),
                 _buildInput(
                   controller: _maxHrCtrl,
@@ -314,6 +350,9 @@ class _SettingsPageState extends State<SettingsPage> {
       oscHrConnectedPath: _oscConnectedCtrl.text.trim(),
       oscHrValuePath: _oscValueCtrl.text.trim(),
       oscHrPercentPath: _oscPercentCtrl.text.trim(),
+      oscHeartbeatIntPath: _oscHeartbeatIntCtrl.text.trim(),
+      oscHeartbeatPulsePath: _oscHeartbeatPulseCtrl.text.trim(),
+      oscHeartbeatTogglePath: _oscHeartbeatToggleCtrl.text.trim(),
       oscChatboxEnabled: _oscChatboxEnabled,
       oscChatboxTemplate: _oscChatboxTemplateCtrl.text.trim(),
       maxHeartRate: int.tryParse(_maxHrCtrl.text.trim()) ?? 200,

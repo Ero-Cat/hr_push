@@ -262,6 +262,24 @@ abstract class AppLocalizations {
   /// **'HR Percent Param'**
   String get fieldHrPercentParam;
 
+  /// No description provided for @fieldHeartbeatIntParam.
+  ///
+  /// In en, this message translates to:
+  /// **'Heartbeat Int Param'**
+  String get fieldHeartbeatIntParam;
+
+  /// No description provided for @fieldHeartbeatPulseParam.
+  ///
+  /// In en, this message translates to:
+  /// **'Heartbeat Pulse Param'**
+  String get fieldHeartbeatPulseParam;
+
+  /// No description provided for @fieldHeartbeatToggleParam.
+  ///
+  /// In en, this message translates to:
+  /// **'Heartbeat Toggle Param'**
+  String get fieldHeartbeatToggleParam;
+
   /// No description provided for @fieldMaxHr.
   ///
   /// In en, this message translates to:

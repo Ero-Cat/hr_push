@@ -107,6 +107,9 @@ class PushCoordinator {
         old.oscHrConnectedPath != value.oscHrConnectedPath ||
         old.oscHrValuePath != value.oscHrValuePath ||
         old.oscHrPercentPath != value.oscHrPercentPath ||
+        old.oscHeartbeatIntPath != value.oscHeartbeatIntPath ||
+        old.oscHeartbeatPulsePath != value.oscHeartbeatPulsePath ||
+        old.oscHeartbeatTogglePath != value.oscHeartbeatTogglePath ||
         old.oscChatboxEnabled != value.oscChatboxEnabled ||
         old.oscChatboxTemplate != value.oscChatboxTemplate;
     if (oscChanged) {
@@ -157,12 +160,17 @@ class PushCoordinator {
     bool force = false,
   }) async {
     if (_settings.oscAddress.trim().isEmpty) {
+      await _oscService?.stopHeartbeat();
       _setOscStatus(OscStatus.disabled());
       return;
     }
-    await _sendOsc(
-      (service) => service.sendConnectedStatus(connected, force: force),
-    );
+    await _sendOsc((service) async {
+      final ok = await service.sendConnectedStatus(connected, force: force);
+      if (!connected) {
+        await service.stopHeartbeat();
+      }
+      return ok;
+    });
   }
 
   /// Send chatbox message via OSC (for VRChat)
@@ -217,6 +225,9 @@ class PushCoordinator {
       hrConnectedPath: _settings.oscHrConnectedPath,
       hrValuePath: _settings.oscHrValuePath,
       hrPercentPath: _settings.oscHrPercentPath,
+      heartbeatIntPath: _settings.oscHeartbeatIntPath,
+      heartbeatPulsePath: _settings.oscHeartbeatPulsePath,
+      heartbeatTogglePath: _settings.oscHeartbeatTogglePath,
       chatboxEnabled: _settings.oscChatboxEnabled,
       chatboxTemplate: _settings.oscChatboxTemplate,
       onLog: onLog,

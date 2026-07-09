@@ -90,6 +90,15 @@ class AppLocalizationsJa extends AppLocalizations {
   String get fieldHrPercentParam => '心拍数％パラメータ';
 
   @override
+  String get fieldHeartbeatIntParam => '心拍 Int パラメータ';
+
+  @override
+  String get fieldHeartbeatPulseParam => '心拍 Pulse パラメータ';
+
+  @override
+  String get fieldHeartbeatToggleParam => '心拍 Toggle パラメータ';
+
+  @override
   String get fieldMaxHr => '最大心拍数';
 
   @override

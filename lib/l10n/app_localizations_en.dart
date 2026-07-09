@@ -90,6 +90,15 @@ class AppLocalizationsEn extends AppLocalizations {
   String get fieldHrPercentParam => 'HR Percent Param';
 
   @override
+  String get fieldHeartbeatIntParam => 'Heartbeat Int Param';
+
+  @override
+  String get fieldHeartbeatPulseParam => 'Heartbeat Pulse Param';
+
+  @override
+  String get fieldHeartbeatToggleParam => 'Heartbeat Toggle Param';
+
+  @override
   String get fieldMaxHr => 'Max HR';
 
   @override

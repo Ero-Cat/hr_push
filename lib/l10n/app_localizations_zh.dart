@@ -90,6 +90,15 @@ class AppLocalizationsZh extends AppLocalizations {
   String get fieldHrPercentParam => '心率百分比参数';
 
   @override
+  String get fieldHeartbeatIntParam => '心跳 Int 参数';
+
+  @override
+  String get fieldHeartbeatPulseParam => '心跳 Pulse 参数';
+
+  @override
+  String get fieldHeartbeatToggleParam => '心跳 Toggle 参数';
+
+  @override
   String get fieldMaxHr => '最大心率';
 
   @override

@@ -27,6 +27,9 @@ class OscService {
     required this.hrConnectedPath,
     required this.hrValuePath,
     required this.hrPercentPath,
+    required this.heartbeatIntPath,
+    required this.heartbeatPulsePath,
+    required this.heartbeatTogglePath,
     required this.chatboxEnabled,
     required this.chatboxTemplate,
     this.onLog,
@@ -36,6 +39,9 @@ class OscService {
   final String hrConnectedPath;
   final String hrValuePath;
   final String hrPercentPath;
+  final String heartbeatIntPath;
+  final String heartbeatPulsePath;
+  final String heartbeatTogglePath;
   final bool chatboxEnabled;
   final String chatboxTemplate;
   final void Function(String message, {Object? error})? onLog;
@@ -47,6 +53,10 @@ class OscService {
   String? _lastHrConnectedKey;
   DateTime? _lastChatboxSentAt;
   String? _lastChatboxMessage;
+  Timer? _heartbeatTimer;
+  Timer? _heartbeatInactiveTimer;
+  int? _heartbeatBpm;
+  bool _currentBeatToggle = false;
 
   static const Duration _chatboxMinInterval = Duration(seconds: 2);
   static const Duration _acknowledgementFreshFor = Duration(seconds: 10);
@@ -125,7 +135,27 @@ class OscService {
     if (percent != null) {
       percentOk = await _sendMessage(hrPercentPath, percent);
     }
+    if (valueOk && percentOk) {
+      _startHeartbeatLoop(bpm);
+    }
     return valueOk && percentOk;
+  }
+
+  /// Stop the heartbeat pulse loop and send inactive values if possible.
+  Future<void> stopHeartbeat({bool sendInactive = true}) async {
+    final hadHeartbeat =
+        _heartbeatBpm != null ||
+        (_heartbeatTimer?.isActive ?? false) ||
+        (_heartbeatInactiveTimer?.isActive ?? false);
+    _heartbeatBpm = null;
+    _heartbeatTimer?.cancel();
+    _heartbeatTimer = null;
+    _heartbeatInactiveTimer?.cancel();
+    _heartbeatInactiveTimer = null;
+
+    if (sendInactive && hadHeartbeat) {
+      await _sendHeartbeatInactive();
+    }
   }
 
   /// Send chatbox message if enabled
@@ -218,6 +248,75 @@ class OscService {
     } catch (_) {}
     _log('osc failed: $address -> ${target.address.address}:${target.port}');
     return false;
+  }
+
+  void _startHeartbeatLoop(int bpm) {
+    if (bpm <= 0) {
+      unawaited(stopHeartbeat());
+      return;
+    }
+
+    _heartbeatBpm = bpm;
+    if (_heartbeatTimer == null && _heartbeatInactiveTimer == null) {
+      _scheduleNextHeartbeat(_rrIntervalFor(bpm));
+    }
+  }
+
+  void _scheduleNextHeartbeat(Duration delay) {
+    if (_heartbeatBpm == null) return;
+    _heartbeatTimer?.cancel();
+    _heartbeatTimer = Timer(delay, () {
+      _heartbeatTimer = null;
+      _emitHeartbeat();
+    });
+  }
+
+  void _emitHeartbeat() {
+    final bpm = _heartbeatBpm;
+    if (bpm == null) return;
+
+    unawaited(_sendHeartbeatActive());
+
+    _heartbeatInactiveTimer?.cancel();
+    _heartbeatInactiveTimer = Timer(_qrsIntervalFor(bpm), () {
+      _heartbeatInactiveTimer = null;
+      unawaited(_completeHeartbeatPulse());
+    });
+
+    _scheduleNextHeartbeat(_rrIntervalFor(bpm));
+  }
+
+  Future<void> _sendHeartbeatActive() async {
+    await _sendMessageIfPath(heartbeatIntPath, 1);
+    await _sendMessageIfPath(heartbeatPulsePath, true);
+    await _sendMessageIfPath(heartbeatTogglePath, _currentBeatToggle);
+  }
+
+  Future<void> _completeHeartbeatPulse() async {
+    await _sendHeartbeatInactive();
+    _currentBeatToggle = !_currentBeatToggle;
+  }
+
+  Future<void> _sendHeartbeatInactive() async {
+    await _sendMessageIfPath(heartbeatIntPath, 0);
+    await _sendMessageIfPath(heartbeatPulsePath, false);
+  }
+
+  Future<bool> _sendMessageIfPath(String address, Object value) async {
+    final path = address.trim();
+    if (path.isEmpty) return true;
+    return _sendMessage(path, value);
+  }
+
+  Duration _rrIntervalFor(int bpm) {
+    final milliseconds = (60000 / bpm).round().clamp(1, 60000).toInt();
+    return Duration(milliseconds: milliseconds);
+  }
+
+  Duration _qrsIntervalFor(int bpm) {
+    final rrMs = _rrIntervalFor(bpm).inMilliseconds;
+    final milliseconds = (rrMs / 5).round().clamp(1, rrMs).toInt();
+    return Duration(milliseconds: milliseconds);
   }
 
   Future<OscTarget?> _resolveTarget() async {
@@ -325,6 +424,11 @@ class OscService {
   }
 
   void dispose() {
+    _heartbeatBpm = null;
+    _heartbeatTimer?.cancel();
+    _heartbeatTimer = null;
+    _heartbeatInactiveTimer?.cancel();
+    _heartbeatInactiveTimer = null;
     _socketSub?.cancel();
     _socketSub = null;
     _socket?.close();

@@ -147,19 +147,121 @@ void main() {
       '/avatar/parameters/hr_new',
     );
   });
+
+  test(
+    'OSC heartbeat path changes take effect without restarting the app',
+    () async {
+      final socket = await RawDatagramSocket.bind(
+        InternetAddress.loopbackIPv4,
+        0,
+      );
+      addTearDown(socket.close);
+      final packets = socket
+          .where((event) => event == RawSocketEvent.read)
+          .map((_) => socket.receive())
+          .where((packet) => packet != null)
+          .cast<Datagram>()
+          .asBroadcastStream();
+
+      final coordinator = PushCoordinator(onLog: (_, {error}) {});
+      addTearDown(coordinator.dispose);
+
+      final initial = HeartRateSettings.defaults().copyWith(
+        oscAddress: '127.0.0.1:${socket.port}',
+        oscHeartbeatIntPath: '/avatar/parameters/HeartBeatIntOld',
+      );
+      coordinator.updateSettings(initial);
+      await coordinator.sendHeartRate(
+        bpm: 240,
+        percent: null,
+        timestamp: DateTime(2026),
+      );
+      expect(
+        await _nextOscAddress(
+          packets,
+          exact: '/avatar/parameters/HeartBeatIntOld',
+        ),
+        '/avatar/parameters/HeartBeatIntOld',
+      );
+
+      coordinator.updateSettings(
+        initial.copyWith(
+          oscHeartbeatIntPath: '/avatar/parameters/HeartBeatIntNew',
+        ),
+      );
+      await coordinator.sendHeartRate(
+        bpm: 240,
+        percent: null,
+        timestamp: DateTime(2026),
+      );
+
+      expect(
+        await _nextOscAddress(
+          packets,
+          exact: '/avatar/parameters/HeartBeatIntNew',
+        ),
+        '/avatar/parameters/HeartBeatIntNew',
+      );
+    },
+  );
+
+  test('disconnecting stops OSC heartbeat loop', () async {
+    final socket = await RawDatagramSocket.bind(
+      InternetAddress.loopbackIPv4,
+      0,
+    );
+    addTearDown(socket.close);
+    final packets = socket
+        .where((event) => event == RawSocketEvent.read)
+        .map((_) => socket.receive())
+        .where((packet) => packet != null)
+        .cast<Datagram>()
+        .asBroadcastStream();
+
+    final coordinator = PushCoordinator(onLog: (_, {error}) {});
+    addTearDown(coordinator.dispose);
+
+    coordinator.updateSettings(
+      HeartRateSettings.defaults().copyWith(
+        oscAddress: '127.0.0.1:${socket.port}',
+      ),
+    );
+    await coordinator.sendHeartRate(
+      bpm: 240,
+      percent: null,
+      timestamp: DateTime(2026),
+    );
+    await _nextOscAddress(packets, exact: '/avatar/parameters/HeartBeatToggle');
+
+    await coordinator.sendConnectionStatus(false, force: true);
+
+    await expectLater(
+      _nextOscAddress(
+        packets,
+        prefix: '/avatar/parameters/HeartBeatToggle',
+        timeout: const Duration(milliseconds: 450),
+      ),
+      throwsA(isA<TimeoutException>()),
+    );
+  });
 }
 
 Future<String> _nextOscAddress(
   Stream<Datagram> packets, {
+  String? exact,
   String? prefix,
+  Duration timeout = const Duration(seconds: 2),
 }) async {
-  final deadline = DateTime.now().add(const Duration(seconds: 2));
+  final deadline = DateTime.now().add(timeout);
   while (DateTime.now().isBefore(deadline)) {
     final datagram = await packets.first.timeout(
       deadline.difference(DateTime.now()),
     );
     final address = _readOscString(datagram.data, 0);
-    if (prefix == null || address.startsWith(prefix)) {
+    if (exact != null && address == exact) {
+      return address;
+    }
+    if (exact == null && (prefix == null || address.startsWith(prefix))) {
       return address;
     }
   }
