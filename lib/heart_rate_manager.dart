@@ -16,7 +16,11 @@ import 'services/services.dart';
 import 'utils/utils.dart';
 
 class HeartRateManager extends ChangeNotifier {
-  HeartRateManager() : _pushCoordinator = PushCoordinator(onLog: _staticLog) {
+  HeartRateManager() {
+    _pushCoordinator = PushCoordinator(
+      onLog: _log,
+      onOscStatusChanged: _handleOscStatusChanged,
+    );
     // Initialize BleScanner with callbacks
     _scanner = BleScanner(
       onLog: _log,
@@ -31,11 +35,6 @@ class HeartRateManager extends ChangeNotifier {
       onHeartRateData: _handleHeartRateData,
       onConnectionStateChange: _onConnectionStateChange,
     );
-  }
-
-  static void _staticLog(String message, {Object? error}) {
-    AppLog.info(message);
-    if (error != null) AppLog.error('$message: $error');
   }
 
   // BLE Scanner for device discovery
@@ -142,6 +141,7 @@ class HeartRateManager extends ChangeNotifier {
   AdapterConnectionState get connectionState => _connectionState;
   BleAdapterState get adapterState => _adapterState;
   HeartRateSettings get settings => _settings;
+  OscStatus get oscStatus => _pushCoordinator.oscStatus;
   bool get isConnected => _connectionState == AdapterConnectionState.connected;
   bool get isBluetoothOn => _adapterState == BleAdapterState.on;
   @visibleForTesting
@@ -879,6 +879,10 @@ class HeartRateManager extends ChangeNotifier {
     if (old.logEnabled != value.logEnabled) {
       AppLog.setEnabled(value.logEnabled);
     }
+  }
+
+  void _handleOscStatusChanged(OscStatus status) {
+    notifyListeners();
   }
 
   @override

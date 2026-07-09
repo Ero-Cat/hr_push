@@ -93,6 +93,24 @@ class AppLocalizationsJa extends AppLocalizations {
   String get fieldMaxHr => '最大心拍数';
 
   @override
+  String get oscStatusTitle => 'OSC送信';
+
+  @override
+  String get oscStatusDisabled => '無効';
+
+  @override
+  String get oscStatusReady => '待機中';
+
+  @override
+  String get oscStatusSent => '送信済み';
+
+  @override
+  String get oscStatusAcknowledged => '確認済み';
+
+  @override
+  String get oscStatusError => '送信失敗';
+
+  @override
   String get sectionOscChatbox => 'OSC チャットボックス';
 
   @override

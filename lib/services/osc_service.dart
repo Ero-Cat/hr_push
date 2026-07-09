@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 import 'dart:typed_data';
 import 'dart:convert';
@@ -40,11 +41,17 @@ class OscService {
   final void Function(String message, {Object? error})? onLog;
 
   RawDatagramSocket? _socket;
+  StreamSubscription<RawSocketEvent>? _socketSub;
+  Completer<bool>? _acknowledgementCompleter;
+  DateTime? _lastAcknowledgementAt;
   String? _lastHrConnectedKey;
   DateTime? _lastChatboxSentAt;
   String? _lastChatboxMessage;
 
   static const Duration _chatboxMinInterval = Duration(seconds: 2);
+  static const Duration _acknowledgementFreshFor = Duration(seconds: 10);
+  static const String acknowledgementPingPath = '/hr_push/ping';
+  static const String acknowledgementPongPath = '/hr_push/pong';
 
   bool get isEnabled => oscAddress.trim().isNotEmpty;
 
@@ -53,37 +60,86 @@ class OscService {
     AppLog.info(message);
   }
 
+  Future<bool> requestAcknowledgement({required Duration timeout}) async {
+    final last = _lastAcknowledgementAt;
+    if (last != null &&
+        DateTime.now().difference(last) <= _acknowledgementFreshFor) {
+      return true;
+    }
+
+    final target = await _resolveTarget();
+    if (target == null) {
+      _log('osc acknowledgement target invalid');
+      return false;
+    }
+    final socket = await _ensureSocket();
+    if (socket == null) {
+      _log('osc acknowledgement socket unavailable');
+      return false;
+    }
+
+    final pending = _acknowledgementCompleter;
+    if (pending != null && !pending.isCompleted) {
+      return pending.future.timeout(timeout, onTimeout: () => false);
+    }
+
+    final completer = Completer<bool>();
+    _acknowledgementCompleter = completer;
+    final msg = _encodeMessage(acknowledgementPingPath, const []);
+    try {
+      socket.send(msg, target.address, target.port);
+      _log(
+        'osc acknowledgement ping -> ${target.address.address}:${target.port}',
+      );
+    } catch (e) {
+      _log('osc acknowledgement failed', error: e);
+      if (!completer.isCompleted) completer.complete(false);
+    }
+
+    return completer.future.timeout(
+      timeout,
+      onTimeout: () {
+        if (!completer.isCompleted) completer.complete(false);
+        _log('osc acknowledgement timeout');
+        return false;
+      },
+    );
+  }
+
   /// Send connection status
-  Future<void> sendConnectedStatus(bool connected, {bool force = false}) async {
+  Future<bool> sendConnectedStatus(bool connected, {bool force = false}) async {
     final key = '${oscAddress.trim()}|$hrConnectedPath|$connected';
-    if (!force && _lastHrConnectedKey == key) return;
+    if (!force && _lastHrConnectedKey == key) return true;
 
     final ok = await _sendMessage(hrConnectedPath, connected);
     if (ok) {
       _lastHrConnectedKey = key;
     }
+    return ok;
   }
 
   /// Send heart rate value and percent
-  Future<void> sendHeartRate(int bpm, double? percent) async {
-    await _sendMessage(hrValuePath, bpm);
+  Future<bool> sendHeartRate(int bpm, double? percent) async {
+    final valueOk = await _sendMessage(hrValuePath, bpm);
+    var percentOk = true;
     if (percent != null) {
-      await _sendMessage(hrPercentPath, percent);
+      percentOk = await _sendMessage(hrPercentPath, percent);
     }
+    return valueOk && percentOk;
   }
 
   /// Send chatbox message if enabled
-  Future<void> sendChatbox(int bpm, double? percent) async {
-    if (!chatboxEnabled) return;
+  Future<bool> sendChatbox(int bpm, double? percent) async {
+    if (!chatboxEnabled) return true;
 
     final text = _buildChatboxText(bpm, percent);
-    if (text.trim().isEmpty) return;
-    if (text == _lastChatboxMessage) return;
+    if (text.trim().isEmpty) return true;
+    if (text == _lastChatboxMessage) return true;
 
     final now = DateTime.now();
     if (_lastChatboxSentAt != null &&
         now.difference(_lastChatboxSentAt!) < _chatboxMinInterval) {
-      return;
+      return true;
     }
 
     final ok = await _sendMessageWithArgs('/chatbox/input', [
@@ -95,6 +151,7 @@ class OscService {
       _lastChatboxSentAt = now;
       _lastChatboxMessage = text;
     }
+    return ok;
   }
 
   String _buildChatboxText(int bpm, double? percent) {
@@ -192,7 +249,36 @@ class OscService {
     if (_socket != null) return _socket;
     try {
       _socket = await RawDatagramSocket.bind(InternetAddress.anyIPv4, 0);
+      _socketSub = _socket?.listen(_handleSocketEvent);
       return _socket;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  void _handleSocketEvent(RawSocketEvent event) {
+    if (event != RawSocketEvent.read) return;
+    while (true) {
+      final packet = _socket?.receive();
+      if (packet == null) return;
+      final address = _readOscAddress(packet.data);
+      if (address != acknowledgementPongPath) continue;
+      _lastAcknowledgementAt = DateTime.now();
+      final pending = _acknowledgementCompleter;
+      if (pending != null && !pending.isCompleted) {
+        pending.complete(true);
+      }
+      _log(
+        'osc acknowledgement pong <- ${packet.address.address}:${packet.port}',
+      );
+    }
+  }
+
+  String? _readOscAddress(Uint8List data) {
+    final end = data.indexOf(0);
+    if (end <= 0) return null;
+    try {
+      return utf8.decode(data.sublist(0, end));
     } catch (_) {
       return null;
     }
@@ -239,6 +325,8 @@ class OscService {
   }
 
   void dispose() {
+    _socketSub?.cancel();
+    _socketSub = null;
     _socket?.close();
     _socket = null;
   }

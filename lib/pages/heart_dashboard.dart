@@ -1,5 +1,3 @@
-
-
 import 'dart:io';
 import '../l10n/app_localizations.dart';
 import 'package:flutter/foundation.dart';
@@ -9,6 +7,7 @@ import 'package:window_manager/window_manager.dart';
 
 import '../heart_rate_manager.dart';
 import '../models/models.dart';
+import '../services/push_coordinator.dart';
 import '../theme/design_system.dart';
 import '../widgets/hero_card.dart';
 import '../widgets/nearby_list.dart';
@@ -26,13 +25,15 @@ class HeartDashboard extends StatelessWidget {
     return CupertinoPageScaffold(
       backgroundColor: AppColors.bgPrimary,
       child: CustomScrollView(
-        physics: const BouncingScrollPhysics(parent: AlwaysScrollableScrollPhysics()),
+        physics: const BouncingScrollPhysics(
+          parent: AlwaysScrollableScrollPhysics(),
+        ),
         slivers: [
           CupertinoSliverNavigationBar(
             largeTitle: DragToMoveArea(
               child: Text(
-                 l10n.appTitle, 
-                 style: const TextStyle(fontFamily: '.SF Pro Display'),
+                l10n.appTitle,
+                style: const TextStyle(fontFamily: '.SF Pro Display'),
               ),
             ),
             backgroundColor: AppColors.bgSecondary,
@@ -78,6 +79,8 @@ class HeartDashboard extends StatelessWidget {
                 delegate: SliverChildListDelegate([
                   const SizedBox(height: AppSpacing.s8),
                   const HeroCard(),
+                  const SizedBox(height: AppSpacing.s12),
+                  const _OscStatusStrip(),
                   const SizedBox(height: AppSpacing.s32),
                   Consumer<HeartRateManager>(
                     builder: (context, mgr, _) => NearbyList(mgr: mgr),
@@ -92,16 +95,144 @@ class HeartDashboard extends StatelessWidget {
     );
   }
 
-
   Future<void> _openSettings(BuildContext context) async {
     final mgr = context.read<HeartRateManager>();
     final updated = await Navigator.of(context).push<HeartRateSettings>(
-      CupertinoPageRoute(
-        builder: (_) => SettingsPage(initial: mgr.settings),
-      ),
+      CupertinoPageRoute(builder: (_) => SettingsPage(initial: mgr.settings)),
     );
     if (updated != null) {
       await mgr.updateSettings(updated);
+    }
+  }
+}
+
+class _OscStatusStrip extends StatelessWidget {
+  const _OscStatusStrip();
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
+    final status = context.watch<HeartRateManager>().oscStatus;
+    final color = _statusColor(status.state).resolveFrom(context);
+    final label = _statusLabel(l10n, status.state);
+    final detail = status.target.isEmpty ? label : status.target;
+
+    return Container(
+      padding: const EdgeInsets.symmetric(
+        horizontal: AppSpacing.s16,
+        vertical: AppSpacing.s12,
+      ),
+      decoration: BoxDecoration(
+        color: AppColors.bgSecondary.resolveFrom(context),
+        borderRadius: BorderRadius.circular(AppRadius.r12),
+        border: Border.all(
+          color: AppColors.separator
+              .resolveFrom(context)
+              .withValues(alpha: 0.5),
+          width: 0.5,
+        ),
+      ),
+      child: Row(
+        children: [
+          Icon(
+            CupertinoIcons.dot_radiowaves_left_right,
+            size: 18,
+            color: color,
+          ),
+          const SizedBox(width: AppSpacing.s12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  l10n.oscStatusTitle,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: AppTypography.caption.copyWith(
+                    color: AppColors.textTertiary.resolveFrom(context),
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                const SizedBox(height: AppSpacing.s4),
+                Text(
+                  detail,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: AppTypography.subheadline.copyWith(
+                    color: AppColors.textPrimary.resolveFrom(context),
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: AppSpacing.s12),
+          Container(
+            constraints: const BoxConstraints(maxWidth: 104),
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+            decoration: BoxDecoration(
+              color: color.withValues(alpha: 0.12),
+              borderRadius: BorderRadius.circular(999),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  width: 7,
+                  height: 7,
+                  decoration: BoxDecoration(
+                    color: color,
+                    shape: BoxShape.circle,
+                  ),
+                ),
+                const SizedBox(width: AppSpacing.s8),
+                Flexible(
+                  child: Text(
+                    label,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: AppTypography.caption.copyWith(
+                      color: color,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  CupertinoDynamicColor _statusColor(OscSendState state) {
+    switch (state) {
+      case OscSendState.disabled:
+        return AppColors.textTertiary;
+      case OscSendState.ready:
+        return AppColors.warning;
+      case OscSendState.sent:
+        return AppColors.success;
+      case OscSendState.acknowledged:
+        return AppColors.success;
+      case OscSendState.error:
+        return AppColors.danger;
+    }
+  }
+
+  String _statusLabel(AppLocalizations l10n, OscSendState state) {
+    switch (state) {
+      case OscSendState.disabled:
+        return l10n.oscStatusDisabled;
+      case OscSendState.ready:
+        return l10n.oscStatusReady;
+      case OscSendState.sent:
+        return l10n.oscStatusSent;
+      case OscSendState.acknowledged:
+        return l10n.oscStatusAcknowledged;
+      case OscSendState.error:
+        return l10n.oscStatusError;
     }
   }
 }

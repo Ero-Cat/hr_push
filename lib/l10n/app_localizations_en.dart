@@ -93,6 +93,24 @@ class AppLocalizationsEn extends AppLocalizations {
   String get fieldMaxHr => 'Max HR';
 
   @override
+  String get oscStatusTitle => 'OSC Push';
+
+  @override
+  String get oscStatusDisabled => 'Disabled';
+
+  @override
+  String get oscStatusReady => 'Ready';
+
+  @override
+  String get oscStatusSent => 'Sent';
+
+  @override
+  String get oscStatusAcknowledged => 'Acknowledged';
+
+  @override
+  String get oscStatusError => 'Send failed';
+
+  @override
   String get sectionOscChatbox => 'OSC Chatbox';
 
   @override

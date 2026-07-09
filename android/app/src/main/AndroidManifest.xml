@@ -3,6 +3,8 @@
     <!-- Tell Play Store that the app uses BLE; keep optional so simulators still run -->
     <uses-feature android:name="android.hardware.bluetooth_le" android:required="false" />
 
+    <!-- Required by release builds for OSC UDP, HTTP, WebSocket, and MQTT push traffic -->
+    <uses-permission android:name="android.permission.INTERNET" />
     <!-- Android 12+ runtime BLE permissions -->
     <uses-permission android:name="android.permission.BLUETOOTH_SCAN" android:usesPermissionFlags="neverForLocation" />
     <uses-permission android:name="android.permission.BLUETOOTH_CONNECT" />

@@ -93,6 +93,24 @@ class AppLocalizationsZh extends AppLocalizations {
   String get fieldMaxHr => '最大心率';
 
   @override
+  String get oscStatusTitle => 'OSC 推送';
+
+  @override
+  String get oscStatusDisabled => '未启用';
+
+  @override
+  String get oscStatusReady => '待发送';
+
+  @override
+  String get oscStatusSent => '已发送';
+
+  @override
+  String get oscStatusAcknowledged => '已确认';
+
+  @override
+  String get oscStatusError => '发送失败';
+
+  @override
   String get sectionOscChatbox => 'OSC 聊天框';
 
   @override

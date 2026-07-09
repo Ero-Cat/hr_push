@@ -1,20 +1,92 @@
+import 'dart:async';
+
 import '../models/heart_rate_settings.dart';
 import 'http_ws_service.dart';
 import 'mqtt_service.dart';
 import 'osc_service.dart';
 
+enum OscSendState { disabled, ready, sent, acknowledged, error }
+
+class OscStatus {
+  const OscStatus({
+    required this.state,
+    required this.target,
+    required this.message,
+    required this.updatedAt,
+  });
+
+  factory OscStatus.disabled() {
+    return const OscStatus(
+      state: OscSendState.disabled,
+      target: '',
+      message: '',
+      updatedAt: null,
+    );
+  }
+
+  factory OscStatus.ready(String target) {
+    return OscStatus(
+      state: OscSendState.ready,
+      target: target,
+      message: '',
+      updatedAt: null,
+    );
+  }
+
+  factory OscStatus.sent(String target) {
+    return OscStatus(
+      state: OscSendState.sent,
+      target: target,
+      message: '',
+      updatedAt: DateTime.now(),
+    );
+  }
+
+  factory OscStatus.acknowledged(String target) {
+    return OscStatus(
+      state: OscSendState.acknowledged,
+      target: target,
+      message: '',
+      updatedAt: DateTime.now(),
+    );
+  }
+
+  factory OscStatus.error(String target, String message) {
+    return OscStatus(
+      state: OscSendState.error,
+      target: target,
+      message: message,
+      updatedAt: DateTime.now(),
+    );
+  }
+
+  final OscSendState state;
+  final String target;
+  final String message;
+  final DateTime? updatedAt;
+}
+
 /// Coordinates all push services (HTTP/WebSocket, MQTT, OSC)
 /// Provides a unified interface for sending heart rate data to all configured endpoints
 class PushCoordinator {
-  PushCoordinator({required this.onLog});
+  PushCoordinator({
+    required this.onLog,
+    this.onOscStatusChanged,
+    this.oscAcknowledgementTimeout = const Duration(milliseconds: 800),
+  });
 
   final void Function(String message, {Object? error}) onLog;
+  final void Function(OscStatus status)? onOscStatusChanged;
+  final Duration oscAcknowledgementTimeout;
 
   HttpWsService? _httpWsService;
   MqttService? _mqttService;
   OscService? _oscService;
+  OscStatus _oscStatus = OscStatus.disabled();
 
   HeartRateSettings _settings = HeartRateSettings.defaults();
+
+  OscStatus get oscStatus => _oscStatus;
 
   /// Update settings and recreate services if needed
   void updateSettings(HeartRateSettings value) {
@@ -41,6 +113,7 @@ class PushCoordinator {
       _oscService?.dispose();
       _oscService = null;
     }
+    _setOscConfiguredStatus(value);
 
     // Reset MQTT service if any MQTT settings changed
     final mqttChanged =
@@ -83,14 +156,23 @@ class PushCoordinator {
     bool connected, {
     bool force = false,
   }) async {
-    if (_settings.oscAddress.trim().isEmpty) return;
-    await _getOscService().sendConnectedStatus(connected, force: force);
+    if (_settings.oscAddress.trim().isEmpty) {
+      _setOscStatus(OscStatus.disabled());
+      return;
+    }
+    await _sendOsc(
+      (service) => service.sendConnectedStatus(connected, force: force),
+    );
   }
 
   /// Send chatbox message via OSC (for VRChat)
   Future<void> sendChatbox(int bpm, double? percent) async {
-    if (_settings.oscAddress.trim().isEmpty) return;
-    await _getOscService().sendChatbox(bpm, percent);
+    if (_settings.oscAddress.trim().isEmpty) {
+      _setOscStatus(OscStatus.disabled());
+      return;
+    }
+    if (!_settings.oscChatboxEnabled) return;
+    await _sendOsc((service) => service.sendChatbox(bpm, percent));
   }
 
   // ─────────────────────────────────────────────────────────────────────────
@@ -122,8 +204,11 @@ class PushCoordinator {
   }
 
   Future<void> _sendOscHeartRate(int bpm, double? percent) async {
-    if (_settings.oscAddress.trim().isEmpty) return;
-    await _getOscService().sendHeartRate(bpm, percent);
+    if (_settings.oscAddress.trim().isEmpty) {
+      _setOscStatus(OscStatus.disabled());
+      return;
+    }
+    await _sendOsc((service) => service.sendHeartRate(bpm, percent));
   }
 
   OscService _getOscService() {
@@ -136,6 +221,51 @@ class PushCoordinator {
       chatboxTemplate: _settings.oscChatboxTemplate,
       onLog: onLog,
     );
+  }
+
+  Future<void> _sendOsc(Future<bool> Function(OscService service) send) async {
+    final target = _settings.oscAddress.trim();
+    final service = _getOscService();
+    try {
+      final ok = await send(service);
+      if (!ok) {
+        _setOscStatus(
+          OscStatus.error(target, 'OSC target or socket unavailable'),
+        );
+        return;
+      }
+      _setOscStatus(OscStatus.sent(target));
+      unawaited(_requestOscAcknowledgement(service, target));
+    } catch (e) {
+      _setOscStatus(OscStatus.error(target, e.toString()));
+    }
+  }
+
+  Future<void> _requestOscAcknowledgement(
+    OscService service,
+    String target,
+  ) async {
+    final ok = await service.requestAcknowledgement(
+      timeout: oscAcknowledgementTimeout,
+    );
+    if (!ok) return;
+    if (_settings.oscAddress.trim() != target) return;
+    if (_oscStatus.target != target) return;
+    _setOscStatus(OscStatus.acknowledged(target));
+  }
+
+  void _setOscConfiguredStatus(HeartRateSettings value) {
+    final target = value.oscAddress.trim();
+    if (target.isEmpty) {
+      _setOscStatus(OscStatus.disabled());
+      return;
+    }
+    _setOscStatus(OscStatus.ready(target));
+  }
+
+  void _setOscStatus(OscStatus status) {
+    _oscStatus = status;
+    onOscStatusChanged?.call(status);
   }
 
   /// Dispose all services

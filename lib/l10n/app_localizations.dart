@@ -268,6 +268,42 @@ abstract class AppLocalizations {
   /// **'Max HR'**
   String get fieldMaxHr;
 
+  /// No description provided for @oscStatusTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'OSC Push'**
+  String get oscStatusTitle;
+
+  /// No description provided for @oscStatusDisabled.
+  ///
+  /// In en, this message translates to:
+  /// **'Disabled'**
+  String get oscStatusDisabled;
+
+  /// No description provided for @oscStatusReady.
+  ///
+  /// In en, this message translates to:
+  /// **'Ready'**
+  String get oscStatusReady;
+
+  /// No description provided for @oscStatusSent.
+  ///
+  /// In en, this message translates to:
+  /// **'Sent'**
+  String get oscStatusSent;
+
+  /// No description provided for @oscStatusAcknowledged.
+  ///
+  /// In en, this message translates to:
+  /// **'Acknowledged'**
+  String get oscStatusAcknowledged;
+
+  /// No description provided for @oscStatusError.
+  ///
+  /// In en, this message translates to:
+  /// **'Send failed'**
+  String get oscStatusError;
+
   /// No description provided for @sectionOscChatbox.
   ///
   /// In en, this message translates to:
