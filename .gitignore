@@ -59,8 +59,10 @@ app.*.map.json
 # local release helper
 tag.sh
 
+# Isolated feature worktrees
+.worktrees/
+
 # Build artifacts
 *.apk
 *.aab
 *.zip
-
