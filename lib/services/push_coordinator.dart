@@ -82,6 +82,7 @@ class PushCoordinator {
   HttpWsService? _httpWsService;
   MqttService? _mqttService;
   OscService? _oscService;
+  Future<void> _oscTransition = Future<void>.value();
   OscStatus _oscStatus = OscStatus.disabled();
 
   HeartRateSettings _settings = HeartRateSettings.defaults();
@@ -110,11 +111,21 @@ class PushCoordinator {
         old.oscHeartbeatIntPath != value.oscHeartbeatIntPath ||
         old.oscHeartbeatPulsePath != value.oscHeartbeatPulsePath ||
         old.oscHeartbeatTogglePath != value.oscHeartbeatTogglePath ||
+        old.oscHeartbeatIntEnabled != value.oscHeartbeatIntEnabled ||
+        old.oscHeartbeatPulseEnabled != value.oscHeartbeatPulseEnabled ||
+        old.oscHeartbeatToggleEnabled != value.oscHeartbeatToggleEnabled ||
+        old.oscHeartbeatPulseDurationMs != value.oscHeartbeatPulseDurationMs ||
         old.oscChatboxEnabled != value.oscChatboxEnabled ||
         old.oscChatboxTemplate != value.oscChatboxTemplate;
     if (oscChanged) {
-      _oscService?.dispose();
+      final previousOscService = _oscService;
       _oscService = null;
+      if (previousOscService != null) {
+        _oscTransition = _oscTransition.then((_) async {
+          await previousOscService.stopHeartbeat();
+          previousOscService.dispose();
+        });
+      }
     }
     _setOscConfiguredStatus(value);
 
@@ -228,6 +239,12 @@ class PushCoordinator {
       heartbeatIntPath: _settings.oscHeartbeatIntPath,
       heartbeatPulsePath: _settings.oscHeartbeatPulsePath,
       heartbeatTogglePath: _settings.oscHeartbeatTogglePath,
+      heartbeatIntEnabled: _settings.oscHeartbeatIntEnabled,
+      heartbeatPulseEnabled: _settings.oscHeartbeatPulseEnabled,
+      heartbeatToggleEnabled: _settings.oscHeartbeatToggleEnabled,
+      heartbeatPulseDuration: Duration(
+        milliseconds: _settings.oscHeartbeatPulseDurationMs,
+      ),
       chatboxEnabled: _settings.oscChatboxEnabled,
       chatboxTemplate: _settings.oscChatboxTemplate,
       onLog: onLog,
@@ -235,6 +252,7 @@ class PushCoordinator {
   }
 
   Future<void> _sendOsc(Future<bool> Function(OscService service) send) async {
+    await _oscTransition;
     final target = _settings.oscAddress.trim();
     final service = _getOscService();
     try {

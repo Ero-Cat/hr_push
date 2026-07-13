@@ -30,6 +30,10 @@ class OscService {
     required this.heartbeatIntPath,
     required this.heartbeatPulsePath,
     required this.heartbeatTogglePath,
+    required this.heartbeatIntEnabled,
+    required this.heartbeatPulseEnabled,
+    required this.heartbeatToggleEnabled,
+    required this.heartbeatPulseDuration,
     required this.chatboxEnabled,
     required this.chatboxTemplate,
     this.onLog,
@@ -42,6 +46,10 @@ class OscService {
   final String heartbeatIntPath;
   final String heartbeatPulsePath;
   final String heartbeatTogglePath;
+  final bool heartbeatIntEnabled;
+  final bool heartbeatPulseEnabled;
+  final bool heartbeatToggleEnabled;
+  final Duration heartbeatPulseDuration;
   final bool chatboxEnabled;
   final String chatboxTemplate;
   final void Function(String message, {Object? error})? onLog;
@@ -56,7 +64,9 @@ class OscService {
   Timer? _heartbeatTimer;
   Timer? _heartbeatInactiveTimer;
   int? _heartbeatBpm;
+  bool _heartbeatPulseActive = false;
   bool _currentBeatToggle = false;
+  Future<void> _heartbeatSendQueue = Future<void>.value();
 
   static const Duration _chatboxMinInterval = Duration(seconds: 2);
   static const Duration _acknowledgementFreshFor = Duration(seconds: 10);
@@ -143,18 +153,16 @@ class OscService {
 
   /// Stop the heartbeat pulse loop and send inactive values if possible.
   Future<void> stopHeartbeat({bool sendInactive = true}) async {
-    final hadHeartbeat =
-        _heartbeatBpm != null ||
-        (_heartbeatTimer?.isActive ?? false) ||
-        (_heartbeatInactiveTimer?.isActive ?? false);
+    final hadActivePulse = _heartbeatPulseActive;
     _heartbeatBpm = null;
     _heartbeatTimer?.cancel();
     _heartbeatTimer = null;
     _heartbeatInactiveTimer?.cancel();
     _heartbeatInactiveTimer = null;
 
-    if (sendInactive && hadHeartbeat) {
-      await _sendHeartbeatInactive();
+    if (sendInactive && hadActivePulse) {
+      _heartbeatPulseActive = false;
+      await _queueHeartbeatSend(_sendHeartbeatInactive);
     }
   }
 
@@ -275,7 +283,8 @@ class OscService {
     final bpm = _heartbeatBpm;
     if (bpm == null) return;
 
-    unawaited(_sendHeartbeatActive());
+    _heartbeatPulseActive = true;
+    unawaited(_queueHeartbeatSend(_sendHeartbeatActive));
 
     _heartbeatInactiveTimer?.cancel();
     _heartbeatInactiveTimer = Timer(_qrsIntervalFor(bpm), () {
@@ -287,19 +296,37 @@ class OscService {
   }
 
   Future<void> _sendHeartbeatActive() async {
-    await _sendMessageIfPath(heartbeatIntPath, 1);
-    await _sendMessageIfPath(heartbeatPulsePath, true);
-    await _sendMessageIfPath(heartbeatTogglePath, _currentBeatToggle);
+    if (heartbeatIntEnabled) {
+      await _sendMessageIfPath(heartbeatIntPath, 1);
+    }
+    if (heartbeatPulseEnabled) {
+      await _sendMessageIfPath(heartbeatPulsePath, true);
+    }
+    if (heartbeatToggleEnabled) {
+      await _sendMessageIfPath(heartbeatTogglePath, _currentBeatToggle);
+    }
   }
 
   Future<void> _completeHeartbeatPulse() async {
-    await _sendHeartbeatInactive();
+    if (!_heartbeatPulseActive) return;
+    _heartbeatPulseActive = false;
+    await _queueHeartbeatSend(_sendHeartbeatInactive);
     _currentBeatToggle = !_currentBeatToggle;
   }
 
   Future<void> _sendHeartbeatInactive() async {
-    await _sendMessageIfPath(heartbeatIntPath, 0);
-    await _sendMessageIfPath(heartbeatPulsePath, false);
+    if (heartbeatIntEnabled) {
+      await _sendMessageIfPath(heartbeatIntPath, 0);
+    }
+    if (heartbeatPulseEnabled) {
+      await _sendMessageIfPath(heartbeatPulsePath, false);
+    }
+  }
+
+  Future<void> _queueHeartbeatSend(Future<void> Function() send) {
+    final queued = _heartbeatSendQueue.then((_) => send());
+    _heartbeatSendQueue = queued.catchError((_) {});
+    return queued;
   }
 
   Future<bool> _sendMessageIfPath(String address, Object value) async {
@@ -315,7 +342,10 @@ class OscService {
 
   Duration _qrsIntervalFor(int bpm) {
     final rrMs = _rrIntervalFor(bpm).inMilliseconds;
-    final milliseconds = (rrMs / 5).round().clamp(1, rrMs).toInt();
+    final maximum = (rrMs - 1).clamp(1, rrMs).toInt();
+    final milliseconds = heartbeatPulseDuration.inMilliseconds
+        .clamp(0, maximum)
+        .toInt();
     return Duration(milliseconds: milliseconds);
   }
 
@@ -425,6 +455,7 @@ class OscService {
 
   void dispose() {
     _heartbeatBpm = null;
+    _heartbeatPulseActive = false;
     _heartbeatTimer?.cancel();
     _heartbeatTimer = null;
     _heartbeatInactiveTimer?.cancel();

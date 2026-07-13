@@ -244,6 +244,144 @@ void main() {
       throwsA(isA<TimeoutException>()),
     );
   });
+
+  test(
+    'OSC heartbeat flags and duration changes take effect without restart',
+    () async {
+      final socket = await RawDatagramSocket.bind(
+        InternetAddress.loopbackIPv4,
+        0,
+      );
+      addTearDown(socket.close);
+      final packets = socket
+          .where((event) => event == RawSocketEvent.read)
+          .map((_) => socket.receive())
+          .where((packet) => packet != null)
+          .cast<Datagram>()
+          .map((datagram) => _CoordinatorOscPacket.parse(datagram.data))
+          .asBroadcastStream();
+
+      final coordinator = PushCoordinator(onLog: (_, {error}) {});
+      addTearDown(coordinator.dispose);
+
+      final initial = HeartRateSettings.defaults().copyWith(
+        oscAddress: '127.0.0.1:${socket.port}',
+        oscHeartbeatIntEnabled: true,
+        oscHeartbeatPulseEnabled: false,
+        oscHeartbeatToggleEnabled: false,
+        oscHeartbeatPulseDurationMs: 80,
+      );
+      coordinator.updateSettings(initial);
+      await coordinator.sendHeartRate(
+        bpm: 600,
+        percent: null,
+        timestamp: DateTime(2026),
+      );
+      expect(
+        (await _nextCoordinatorOscPacket(
+          packets,
+          '/avatar/parameters/HeartBeatInt',
+        )).intValue,
+        1,
+      );
+
+      coordinator.updateSettings(
+        initial.copyWith(
+          oscHeartbeatIntEnabled: false,
+          oscHeartbeatPulseEnabled: true,
+          oscHeartbeatPulseDurationMs: 40,
+        ),
+      );
+      await coordinator.sendHeartRate(
+        bpm: 600,
+        percent: null,
+        timestamp: DateTime(2026),
+      );
+
+      expect(
+        (await _nextCoordinatorOscPacket(
+          packets,
+          '/avatar/parameters/HeartBeatInt',
+        )).intValue,
+        0,
+      );
+      expect(
+        (await _nextCoordinatorOscPacket(
+          packets,
+          '/avatar/parameters/HeartBeatPulse',
+        )).boolValue,
+        isTrue,
+      );
+      expect(
+        (await _nextCoordinatorOscPacket(
+          packets,
+          '/avatar/parameters/HeartBeatPulse',
+        )).boolValue,
+        isFalse,
+      );
+    },
+  );
+}
+
+class _CoordinatorOscPacket {
+  const _CoordinatorOscPacket({
+    required this.address,
+    required this.typeTags,
+    this.intValue,
+  });
+
+  final String address;
+  final String typeTags;
+  final int? intValue;
+
+  bool? get boolValue {
+    if (typeTags == ',T') return true;
+    if (typeTags == ',F') return false;
+    return null;
+  }
+
+  factory _CoordinatorOscPacket.parse(Uint8List data) {
+    final address = _readOscString(data, 0);
+    final typeStart = _nextOscOffset(data.indexOf(0));
+    final typeTags = _readOscString(data, typeStart);
+    int? intValue;
+    if (typeTags == ',i') {
+      final valueStart = _nextOscOffset(data.indexOf(0, typeStart));
+      intValue = ByteData.sublistView(
+        data,
+        valueStart,
+        valueStart + 4,
+      ).getInt32(0, Endian.big);
+    }
+    return _CoordinatorOscPacket(
+      address: address,
+      typeTags: typeTags,
+      intValue: intValue,
+    );
+  }
+}
+
+int _nextOscOffset(int stringEnd) {
+  var offset = stringEnd + 1;
+  while (offset % 4 != 0) {
+    offset++;
+  }
+  return offset;
+}
+
+Future<_CoordinatorOscPacket> _nextCoordinatorOscPacket(
+  Stream<_CoordinatorOscPacket> packets,
+  String address, {
+  Duration timeout = const Duration(seconds: 2),
+}) async {
+  final deadline = DateTime.now().add(timeout);
+  while (DateTime.now().isBefore(deadline)) {
+    final packet = await packets.first.timeout(
+      deadline.difference(DateTime.now()),
+    );
+    if (packet.address == address) return packet;
+  }
+  throw TimeoutException('OSC packet not received: $address');
 }
 
 Future<String> _nextOscAddress(
