@@ -37,6 +37,7 @@ class OscService {
     required this.chatboxEnabled,
     required this.chatboxTemplate,
     this.onLog,
+    this.beforeHeartbeatSend,
   });
 
   final String oscAddress;
@@ -53,6 +54,7 @@ class OscService {
   final bool chatboxEnabled;
   final String chatboxTemplate;
   final void Function(String message, {Object? error})? onLog;
+  final Future<void> Function(bool isActive)? beforeHeartbeatSend;
 
   RawDatagramSocket? _socket;
   StreamSubscription<RawSocketEvent>? _socketSub;
@@ -65,8 +67,12 @@ class OscService {
   Timer? _heartbeatInactiveTimer;
   int? _heartbeatBpm;
   bool _heartbeatPulseActive = false;
+  bool _heartbeatOutputMayBeActive = false;
   bool _currentBeatToggle = false;
   Future<void> _heartbeatSendQueue = Future<void>.value();
+  int _heartbeatWorkGeneration = 0;
+  bool _acceptingHeartbeatWork = true;
+  bool _isDisposed = false;
 
   static const Duration _chatboxMinInterval = Duration(seconds: 2);
   static const Duration _acknowledgementFreshFor = Duration(seconds: 10);
@@ -81,6 +87,7 @@ class OscService {
   }
 
   Future<bool> requestAcknowledgement({required Duration timeout}) async {
+    if (_isDisposed) return false;
     final last = _lastAcknowledgementAt;
     if (last != null &&
         DateTime.now().difference(last) <= _acknowledgementFreshFor) {
@@ -88,12 +95,12 @@ class OscService {
     }
 
     final target = await _resolveTarget();
-    if (target == null) {
+    if (_isDisposed || target == null) {
       _log('osc acknowledgement target invalid');
       return false;
     }
     final socket = await _ensureSocket();
-    if (socket == null) {
+    if (_isDisposed || socket == null) {
       _log('osc acknowledgement socket unavailable');
       return false;
     }
@@ -107,6 +114,7 @@ class OscService {
     _acknowledgementCompleter = completer;
     final msg = _encodeMessage(acknowledgementPingPath, const []);
     try {
+      if (_isDisposed) return false;
       socket.send(msg, target.address, target.port);
       _log(
         'osc acknowledgement ping -> ${target.address.address}:${target.port}',
@@ -153,16 +161,24 @@ class OscService {
 
   /// Stop the heartbeat pulse loop and send inactive values if possible.
   Future<void> stopHeartbeat({bool sendInactive = true}) async {
-    final hadActivePulse = _heartbeatPulseActive;
+    final shouldSendInactive = sendInactive && _heartbeatOutputMayBeActive;
     _heartbeatBpm = null;
+    _heartbeatPulseActive = false;
     _heartbeatTimer?.cancel();
     _heartbeatTimer = null;
     _heartbeatInactiveTimer?.cancel();
     _heartbeatInactiveTimer = null;
+    _acceptingHeartbeatWork = false;
+    final cleanupGeneration = ++_heartbeatWorkGeneration;
 
-    if (sendInactive && hadActivePulse) {
-      _heartbeatPulseActive = false;
-      await _queueHeartbeatSend(_sendHeartbeatInactive);
+    if (shouldSendInactive) {
+      await _queueHeartbeatSend(
+        _sendHeartbeatInactive,
+        generation: cleanupGeneration,
+        allowWhileStopped: true,
+      );
+    } else {
+      await _heartbeatSendQueue;
     }
   }
 
@@ -213,20 +229,26 @@ class OscService {
     return text;
   }
 
-  Future<bool> _sendMessage(String address, Object value) async {
+  Future<bool> _sendMessage(
+    String address,
+    Object value, {
+    bool Function()? canSend,
+  }) async {
+    if (_isDisposed || (canSend != null && !canSend())) return false;
     final target = await _resolveTarget();
-    if (target == null) {
+    if (_isDisposed || (canSend != null && !canSend()) || target == null) {
       _log('osc target invalid: $address');
       return false;
     }
     final socket = await _ensureSocket();
-    if (socket == null) {
+    if (_isDisposed || (canSend != null && !canSend()) || socket == null) {
       _log('osc socket unavailable: $address');
       return false;
     }
 
     final msg = _encodeMessage(address, [_argFromValue(value)]);
     try {
+      if (_isDisposed || (canSend != null && !canSend())) return false;
       socket.send(msg, target.address, target.port);
       _log('osc sent: $address -> ${target.address.address}:${target.port}');
       return true;
@@ -259,11 +281,16 @@ class OscService {
   }
 
   void _startHeartbeatLoop(int bpm) {
+    if (_isDisposed) return;
     if (bpm <= 0) {
       unawaited(stopHeartbeat());
       return;
     }
 
+    if (!_acceptingHeartbeatWork) {
+      _acceptingHeartbeatWork = true;
+      _heartbeatWorkGeneration++;
+    }
     _heartbeatBpm = bpm;
     if (_heartbeatTimer == null && _heartbeatInactiveTimer == null) {
       _scheduleNextHeartbeat(_rrIntervalFor(bpm));
@@ -281,72 +308,117 @@ class OscService {
 
   void _emitHeartbeat() {
     final bpm = _heartbeatBpm;
-    if (bpm == null) return;
+    if (bpm == null || !_acceptingHeartbeatWork || _isDisposed) return;
 
     _heartbeatPulseActive = true;
-    unawaited(_queueHeartbeatSend(_sendHeartbeatActive));
+    _heartbeatOutputMayBeActive = true;
+    final generation = _heartbeatWorkGeneration;
+    unawaited(
+      _queueHeartbeatSend(_sendHeartbeatActive, generation: generation),
+    );
 
     _heartbeatInactiveTimer?.cancel();
     _heartbeatInactiveTimer = Timer(_qrsIntervalFor(bpm), () {
       _heartbeatInactiveTimer = null;
-      unawaited(_completeHeartbeatPulse());
+      unawaited(_completeHeartbeatPulse(generation));
     });
 
     _scheduleNextHeartbeat(_rrIntervalFor(bpm));
   }
 
-  Future<void> _sendHeartbeatActive() async {
+  Future<void> _sendHeartbeatActive(bool Function() canSend) async {
+    await beforeHeartbeatSend?.call(true);
+    if (!canSend()) return;
     if (heartbeatIntEnabled) {
-      await _sendMessageIfPath(heartbeatIntPath, 1);
+      await _sendMessageIfPath(heartbeatIntPath, 1, canSend: canSend);
     }
     if (heartbeatPulseEnabled) {
-      await _sendMessageIfPath(heartbeatPulsePath, true);
+      await _sendMessageIfPath(heartbeatPulsePath, true, canSend: canSend);
     }
     if (heartbeatToggleEnabled) {
-      await _sendMessageIfPath(heartbeatTogglePath, _currentBeatToggle);
+      await _sendMessageIfPath(
+        heartbeatTogglePath,
+        _currentBeatToggle,
+        canSend: canSend,
+      );
     }
   }
 
-  Future<void> _completeHeartbeatPulse() async {
-    if (!_heartbeatPulseActive) return;
+  Future<void> _completeHeartbeatPulse(int generation) async {
+    if (!_heartbeatPulseActive || generation != _heartbeatWorkGeneration) {
+      return;
+    }
     _heartbeatPulseActive = false;
-    await _queueHeartbeatSend(_sendHeartbeatInactive);
+    await _queueHeartbeatSend(_sendHeartbeatInactive, generation: generation);
     _currentBeatToggle = !_currentBeatToggle;
   }
 
-  Future<void> _sendHeartbeatInactive() async {
+  Future<void> _sendHeartbeatInactive(bool Function() canSend) async {
+    await beforeHeartbeatSend?.call(false);
+    if (!canSend()) return;
     if (heartbeatIntEnabled) {
-      await _sendMessageIfPath(heartbeatIntPath, 0);
+      await _sendMessageIfPath(heartbeatIntPath, 0, canSend: canSend);
     }
     if (heartbeatPulseEnabled) {
-      await _sendMessageIfPath(heartbeatPulsePath, false);
+      await _sendMessageIfPath(heartbeatPulsePath, false, canSend: canSend);
     }
+    if (canSend()) _heartbeatOutputMayBeActive = false;
   }
 
-  Future<void> _queueHeartbeatSend(Future<void> Function() send) {
-    final queued = _heartbeatSendQueue.then((_) => send());
+  Future<void> _queueHeartbeatSend(
+    Future<void> Function(bool Function() canSend) send, {
+    int? generation,
+    bool allowWhileStopped = false,
+  }) {
+    final workGeneration = generation ?? _heartbeatWorkGeneration;
+    bool canSend() {
+      return !_isDisposed &&
+          workGeneration == _heartbeatWorkGeneration &&
+          (allowWhileStopped || _acceptingHeartbeatWork);
+    }
+
+    final queued = _heartbeatSendQueue.then((_) async {
+      if (!canSend()) return;
+      await send(canSend);
+    });
     _heartbeatSendQueue = queued.catchError((_) {});
     return queued;
   }
 
-  Future<bool> _sendMessageIfPath(String address, Object value) async {
+  Future<bool> _sendMessageIfPath(
+    String address,
+    Object value, {
+    bool Function()? canSend,
+  }) async {
     final path = address.trim();
     if (path.isEmpty) return true;
-    return _sendMessage(path, value);
+    return _sendMessage(path, value, canSend: canSend);
   }
 
-  Duration _rrIntervalFor(int bpm) {
+  static Duration _rrIntervalFor(int bpm) {
     final milliseconds = (60000 / bpm).round().clamp(1, 60000).toInt();
     return Duration(milliseconds: milliseconds);
   }
 
-  Duration _qrsIntervalFor(int bpm) {
+  /// Returns a pulse duration that completes before the following heartbeat.
+  static Duration heartbeatPulseDurationFor({
+    required int bpm,
+    required Duration requestedDuration,
+  }) {
+    if (bpm <= 0) return Duration.zero;
     final rrMs = _rrIntervalFor(bpm).inMilliseconds;
     final maximum = (rrMs - 1).clamp(1, rrMs).toInt();
-    final milliseconds = heartbeatPulseDuration.inMilliseconds
+    final milliseconds = requestedDuration.inMilliseconds
         .clamp(0, maximum)
         .toInt();
     return Duration(milliseconds: milliseconds);
+  }
+
+  Duration _qrsIntervalFor(int bpm) {
+    return heartbeatPulseDurationFor(
+      bpm: bpm,
+      requestedDuration: heartbeatPulseDuration,
+    );
   }
 
   Future<OscTarget?> _resolveTarget() async {
@@ -375,9 +447,15 @@ class OscService {
   }
 
   Future<RawDatagramSocket?> _ensureSocket() async {
+    if (_isDisposed) return null;
     if (_socket != null) return _socket;
     try {
-      _socket = await RawDatagramSocket.bind(InternetAddress.anyIPv4, 0);
+      final socket = await RawDatagramSocket.bind(InternetAddress.anyIPv4, 0);
+      if (_isDisposed) {
+        socket.close();
+        return null;
+      }
+      _socket = socket;
       _socketSub = _socket?.listen(_handleSocketEvent);
       return _socket;
     } catch (_) {
@@ -454,6 +532,10 @@ class OscService {
   }
 
   void dispose() {
+    if (_isDisposed) return;
+    _isDisposed = true;
+    _acceptingHeartbeatWork = false;
+    _heartbeatWorkGeneration++;
     _heartbeatBpm = null;
     _heartbeatPulseActive = false;
     _heartbeatTimer?.cancel();

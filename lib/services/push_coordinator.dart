@@ -73,11 +73,17 @@ class PushCoordinator {
     required this.onLog,
     this.onOscStatusChanged,
     this.oscAcknowledgementTimeout = const Duration(milliseconds: 800),
+    this.oscServiceFactory,
   });
 
   final void Function(String message, {Object? error}) onLog;
   final void Function(OscStatus status)? onOscStatusChanged;
   final Duration oscAcknowledgementTimeout;
+  final OscService Function(
+    HeartRateSettings settings,
+    void Function(String message, {Object? error}) onLog,
+  )?
+  oscServiceFactory;
 
   HttpWsService? _httpWsService;
   MqttService? _mqttService;
@@ -231,6 +237,10 @@ class PushCoordinator {
   }
 
   OscService _getOscService() {
+    final factory = oscServiceFactory;
+    if (factory != null) {
+      return _oscService ??= factory(_settings, onLog);
+    }
     return _oscService ??= OscService(
       oscAddress: _settings.oscAddress,
       hrConnectedPath: _settings.oscHrConnectedPath,

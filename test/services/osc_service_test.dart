@@ -7,6 +7,33 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:hr_push/services/osc_service.dart';
 
 void main() {
+  test(
+    'heartbeat pulse duration clamps deterministically before the next beat',
+    () {
+      expect(
+        OscService.heartbeatPulseDurationFor(
+          bpm: 100,
+          requestedDuration: const Duration(seconds: 1),
+        ),
+        const Duration(milliseconds: 599),
+      );
+      expect(
+        OscService.heartbeatPulseDurationFor(
+          bpm: 600,
+          requestedDuration: const Duration(seconds: 1),
+        ),
+        const Duration(milliseconds: 99),
+      );
+      expect(
+        OscService.heartbeatPulseDurationFor(
+          bpm: 600,
+          requestedDuration: Duration.zero,
+        ),
+        Duration.zero,
+      );
+    },
+  );
+
   test('chatbox string arguments are encoded as UTF-8 OSC strings', () async {
     final socket = await RawDatagramSocket.bind(
       InternetAddress.loopbackIPv4,
