@@ -78,25 +78,37 @@ class AppLocalizationsJa extends AppLocalizations {
   String get sectionVrchatOsc => 'VRChat OSC';
 
   @override
-  String get fieldAddress => 'アドレス';
+  String get fieldAddress => '受信アドレス';
 
   @override
-  String get fieldConnectedParam => '接続パラメータ';
+  String get fieldConnectedParam => 'オンライン状態アドレス';
 
   @override
-  String get fieldHrValueParam => '心拍数パラメータ';
+  String get fieldHrValueParam => 'リアルタイム心拍数アドレス';
 
   @override
-  String get fieldHrPercentParam => '心拍数％パラメータ';
+  String get fieldHrPercentParam => '心拍数比率アドレス';
 
   @override
-  String get fieldHeartbeatIntParam => '心拍 Int パラメータ';
+  String get fieldHeartbeatInt => '整数フラッシュ';
 
   @override
-  String get fieldHeartbeatPulseParam => '心拍 Pulse パラメータ';
+  String get fieldHeartbeatIntPath => '整数フラッシュのアドレス';
 
   @override
-  String get fieldHeartbeatToggleParam => '心拍 Toggle パラメータ';
+  String get fieldHeartbeatPulse => '真偽値フラッシュ';
+
+  @override
+  String get fieldHeartbeatPulsePath => '真偽値フラッシュのアドレス';
+
+  @override
+  String get fieldHeartbeatToggle => '拍ごとの切り替え';
+
+  @override
+  String get fieldHeartbeatTogglePath => '拍ごとの切り替えアドレス';
+
+  @override
+  String get fieldHeartbeatDuration => 'フラッシュ時間 (ms)';
 
   @override
   String get fieldMaxHr => '最大心拍数';

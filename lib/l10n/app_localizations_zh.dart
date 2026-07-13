@@ -78,25 +78,37 @@ class AppLocalizationsZh extends AppLocalizations {
   String get sectionVrchatOsc => 'VRChat OSC';
 
   @override
-  String get fieldAddress => 'OSC 地址';
+  String get fieldAddress => '接收地址';
 
   @override
-  String get fieldConnectedParam => '在线参数';
+  String get fieldConnectedParam => '在线状态地址';
 
   @override
-  String get fieldHrValueParam => '心率参数';
+  String get fieldHrValueParam => '实时心率地址';
 
   @override
-  String get fieldHrPercentParam => '心率百分比参数';
+  String get fieldHrPercentParam => '心率比例地址';
 
   @override
-  String get fieldHeartbeatIntParam => '心跳 Int 参数';
+  String get fieldHeartbeatInt => '整数闪烁';
 
   @override
-  String get fieldHeartbeatPulseParam => '心跳 Pulse 参数';
+  String get fieldHeartbeatIntPath => '整数闪烁地址';
 
   @override
-  String get fieldHeartbeatToggleParam => '心跳 Toggle 参数';
+  String get fieldHeartbeatPulse => '布尔闪烁';
+
+  @override
+  String get fieldHeartbeatPulsePath => '布尔闪烁地址';
+
+  @override
+  String get fieldHeartbeatToggle => '逐拍翻转';
+
+  @override
+  String get fieldHeartbeatTogglePath => '逐拍翻转地址';
+
+  @override
+  String get fieldHeartbeatDuration => '闪烁时长 (ms)';
 
   @override
   String get fieldMaxHr => '最大心率';
