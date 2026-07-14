@@ -135,6 +135,12 @@ class AppLocalizationsEn extends AppLocalizations {
   String get sectionOscChatbox => 'OSC Chatbox';
 
   @override
+  String get sectionBackgroundRuntime => 'Background runtime';
+
+  @override
+  String get btnBackgroundRuntime => 'Protect background runtime';
+
+  @override
   String get fieldEnabled => 'Enabled';
 
   @override

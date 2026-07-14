@@ -42,6 +42,8 @@
   "oscStatusAcknowledged": "確認済み",
   "oscStatusError": "送信失敗",
   "sectionOscChatbox": "OSC チャットボックス",
+  "sectionBackgroundRuntime": "バックグラウンド実行",
+  "btnBackgroundRuntime": "バックグラウンド実行を保護",
   "fieldEnabled": "有効",
   "fieldTemplate": "テンプレート",
   "sectionMqtt": "MQTT クライアント",

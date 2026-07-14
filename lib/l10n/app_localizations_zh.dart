@@ -135,6 +135,12 @@ class AppLocalizationsZh extends AppLocalizations {
   String get sectionOscChatbox => 'OSC 聊天框';
 
   @override
+  String get sectionBackgroundRuntime => '后台运行';
+
+  @override
+  String get btnBackgroundRuntime => '后台运行保障';
+
+  @override
   String get fieldEnabled => '启用';
 
   @override

@@ -42,6 +42,8 @@
   "oscStatusAcknowledged": "Acknowledged",
   "oscStatusError": "Send failed",
   "sectionOscChatbox": "OSC Chatbox",
+  "sectionBackgroundRuntime": "Background runtime",
+  "btnBackgroundRuntime": "Protect background runtime",
   "fieldEnabled": "Enabled",
   "fieldTemplate": "Template",
   "sectionMqtt": "MQTT Client",

@@ -352,6 +352,18 @@ abstract class AppLocalizations {
   /// **'OSC Chatbox'**
   String get sectionOscChatbox;
 
+  /// No description provided for @sectionBackgroundRuntime.
+  ///
+  /// In en, this message translates to:
+  /// **'Background runtime'**
+  String get sectionBackgroundRuntime;
+
+  /// No description provided for @btnBackgroundRuntime.
+  ///
+  /// In en, this message translates to:
+  /// **'Protect background runtime'**
+  String get btnBackgroundRuntime;
+
   /// No description provided for @fieldEnabled.
   ///
   /// In en, this message translates to:

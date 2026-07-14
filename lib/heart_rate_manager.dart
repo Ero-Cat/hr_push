@@ -239,16 +239,25 @@ class HeartRateManager extends ChangeNotifier {
     }
 
     if (Platform.isAndroid) {
-      unawaited(() async {
+      try {
         await _notificationService.initialize();
+        final started = await _notificationService.start();
+        if (!started) {
+          _log('foreground service start failed');
+        }
         final granted = await _notificationService.ensurePermission();
         if (!granted) {
           _setStatus('通知权限未授予，无法显示常驻心率卡片');
           notifyListeners();
-          return;
         }
         await _notificationService.showDisconnected(status: _status);
-      }());
+      } catch (error, stackTrace) {
+        _log(
+          'foreground service initialization failed',
+          error: error,
+          stackTrace: stackTrace,
+        );
+      }
     }
 
     _adapterStateSub = _bleAdapter.adapterStateStream.listen((state) {
@@ -897,7 +906,7 @@ class HeartRateManager extends ChangeNotifier {
     _scanLoopTimer?.cancel();
     _uiNotifyTimer?.cancel();
     _pushCoordinator.dispose();
-    unawaited(_notificationService.cancel());
+    unawaited(_notificationService.stop());
     super.dispose();
   }
 

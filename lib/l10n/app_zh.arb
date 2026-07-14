@@ -42,6 +42,8 @@
   "oscStatusAcknowledged": "已确认",
   "oscStatusError": "发送失败",
   "sectionOscChatbox": "OSC 聊天框",
+  "sectionBackgroundRuntime": "后台运行",
+  "btnBackgroundRuntime": "后台运行保障",
   "fieldEnabled": "启用",
   "fieldTemplate": "模板",
   "sectionMqtt": "MQTT 客户端",

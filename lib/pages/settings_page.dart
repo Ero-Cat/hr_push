@@ -1,5 +1,8 @@
+import 'dart:io' show Platform;
+
 import 'package:flutter/cupertino.dart';
 import '../l10n/app_localizations.dart';
+import '../hr_notification_service.dart';
 import '../models/models.dart';
 import '../theme/design_system.dart';
 import 'log_detail_page.dart';
@@ -277,6 +280,20 @@ class _SettingsPageState extends State<SettingsPage> {
                   ),
               ],
             ),
+
+            if (Platform.isAndroid)
+              _buildSection(
+                header: l10n.sectionBackgroundRuntime,
+                children: [
+                  CupertinoButton(
+                    onPressed: () async {
+                      await HrNotificationService()
+                          .openBackgroundRuntimeSettings();
+                    },
+                    child: Text(l10n.btnBackgroundRuntime),
+                  ),
+                ],
+              ),
 
             _buildSection(
               header: l10n.sectionMqtt,
