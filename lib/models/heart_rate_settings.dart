@@ -11,6 +11,10 @@ class HeartRateSettings {
     required this.oscHeartbeatIntPath,
     required this.oscHeartbeatPulsePath,
     required this.oscHeartbeatTogglePath,
+    required this.oscHeartbeatIntEnabled,
+    required this.oscHeartbeatPulseEnabled,
+    required this.oscHeartbeatToggleEnabled,
+    required this.oscHeartbeatPulseDurationMs,
     required this.oscChatboxEnabled,
     required this.oscChatboxTemplate,
     required this.maxHeartRate,
@@ -32,6 +36,10 @@ class HeartRateSettings {
   final String oscHeartbeatIntPath;
   final String oscHeartbeatPulsePath;
   final String oscHeartbeatTogglePath;
+  final bool oscHeartbeatIntEnabled;
+  final bool oscHeartbeatPulseEnabled;
+  final bool oscHeartbeatToggleEnabled;
+  final int oscHeartbeatPulseDurationMs;
   final bool oscChatboxEnabled;
   final String oscChatboxTemplate;
   final int maxHeartRate;
@@ -54,6 +62,10 @@ class HeartRateSettings {
   static const _defaultHeartbeatPulsePath = '/avatar/parameters/HeartBeatPulse';
   static const _defaultHeartbeatTogglePath =
       '/avatar/parameters/HeartBeatToggle';
+  static const _defaultHeartbeatIntEnabled = true;
+  static const _defaultHeartbeatPulseEnabled = true;
+  static const _defaultHeartbeatToggleEnabled = true;
+  static const _defaultHeartbeatPulseDurationMs = 120;
   static const _defaultOscChatboxEnabled = false;
   static const _defaultOscChatboxTemplate = '💓{hr}';
   static const _defaultMaxHeartRate = 200;
@@ -75,6 +87,13 @@ class HeartRateSettings {
   static const _kOscHeartbeatIntKey = 'cfg_osc_heartbeat_int_path';
   static const _kOscHeartbeatPulseKey = 'cfg_osc_heartbeat_pulse_path';
   static const _kOscHeartbeatToggleKey = 'cfg_osc_heartbeat_toggle_path';
+  static const _kOscHeartbeatIntEnabledKey = 'cfg_osc_heartbeat_int_enabled';
+  static const _kOscHeartbeatPulseEnabledKey =
+      'cfg_osc_heartbeat_pulse_enabled';
+  static const _kOscHeartbeatToggleEnabledKey =
+      'cfg_osc_heartbeat_toggle_enabled';
+  static const _kOscHeartbeatPulseDurationKey =
+      'cfg_osc_heartbeat_pulse_duration_ms';
   static const _kOscChatboxEnabledKey = 'cfg_osc_chatbox_enabled';
   static const _kOscChatboxTemplateKey = 'cfg_osc_chatbox_template';
   static const _kMaxHeartRateKey = 'cfg_max_heart_rate';
@@ -97,6 +116,10 @@ class HeartRateSettings {
       oscHeartbeatIntPath: _defaultHeartbeatIntPath,
       oscHeartbeatPulsePath: _defaultHeartbeatPulsePath,
       oscHeartbeatTogglePath: _defaultHeartbeatTogglePath,
+      oscHeartbeatIntEnabled: _defaultHeartbeatIntEnabled,
+      oscHeartbeatPulseEnabled: _defaultHeartbeatPulseEnabled,
+      oscHeartbeatToggleEnabled: _defaultHeartbeatToggleEnabled,
+      oscHeartbeatPulseDurationMs: _defaultHeartbeatPulseDurationMs,
       oscChatboxEnabled: _defaultOscChatboxEnabled,
       oscChatboxTemplate: _defaultOscChatboxTemplate,
       maxHeartRate: _defaultMaxHeartRate,
@@ -129,6 +152,18 @@ class HeartRateSettings {
       oscHeartbeatTogglePath:
           prefs.getString(_kOscHeartbeatToggleKey) ??
           _defaultHeartbeatTogglePath,
+      oscHeartbeatIntEnabled:
+          prefs.getBool(_kOscHeartbeatIntEnabledKey) ??
+          _defaultHeartbeatIntEnabled,
+      oscHeartbeatPulseEnabled:
+          prefs.getBool(_kOscHeartbeatPulseEnabledKey) ??
+          _defaultHeartbeatPulseEnabled,
+      oscHeartbeatToggleEnabled:
+          prefs.getBool(_kOscHeartbeatToggleEnabledKey) ??
+          _defaultHeartbeatToggleEnabled,
+      oscHeartbeatPulseDurationMs:
+          prefs.getInt(_kOscHeartbeatPulseDurationKey) ??
+          _defaultHeartbeatPulseDurationMs,
       oscChatboxEnabled:
           prefs.getBool(_kOscChatboxEnabledKey) ?? _defaultOscChatboxEnabled,
       oscChatboxTemplate:
@@ -157,6 +192,19 @@ class HeartRateSettings {
     await prefs.setString(_kOscHeartbeatIntKey, oscHeartbeatIntPath);
     await prefs.setString(_kOscHeartbeatPulseKey, oscHeartbeatPulsePath);
     await prefs.setString(_kOscHeartbeatToggleKey, oscHeartbeatTogglePath);
+    await prefs.setBool(_kOscHeartbeatIntEnabledKey, oscHeartbeatIntEnabled);
+    await prefs.setBool(
+      _kOscHeartbeatPulseEnabledKey,
+      oscHeartbeatPulseEnabled,
+    );
+    await prefs.setBool(
+      _kOscHeartbeatToggleEnabledKey,
+      oscHeartbeatToggleEnabled,
+    );
+    await prefs.setInt(
+      _kOscHeartbeatPulseDurationKey,
+      oscHeartbeatPulseDurationMs,
+    );
     await prefs.setBool(_kOscChatboxEnabledKey, oscChatboxEnabled);
     await prefs.setString(_kOscChatboxTemplateKey, oscChatboxTemplate);
     await prefs.setInt(_kMaxHeartRateKey, maxHeartRate);
@@ -179,6 +227,10 @@ class HeartRateSettings {
     String? oscHeartbeatIntPath,
     String? oscHeartbeatPulsePath,
     String? oscHeartbeatTogglePath,
+    bool? oscHeartbeatIntEnabled,
+    bool? oscHeartbeatPulseEnabled,
+    bool? oscHeartbeatToggleEnabled,
+    int? oscHeartbeatPulseDurationMs,
     bool? oscChatboxEnabled,
     String? oscChatboxTemplate,
     int? maxHeartRate,
@@ -202,6 +254,14 @@ class HeartRateSettings {
           oscHeartbeatPulsePath ?? this.oscHeartbeatPulsePath,
       oscHeartbeatTogglePath:
           oscHeartbeatTogglePath ?? this.oscHeartbeatTogglePath,
+      oscHeartbeatIntEnabled:
+          oscHeartbeatIntEnabled ?? this.oscHeartbeatIntEnabled,
+      oscHeartbeatPulseEnabled:
+          oscHeartbeatPulseEnabled ?? this.oscHeartbeatPulseEnabled,
+      oscHeartbeatToggleEnabled:
+          oscHeartbeatToggleEnabled ?? this.oscHeartbeatToggleEnabled,
+      oscHeartbeatPulseDurationMs:
+          oscHeartbeatPulseDurationMs ?? this.oscHeartbeatPulseDurationMs,
       oscChatboxEnabled: oscChatboxEnabled ?? this.oscChatboxEnabled,
       oscChatboxTemplate: oscChatboxTemplate ?? this.oscChatboxTemplate,
       maxHeartRate: maxHeartRate ?? this.maxHeartRate,

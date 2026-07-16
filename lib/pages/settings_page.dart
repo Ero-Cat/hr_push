@@ -1,5 +1,8 @@
+import 'dart:io' show Platform;
+
 import 'package:flutter/cupertino.dart';
 import '../l10n/app_localizations.dart';
+import '../hr_notification_service.dart';
 import '../models/models.dart';
 import '../theme/design_system.dart';
 import 'log_detail_page.dart';
@@ -23,6 +26,7 @@ class _SettingsPageState extends State<SettingsPage> {
   late final TextEditingController _oscHeartbeatIntCtrl;
   late final TextEditingController _oscHeartbeatPulseCtrl;
   late final TextEditingController _oscHeartbeatToggleCtrl;
+  late final TextEditingController _oscHeartbeatPulseDurationCtrl;
   late final TextEditingController _oscChatboxTemplateCtrl;
   late final TextEditingController _maxHrCtrl;
   late final TextEditingController _intervalCtrl;
@@ -34,6 +38,9 @@ class _SettingsPageState extends State<SettingsPage> {
   late final TextEditingController _mqttClientIdCtrl;
 
   bool _oscChatboxEnabled = false;
+  bool _oscHeartbeatIntEnabled = false;
+  bool _oscHeartbeatPulseEnabled = false;
+  bool _oscHeartbeatToggleEnabled = false;
   bool _logEnabled = false;
 
   @override
@@ -58,6 +65,9 @@ class _SettingsPageState extends State<SettingsPage> {
     _oscHeartbeatToggleCtrl = TextEditingController(
       text: widget.initial.oscHeartbeatTogglePath,
     );
+    _oscHeartbeatPulseDurationCtrl = TextEditingController(
+      text: widget.initial.oscHeartbeatPulseDurationMs.toString(),
+    );
     _oscChatboxTemplateCtrl = TextEditingController(
       text: widget.initial.oscChatboxTemplate,
     );
@@ -69,6 +79,9 @@ class _SettingsPageState extends State<SettingsPage> {
     );
 
     _oscChatboxEnabled = widget.initial.oscChatboxEnabled;
+    _oscHeartbeatIntEnabled = widget.initial.oscHeartbeatIntEnabled;
+    _oscHeartbeatPulseEnabled = widget.initial.oscHeartbeatPulseEnabled;
+    _oscHeartbeatToggleEnabled = widget.initial.oscHeartbeatToggleEnabled;
     _logEnabled = widget.initial.logEnabled;
 
     _mqttBrokerCtrl = TextEditingController(text: widget.initial.mqttBroker);
@@ -126,6 +139,7 @@ class _SettingsPageState extends State<SettingsPage> {
     _oscHeartbeatIntCtrl.dispose();
     _oscHeartbeatPulseCtrl.dispose();
     _oscHeartbeatToggleCtrl.dispose();
+    _oscHeartbeatPulseDurationCtrl.dispose();
     _oscChatboxTemplateCtrl.dispose();
     _maxHrCtrl.dispose();
     _intervalCtrl.dispose();
@@ -192,17 +206,52 @@ class _SettingsPageState extends State<SettingsPage> {
                   controller: _oscPercentCtrl,
                   label: l10n.fieldHrPercentParam,
                 ),
-                _buildInput(
-                  controller: _oscHeartbeatIntCtrl,
-                  label: l10n.fieldHeartbeatIntParam,
+                CupertinoFormRow(
+                  prefix: Text(l10n.fieldHeartbeatInt),
+                  child: CupertinoSwitch(
+                    value: _oscHeartbeatIntEnabled,
+                    activeTrackColor: AppColors.accent,
+                    onChanged: (value) =>
+                        setState(() => _oscHeartbeatIntEnabled = value),
+                  ),
                 ),
-                _buildInput(
-                  controller: _oscHeartbeatPulseCtrl,
-                  label: l10n.fieldHeartbeatPulseParam,
+                if (_oscHeartbeatIntEnabled)
+                  _buildInput(
+                    controller: _oscHeartbeatIntCtrl,
+                    label: l10n.fieldHeartbeatIntPath,
+                  ),
+                CupertinoFormRow(
+                  prefix: Text(l10n.fieldHeartbeatPulse),
+                  child: CupertinoSwitch(
+                    value: _oscHeartbeatPulseEnabled,
+                    activeTrackColor: AppColors.accent,
+                    onChanged: (value) =>
+                        setState(() => _oscHeartbeatPulseEnabled = value),
+                  ),
                 ),
+                if (_oscHeartbeatPulseEnabled)
+                  _buildInput(
+                    controller: _oscHeartbeatPulseCtrl,
+                    label: l10n.fieldHeartbeatPulsePath,
+                  ),
+                CupertinoFormRow(
+                  prefix: Text(l10n.fieldHeartbeatToggle),
+                  child: CupertinoSwitch(
+                    value: _oscHeartbeatToggleEnabled,
+                    activeTrackColor: AppColors.accent,
+                    onChanged: (value) =>
+                        setState(() => _oscHeartbeatToggleEnabled = value),
+                  ),
+                ),
+                if (_oscHeartbeatToggleEnabled)
+                  _buildInput(
+                    controller: _oscHeartbeatToggleCtrl,
+                    label: l10n.fieldHeartbeatTogglePath,
+                  ),
                 _buildInput(
-                  controller: _oscHeartbeatToggleCtrl,
-                  label: l10n.fieldHeartbeatToggleParam,
+                  controller: _oscHeartbeatPulseDurationCtrl,
+                  label: l10n.fieldHeartbeatDuration,
+                  keyboardType: TextInputType.number,
                 ),
                 _buildInput(
                   controller: _maxHrCtrl,
@@ -231,6 +280,20 @@ class _SettingsPageState extends State<SettingsPage> {
                   ),
               ],
             ),
+
+            if (Platform.isAndroid)
+              _buildSection(
+                header: l10n.sectionBackgroundRuntime,
+                children: [
+                  CupertinoButton(
+                    onPressed: () async {
+                      await HrNotificationService()
+                          .openBackgroundRuntimeSettings();
+                    },
+                    child: Text(l10n.btnBackgroundRuntime),
+                  ),
+                ],
+              ),
 
             _buildSection(
               header: l10n.sectionMqtt,
@@ -344,6 +407,9 @@ class _SettingsPageState extends State<SettingsPage> {
   }
 
   void _onSave() {
+    final pulseDuration = int.tryParse(
+      _oscHeartbeatPulseDurationCtrl.text.trim(),
+    );
     final updated = widget.initial.copyWith(
       pushEndpoint: _pushCtrl.text.trim(),
       oscAddress: _oscCtrl.text.trim(),
@@ -353,6 +419,13 @@ class _SettingsPageState extends State<SettingsPage> {
       oscHeartbeatIntPath: _oscHeartbeatIntCtrl.text.trim(),
       oscHeartbeatPulsePath: _oscHeartbeatPulseCtrl.text.trim(),
       oscHeartbeatTogglePath: _oscHeartbeatToggleCtrl.text.trim(),
+      oscHeartbeatIntEnabled: _oscHeartbeatIntEnabled,
+      oscHeartbeatPulseEnabled: _oscHeartbeatPulseEnabled,
+      oscHeartbeatToggleEnabled: _oscHeartbeatToggleEnabled,
+      oscHeartbeatPulseDurationMs:
+          pulseDuration != null && pulseDuration >= 20 && pulseDuration <= 1000
+          ? pulseDuration
+          : 120,
       oscChatboxEnabled: _oscChatboxEnabled,
       oscChatboxTemplate: _oscChatboxTemplateCtrl.text.trim(),
       maxHeartRate: int.tryParse(_maxHrCtrl.text.trim()) ?? 200,

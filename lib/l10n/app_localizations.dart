@@ -241,44 +241,68 @@ abstract class AppLocalizations {
   /// No description provided for @fieldAddress.
   ///
   /// In en, this message translates to:
-  /// **'Address'**
+  /// **'Receive address'**
   String get fieldAddress;
 
   /// No description provided for @fieldConnectedParam.
   ///
   /// In en, this message translates to:
-  /// **'Connected Param'**
+  /// **'Online status address'**
   String get fieldConnectedParam;
 
   /// No description provided for @fieldHrValueParam.
   ///
   /// In en, this message translates to:
-  /// **'HR Value Param'**
+  /// **'Live heart rate address'**
   String get fieldHrValueParam;
 
   /// No description provided for @fieldHrPercentParam.
   ///
   /// In en, this message translates to:
-  /// **'HR Percent Param'**
+  /// **'Heart rate ratio address'**
   String get fieldHrPercentParam;
 
-  /// No description provided for @fieldHeartbeatIntParam.
+  /// No description provided for @fieldHeartbeatInt.
   ///
   /// In en, this message translates to:
-  /// **'Heartbeat Int Param'**
-  String get fieldHeartbeatIntParam;
+  /// **'Integer flash'**
+  String get fieldHeartbeatInt;
 
-  /// No description provided for @fieldHeartbeatPulseParam.
+  /// No description provided for @fieldHeartbeatIntPath.
   ///
   /// In en, this message translates to:
-  /// **'Heartbeat Pulse Param'**
-  String get fieldHeartbeatPulseParam;
+  /// **'Integer flash address'**
+  String get fieldHeartbeatIntPath;
 
-  /// No description provided for @fieldHeartbeatToggleParam.
+  /// No description provided for @fieldHeartbeatPulse.
   ///
   /// In en, this message translates to:
-  /// **'Heartbeat Toggle Param'**
-  String get fieldHeartbeatToggleParam;
+  /// **'Boolean flash'**
+  String get fieldHeartbeatPulse;
+
+  /// No description provided for @fieldHeartbeatPulsePath.
+  ///
+  /// In en, this message translates to:
+  /// **'Boolean flash address'**
+  String get fieldHeartbeatPulsePath;
+
+  /// No description provided for @fieldHeartbeatToggle.
+  ///
+  /// In en, this message translates to:
+  /// **'Beat toggle'**
+  String get fieldHeartbeatToggle;
+
+  /// No description provided for @fieldHeartbeatTogglePath.
+  ///
+  /// In en, this message translates to:
+  /// **'Beat toggle address'**
+  String get fieldHeartbeatTogglePath;
+
+  /// No description provided for @fieldHeartbeatDuration.
+  ///
+  /// In en, this message translates to:
+  /// **'Flash duration (ms)'**
+  String get fieldHeartbeatDuration;
 
   /// No description provided for @fieldMaxHr.
   ///
@@ -327,6 +351,18 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'OSC Chatbox'**
   String get sectionOscChatbox;
+
+  /// No description provided for @sectionBackgroundRuntime.
+  ///
+  /// In en, this message translates to:
+  /// **'Background runtime'**
+  String get sectionBackgroundRuntime;
+
+  /// No description provided for @btnBackgroundRuntime.
+  ///
+  /// In en, this message translates to:
+  /// **'Protect background runtime'**
+  String get btnBackgroundRuntime;
 
   /// No description provided for @fieldEnabled.
   ///

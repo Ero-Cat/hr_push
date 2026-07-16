@@ -73,15 +73,22 @@ class PushCoordinator {
     required this.onLog,
     this.onOscStatusChanged,
     this.oscAcknowledgementTimeout = const Duration(milliseconds: 800),
+    this.oscServiceFactory,
   });
 
   final void Function(String message, {Object? error}) onLog;
   final void Function(OscStatus status)? onOscStatusChanged;
   final Duration oscAcknowledgementTimeout;
+  final OscService Function(
+    HeartRateSettings settings,
+    void Function(String message, {Object? error}) onLog,
+  )?
+  oscServiceFactory;
 
   HttpWsService? _httpWsService;
   MqttService? _mqttService;
   OscService? _oscService;
+  Future<void> _oscTransition = Future<void>.value();
   OscStatus _oscStatus = OscStatus.disabled();
 
   HeartRateSettings _settings = HeartRateSettings.defaults();
@@ -110,11 +117,21 @@ class PushCoordinator {
         old.oscHeartbeatIntPath != value.oscHeartbeatIntPath ||
         old.oscHeartbeatPulsePath != value.oscHeartbeatPulsePath ||
         old.oscHeartbeatTogglePath != value.oscHeartbeatTogglePath ||
+        old.oscHeartbeatIntEnabled != value.oscHeartbeatIntEnabled ||
+        old.oscHeartbeatPulseEnabled != value.oscHeartbeatPulseEnabled ||
+        old.oscHeartbeatToggleEnabled != value.oscHeartbeatToggleEnabled ||
+        old.oscHeartbeatPulseDurationMs != value.oscHeartbeatPulseDurationMs ||
         old.oscChatboxEnabled != value.oscChatboxEnabled ||
         old.oscChatboxTemplate != value.oscChatboxTemplate;
     if (oscChanged) {
-      _oscService?.dispose();
+      final previousOscService = _oscService;
       _oscService = null;
+      if (previousOscService != null) {
+        _oscTransition = _oscTransition.then((_) async {
+          await previousOscService.stopHeartbeat();
+          previousOscService.dispose();
+        });
+      }
     }
     _setOscConfiguredStatus(value);
 
@@ -220,6 +237,10 @@ class PushCoordinator {
   }
 
   OscService _getOscService() {
+    final factory = oscServiceFactory;
+    if (factory != null) {
+      return _oscService ??= factory(_settings, onLog);
+    }
     return _oscService ??= OscService(
       oscAddress: _settings.oscAddress,
       hrConnectedPath: _settings.oscHrConnectedPath,
@@ -228,6 +249,12 @@ class PushCoordinator {
       heartbeatIntPath: _settings.oscHeartbeatIntPath,
       heartbeatPulsePath: _settings.oscHeartbeatPulsePath,
       heartbeatTogglePath: _settings.oscHeartbeatTogglePath,
+      heartbeatIntEnabled: _settings.oscHeartbeatIntEnabled,
+      heartbeatPulseEnabled: _settings.oscHeartbeatPulseEnabled,
+      heartbeatToggleEnabled: _settings.oscHeartbeatToggleEnabled,
+      heartbeatPulseDuration: Duration(
+        milliseconds: _settings.oscHeartbeatPulseDurationMs,
+      ),
       chatboxEnabled: _settings.oscChatboxEnabled,
       chatboxTemplate: _settings.oscChatboxTemplate,
       onLog: onLog,
@@ -235,6 +262,7 @@ class PushCoordinator {
   }
 
   Future<void> _sendOsc(Future<bool> Function(OscService service) send) async {
+    await _oscTransition;
     final target = _settings.oscAddress.trim();
     final service = _getOscService();
     try {

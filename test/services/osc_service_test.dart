@@ -7,6 +7,33 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:hr_push/services/osc_service.dart';
 
 void main() {
+  test(
+    'heartbeat pulse duration clamps deterministically before the next beat',
+    () {
+      expect(
+        OscService.heartbeatPulseDurationFor(
+          bpm: 100,
+          requestedDuration: const Duration(seconds: 1),
+        ),
+        const Duration(milliseconds: 599),
+      );
+      expect(
+        OscService.heartbeatPulseDurationFor(
+          bpm: 600,
+          requestedDuration: const Duration(seconds: 1),
+        ),
+        const Duration(milliseconds: 99),
+      );
+      expect(
+        OscService.heartbeatPulseDurationFor(
+          bpm: 600,
+          requestedDuration: Duration.zero,
+        ),
+        Duration.zero,
+      );
+    },
+  );
+
   test('chatbox string arguments are encoded as UTF-8 OSC strings', () async {
     final socket = await RawDatagramSocket.bind(
       InternetAddress.loopbackIPv4,
@@ -22,6 +49,10 @@ void main() {
       heartbeatIntPath: '/avatar/parameters/HeartBeatInt',
       heartbeatPulsePath: '/avatar/parameters/HeartBeatPulse',
       heartbeatTogglePath: '/avatar/parameters/HeartBeatToggle',
+      heartbeatIntEnabled: true,
+      heartbeatPulseEnabled: true,
+      heartbeatToggleEnabled: true,
+      heartbeatPulseDuration: const Duration(milliseconds: 120),
       chatboxEnabled: true,
       chatboxTemplate: '心率{hr}💓',
     );
@@ -64,6 +95,10 @@ void main() {
       heartbeatIntPath: '/avatar/parameters/HeartBeatInt',
       heartbeatPulsePath: '/avatar/parameters/HeartBeatPulse',
       heartbeatTogglePath: '/avatar/parameters/HeartBeatToggle',
+      heartbeatIntEnabled: true,
+      heartbeatPulseEnabled: true,
+      heartbeatToggleEnabled: true,
+      heartbeatPulseDuration: const Duration(milliseconds: 120),
       chatboxEnabled: false,
       chatboxTemplate: '',
     );
@@ -110,6 +145,10 @@ void main() {
       heartbeatIntPath: '/avatar/parameters/HeartBeatInt',
       heartbeatPulsePath: '/avatar/parameters/HeartBeatPulse',
       heartbeatTogglePath: '/avatar/parameters/HeartBeatToggle',
+      heartbeatIntEnabled: true,
+      heartbeatPulseEnabled: true,
+      heartbeatToggleEnabled: true,
+      heartbeatPulseDuration: const Duration(milliseconds: 120),
       chatboxEnabled: false,
       chatboxTemplate: '',
     );
@@ -146,6 +185,10 @@ void main() {
       heartbeatIntPath: '/avatar/parameters/HeartBeatInt',
       heartbeatPulsePath: '/avatar/parameters/HeartBeatPulse',
       heartbeatTogglePath: '/avatar/parameters/HeartBeatToggle',
+      heartbeatIntEnabled: true,
+      heartbeatPulseEnabled: true,
+      heartbeatToggleEnabled: true,
+      heartbeatPulseDuration: const Duration(milliseconds: 120),
       chatboxEnabled: false,
       chatboxTemplate: '',
     );
@@ -163,6 +206,191 @@ void main() {
       throwsA(isA<TimeoutException>()),
     );
   });
+
+  test('disabled heartbeat int and toggle emit no packets', () async {
+    final socket = await RawDatagramSocket.bind(
+      InternetAddress.loopbackIPv4,
+      0,
+    );
+    addTearDown(socket.close);
+    final packets = _oscPackets(socket);
+
+    final service = OscService(
+      oscAddress: '127.0.0.1:${socket.port}',
+      hrConnectedPath: '/avatar/parameters/hr_connected',
+      hrValuePath: '/avatar/parameters/hr_val',
+      hrPercentPath: '/avatar/parameters/hr_percent',
+      heartbeatIntPath: '/avatar/parameters/HeartBeatInt',
+      heartbeatPulsePath: '/avatar/parameters/HeartBeatPulse',
+      heartbeatTogglePath: '/avatar/parameters/HeartBeatToggle',
+      heartbeatIntEnabled: false,
+      heartbeatPulseEnabled: true,
+      heartbeatToggleEnabled: false,
+      heartbeatPulseDuration: const Duration(milliseconds: 40),
+      chatboxEnabled: false,
+      chatboxTemplate: '',
+    );
+    addTearDown(service.dispose);
+
+    await service.sendHeartRate(600, null);
+
+    expect(
+      (await _nextOscPacket(
+        packets,
+        '/avatar/parameters/HeartBeatPulse',
+      )).boolValue,
+      isTrue,
+    );
+    final activeAt = DateTime.now();
+    expect(
+      (await _nextOscPacket(
+        packets,
+        '/avatar/parameters/HeartBeatPulse',
+      )).boolValue,
+      isFalse,
+    );
+    expect(
+      DateTime.now().difference(activeAt).inMilliseconds,
+      inInclusiveRange(30, 120),
+    );
+    await expectLater(
+      _nextOscPacket(
+        packets,
+        '/avatar/parameters/HeartBeatInt',
+        timeout: const Duration(milliseconds: 180),
+      ),
+      throwsA(isA<TimeoutException>()),
+    );
+    await expectLater(
+      _nextOscPacket(
+        packets,
+        '/avatar/parameters/HeartBeatToggle',
+        timeout: const Duration(milliseconds: 180),
+      ),
+      throwsA(isA<TimeoutException>()),
+    );
+  });
+
+  test('heartbeat pulse duration clamps before the next 600 ms beat', () async {
+    final socket = await RawDatagramSocket.bind(
+      InternetAddress.loopbackIPv4,
+      0,
+    );
+    addTearDown(socket.close);
+    final packets = _oscPackets(socket);
+
+    final service = OscService(
+      oscAddress: '127.0.0.1:${socket.port}',
+      hrConnectedPath: '/avatar/parameters/hr_connected',
+      hrValuePath: '/avatar/parameters/hr_val',
+      hrPercentPath: '/avatar/parameters/hr_percent',
+      heartbeatIntPath: '/avatar/parameters/HeartBeatInt',
+      heartbeatPulsePath: '/avatar/parameters/HeartBeatPulse',
+      heartbeatTogglePath: '/avatar/parameters/HeartBeatToggle',
+      heartbeatIntEnabled: false,
+      heartbeatPulseEnabled: true,
+      heartbeatToggleEnabled: false,
+      heartbeatPulseDuration: const Duration(seconds: 1),
+      chatboxEnabled: false,
+      chatboxTemplate: '',
+    );
+    addTearDown(service.dispose);
+
+    await service.sendHeartRate(100, null);
+
+    expect(
+      (await _nextOscPacket(
+        packets,
+        '/avatar/parameters/HeartBeatPulse',
+      )).boolValue,
+      isTrue,
+    );
+    expect(
+      (await _nextOscPacket(
+        packets,
+        '/avatar/parameters/HeartBeatPulse',
+      )).boolValue,
+      isFalse,
+    );
+    expect(
+      (await _nextOscPacket(
+        packets,
+        '/avatar/parameters/HeartBeatPulse',
+      )).boolValue,
+      isTrue,
+    );
+  });
+
+  test(
+    'stopping an active pulse sends inactive only for enabled blink outputs',
+    () async {
+      final socket = await RawDatagramSocket.bind(
+        InternetAddress.loopbackIPv4,
+        0,
+      );
+      addTearDown(socket.close);
+      final packets = _oscPackets(socket);
+
+      final service = OscService(
+        oscAddress: '127.0.0.1:${socket.port}',
+        hrConnectedPath: '/avatar/parameters/hr_connected',
+        hrValuePath: '/avatar/parameters/hr_val',
+        hrPercentPath: '/avatar/parameters/hr_percent',
+        heartbeatIntPath: '/avatar/parameters/HeartBeatInt',
+        heartbeatPulsePath: '/avatar/parameters/HeartBeatPulse',
+        heartbeatTogglePath: '/avatar/parameters/HeartBeatToggle',
+        heartbeatIntEnabled: true,
+        heartbeatPulseEnabled: false,
+        heartbeatToggleEnabled: true,
+        heartbeatPulseDuration: const Duration(milliseconds: 80),
+        chatboxEnabled: false,
+        chatboxTemplate: '',
+      );
+      addTearDown(service.dispose);
+
+      await service.sendHeartRate(600, null);
+      expect(
+        (await _nextOscPacket(
+          packets,
+          '/avatar/parameters/HeartBeatInt',
+        )).intValue,
+        1,
+      );
+      expect(
+        (await _nextOscPacket(
+          packets,
+          '/avatar/parameters/HeartBeatToggle',
+        )).boolValue,
+        isFalse,
+      );
+
+      await service.stopHeartbeat();
+
+      expect(
+        (await _nextOscPacket(
+          packets,
+          '/avatar/parameters/HeartBeatInt',
+        )).intValue,
+        0,
+      );
+      await expectLater(
+        _nextOscPacket(
+          packets,
+          '/avatar/parameters/HeartBeatPulse',
+          timeout: const Duration(milliseconds: 150),
+        ),
+        throwsA(isA<TimeoutException>()),
+      );
+      await expectLater(
+        _nextOscPacket(
+          packets,
+          '/avatar/parameters/HeartBeatToggle',
+          timeout: const Duration(milliseconds: 150),
+        ),
+        throwsA(isA<TimeoutException>()),
+      );
+    },
+  );
 }
 
 int _nextOscOffset(int stringEnd) {

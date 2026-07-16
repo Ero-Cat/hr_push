@@ -78,25 +78,37 @@ class AppLocalizationsEn extends AppLocalizations {
   String get sectionVrchatOsc => 'VRChat OSC';
 
   @override
-  String get fieldAddress => 'Address';
+  String get fieldAddress => 'Receive address';
 
   @override
-  String get fieldConnectedParam => 'Connected Param';
+  String get fieldConnectedParam => 'Online status address';
 
   @override
-  String get fieldHrValueParam => 'HR Value Param';
+  String get fieldHrValueParam => 'Live heart rate address';
 
   @override
-  String get fieldHrPercentParam => 'HR Percent Param';
+  String get fieldHrPercentParam => 'Heart rate ratio address';
 
   @override
-  String get fieldHeartbeatIntParam => 'Heartbeat Int Param';
+  String get fieldHeartbeatInt => 'Integer flash';
 
   @override
-  String get fieldHeartbeatPulseParam => 'Heartbeat Pulse Param';
+  String get fieldHeartbeatIntPath => 'Integer flash address';
 
   @override
-  String get fieldHeartbeatToggleParam => 'Heartbeat Toggle Param';
+  String get fieldHeartbeatPulse => 'Boolean flash';
+
+  @override
+  String get fieldHeartbeatPulsePath => 'Boolean flash address';
+
+  @override
+  String get fieldHeartbeatToggle => 'Beat toggle';
+
+  @override
+  String get fieldHeartbeatTogglePath => 'Beat toggle address';
+
+  @override
+  String get fieldHeartbeatDuration => 'Flash duration (ms)';
 
   @override
   String get fieldMaxHr => 'Max HR';
@@ -121,6 +133,12 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get sectionOscChatbox => 'OSC Chatbox';
+
+  @override
+  String get sectionBackgroundRuntime => 'Background runtime';
+
+  @override
+  String get btnBackgroundRuntime => 'Protect background runtime';
 
   @override
   String get fieldEnabled => 'Enabled';

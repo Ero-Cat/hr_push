@@ -1,6 +1,5 @@
 import 'dart:io' show Platform;
 
-
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
@@ -8,12 +7,16 @@ import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 class HrNotificationService {
   static const _channel = MethodChannel('moe.iacg.hrpush/notification');
 
+  HrNotificationService({bool Function()? isAndroid})
+    : _isAndroid = isAndroid ?? (() => Platform.isAndroid);
+
   final FlutterLocalNotificationsPlugin _plugin =
       FlutterLocalNotificationsPlugin();
+  final bool Function() _isAndroid;
   bool _initialized = false;
 
   Future<void> initialize() async {
-    if (!Platform.isAndroid || _initialized) return;
+    if (!_isAndroid() || _initialized) return;
 
     // We still use local_notifications for permission management for now
     // or just initialization if needed, but primary display is via MethodChannel.
@@ -25,7 +28,7 @@ class HrNotificationService {
   }
 
   Future<bool> ensurePermission() async {
-    if (!Platform.isAndroid) return true;
+    if (!_isAndroid()) return true;
     if (!_initialized) {
       await initialize();
     }
@@ -43,7 +46,7 @@ class HrNotificationService {
   }
 
   Future<void> showDisconnected({String? status}) async {
-    if (!Platform.isAndroid) return;
+    if (!_isAndroid()) return;
     try {
       await _channel.invokeMethod('updateNotification', {
         'bpm': 0,
@@ -60,7 +63,7 @@ class HrNotificationService {
     int? bpm,
     DateTime? lastUpdated,
   }) async {
-    if (!Platform.isAndroid) return;
+    if (!_isAndroid()) return;
     try {
       await _channel.invokeMethod('updateNotification', {
         'bpm': bpm ?? 0,
@@ -72,10 +75,42 @@ class HrNotificationService {
     }
   }
 
-  Future<void> cancel() async {
-    if (!Platform.isAndroid) return;
+  Future<bool> start() async {
+    if (!_isAndroid()) return true;
     try {
-      await _channel.invokeMethod('cancelNotification');
-    } catch (_) {}
+      await _channel.invokeMethod('startForegroundService', {
+        'bpm': 0,
+        'deviceName': '',
+        'isConnected': false,
+      });
+      return true;
+    } catch (e) {
+      debugPrint('Error starting foreground service: $e');
+      return false;
+    }
   }
+
+  Future<bool> openBackgroundRuntimeSettings() async {
+    if (!_isAndroid()) return false;
+    try {
+      return await _channel.invokeMethod<bool>(
+            'openBackgroundRuntimeSettings',
+          ) ??
+          false;
+    } catch (e) {
+      debugPrint('Error opening background runtime settings: $e');
+      return false;
+    }
+  }
+
+  Future<void> stop() async {
+    if (!_isAndroid()) return;
+    try {
+      await _channel.invokeMethod('stopForegroundService');
+    } catch (e) {
+      debugPrint('Error stopping foreground service: $e');
+    }
+  }
+
+  Future<void> cancel() => stop();
 }

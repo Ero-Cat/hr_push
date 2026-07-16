@@ -12,6 +12,10 @@ void main() {
       settings.oscHeartbeatTogglePath,
       '/avatar/parameters/HeartBeatToggle',
     );
+    expect(settings.oscHeartbeatIntEnabled, isTrue);
+    expect(settings.oscHeartbeatPulseEnabled, isTrue);
+    expect(settings.oscHeartbeatToggleEnabled, isTrue);
+    expect(settings.oscHeartbeatPulseDurationMs, 120);
   });
 
   test('heart beat parameter paths persist through preferences', () async {
@@ -33,5 +37,25 @@ void main() {
       restored.oscHeartbeatTogglePath,
       '/avatar/parameters/HBToggleCustom',
     );
+  });
+
+  test('heart beat settings persist through preferences', () async {
+    SharedPreferences.setMockInitialValues({});
+    final prefs = await SharedPreferences.getInstance();
+
+    final settings = HeartRateSettings.defaults().copyWith(
+      oscHeartbeatIntEnabled: false,
+      oscHeartbeatPulseEnabled: false,
+      oscHeartbeatToggleEnabled: false,
+      oscHeartbeatPulseDurationMs: 360,
+    );
+
+    await settings.save(prefs);
+    final restored = HeartRateSettings.fromPrefs(prefs);
+
+    expect(restored.oscHeartbeatIntEnabled, isFalse);
+    expect(restored.oscHeartbeatPulseEnabled, isFalse);
+    expect(restored.oscHeartbeatToggleEnabled, isFalse);
+    expect(restored.oscHeartbeatPulseDurationMs, 360);
   });
 }
