@@ -8,7 +8,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
 
 PUBSPEC="$PROJECT_ROOT/pubspec.yaml"
-SETTINGS_PAGE="$PROJECT_ROOT/lib/pages/settings_page.dart"
+METADATA="$PROJECT_ROOT/lib/app_metadata.dart"
 
 # Extract version from pubspec.yaml
 VERSION=$(grep "^version:" "$PUBSPEC" | sed 's/version: *//' | cut -d'+' -f1)
@@ -20,18 +20,17 @@ fi
 
 echo "Extracted version: $VERSION"
 
-# Update settings_page.dart
-if [ -f "$SETTINGS_PAGE" ]; then
-    # Replace version string pattern 'v1.x.x' with new version
-    if grep -q "'v[0-9]\+\.[0-9]\+\.[0-9]\+'" "$SETTINGS_PAGE"; then
-        sed -i.bak "s/'v[0-9]\+\.[0-9]\+\.[0-9]\+'/'v$VERSION'/g" "$SETTINGS_PAGE"
-        rm -f "$SETTINGS_PAGE.bak"
-        echo "Updated $SETTINGS_PAGE to v$VERSION"
+# Update app_metadata.dart (single source of the in-app version string)
+if [ -f "$METADATA" ]; then
+    if grep -q "const String appVersion = '[0-9]\+\.[0-9]\+\.[0-9]\+';" "$METADATA"; then
+        sed -i.bak "s/const String appVersion = '[0-9]\+\.[0-9]\+\.[0-9]\+';/const String appVersion = '$VERSION';/g" "$METADATA"
+        rm -f "$METADATA.bak"
+        echo "Updated $METADATA to $VERSION"
     else
-        echo "Warning: Version pattern not found in $SETTINGS_PAGE"
+        echo "Warning: Version pattern not found in $METADATA"
     fi
 else
-    echo "Warning: $SETTINGS_PAGE not found"
+    echo "Warning: $METADATA not found"
 fi
 
 echo "Version sync complete: v$VERSION"

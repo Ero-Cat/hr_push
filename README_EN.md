@@ -138,6 +138,16 @@ Heart-rate events carry both `heartRate` and `heart_rate` keys (same value): the
 - On Windows, running from non-ASCII paths may fail. Prefer an ASCII-only path.
 
 ## 🧾 Changelog
+### v1.8.0
+- **Redmi/Xiaomi watch compatibility**: scan filter accepts Redmi devices and unnamed heart-rate broadcasters; connect timeout honored, reconnect storms fixed (backoff + failure cap), zombie no-data connections detected, rotating-MAC name-based reconnect; a tri-lingual "enable Heart Rate Broadcast" guide appears when the HR service is missing.
+- **Settings page rebuild**: protocol-grouped sections with progressive disclosure, inline validation, one-tap HTTP/WS/OSC/MQTT connection tests, unsaved-changes guard, save feedback, live OSC status, first-run onboarding.
+- **MQTT**: TLS (mqtts/8883), password visibility toggle, last-will topic, stable default client ID.
+- **Push performance**: persistent HTTP connection reuse, parallel protocol fan-out (slow endpoints no longer block VRChat OSC), WebSocket exponential-backoff reconnect, OSC DNS caching, `hr_connected` sent on state change only.
+- **Payload**: added `event`/`connected`/`device` fields plus a `heart_rate` compatibility key; connection lifecycle events now reach HTTP/WS/MQTT.
+- **Platform features**: iOS Live Activities (lock screen / Dynamic Island, iOS 16.1+), Windows minimize-to-tray background running.
+- **UX & accessibility**: fully localized status text (incl. Android notification), OS text-scaling support, semantics labels, heart animation repaint optimizations.
+- **Stability**: Android scan-throttling self-healing, nearby list expanded to 15 with anti-flicker TTL, resource-dispose fixes; removed 5 dead modules; tests 25 → 51.
+
 ### v1.6.1
 - **Android Optimization**: Updated Proguard rules and optimized build minification.
 - **BLE Adapter Refinement**: Fine-tuned `universal_ble` adapter layer for better stability.
