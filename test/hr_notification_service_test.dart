@@ -43,11 +43,13 @@ void main() {
       'bpm': 72,
       'deviceName': 'Band',
       'isConnected': true,
+      'status': '',
     });
     expect(calls[2].arguments, {
       'bpm': 0,
       'deviceName': '',
       'isConnected': false,
+      'status': '',
     });
   });
 }

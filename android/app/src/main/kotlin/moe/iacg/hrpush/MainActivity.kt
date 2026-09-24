@@ -24,6 +24,7 @@ class MainActivity : FlutterActivity() {
                             call.argument<Int>("bpm") ?: 0,
                             call.argument<String>("deviceName").orEmpty(),
                             call.argument<Boolean>("isConnected") ?: false,
+                            call.argument<String>("status").orEmpty(),
                         )
                         result.success(null)
                     }
@@ -34,6 +35,7 @@ class MainActivity : FlutterActivity() {
                             call.argument<Int>("bpm") ?: 0,
                             call.argument<String>("deviceName").orEmpty(),
                             call.argument<Boolean>("isConnected") ?: false,
+                            call.argument<String>("status").orEmpty(),
                         )
                         result.success(null)
                     }

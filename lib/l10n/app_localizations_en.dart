@@ -376,4 +376,64 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get onbBody3 =>
       'Open Settings to enter your webhook, OSC or MQTT address. Use the Test button to verify connectivity; data pushes in real time after saving.';
+
+  @override
+  String get stPermissionFailed => 'Permission check failed';
+
+  @override
+  String get stConnectFailed => 'Connection failed';
+
+  @override
+  String get stWaitingBroadcast => 'Waiting for device broadcast...';
+
+  @override
+  String get stReconnectGaveUp =>
+      'Auto reconnect failed; please pick the device manually';
+
+  @override
+  String get stWaitingRebroadcast =>
+      'Waiting for the device to advertise again...';
+
+  @override
+  String get stHrServiceMissingXiaomi =>
+      'Heart rate service not found; enable \"Heart Rate Broadcast\" on the watch';
+
+  @override
+  String get stHrServiceMissing =>
+      'Device does not expose the standard heart rate service';
+
+  @override
+  String get stConnectedSubscribing =>
+      'Connected, subscribing to heart rate...';
+
+  @override
+  String get stDisconnecting => 'Disconnecting...';
+
+  @override
+  String get stDisconnectedDone => 'Disconnected';
+
+  @override
+  String get stResubscribeFailedReconnecting =>
+      'Subscribe failed, reconnecting...';
+
+  @override
+  String get stSubscribing => 'Subscribing to heart rate...';
+
+  @override
+  String get stDiscovering => 'Discovering services...';
+
+  @override
+  String get stSubscribeRetrying => 'Retrying subscription...';
+
+  @override
+  String get stSubscribeFailed => 'Subscription failed';
+
+  @override
+  String get stConnectTimeout => 'Connection timed out';
+
+  @override
+  String get stConnectCancelled => 'Connection cancelled';
+
+  @override
+  String get stDeviceDisconnected => 'Device disconnected';
 }

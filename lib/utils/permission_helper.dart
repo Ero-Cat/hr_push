@@ -35,11 +35,11 @@ class PermissionHelper {
   /// Check permissions and Bluetooth availability
   Future<PermissionCheckResult> ensurePermissionsAndBluetooth() async {
     if (!isBleSupportedPlatform) {
-      return PermissionCheckResult.error('当前平台暂不支持蓝牙');
+      return PermissionCheckResult.error('bluetoothNotSupported');
     }
 
     if (!await _bleAdapter.isBluetoothAvailable()) {
-      return PermissionCheckResult.error('蓝牙不可用');
+      return PermissionCheckResult.error('bluetoothUnavailable');
     }
 
     if (Platform.isAndroid) {
@@ -68,7 +68,7 @@ class PermissionHelper {
     );
 
     if (denied) {
-      return PermissionCheckResult.error('蓝牙/定位权限未授予');
+      return PermissionCheckResult.error('permissionDenied');
     }
 
     return PermissionCheckResult.ok;

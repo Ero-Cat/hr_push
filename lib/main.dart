@@ -10,6 +10,7 @@ import 'package:window_manager/window_manager.dart';
 
 import 'app_log.dart';
 import 'heart_rate_manager.dart';
+import 'l10n/l10n_keys.dart';
 import 'theme/design_system.dart';
 import 'pages/heart_dashboard.dart';
 
@@ -84,15 +85,14 @@ class HrOscApp extends StatelessWidget {
           ),
         ),
         builder: (context, child) {
-          // Wrap with a custom title bar for desktop if needed,
-          // or just generic system UI sync.
-          return MediaQuery(
-            // Ensure fonts scale appropriately
-            data: MediaQuery.of(
-              context,
-            ).copyWith(textScaler: const TextScaler.linear(1.0)),
-            child: child!,
-          );
+          // Feed the manager a localizer so platform notifications can
+          // render status text in the active app locale.
+          final l10n = AppLocalizations.of(context);
+          if (l10n != null) {
+            HeartRateManager.statusLocalizer = (key, param) =>
+                localizedStatus(l10n, key, param);
+          }
+          return child!;
         },
         home: ScrollConfiguration(
           behavior: const ScrollBehavior().copyWith(scrollbars: false),

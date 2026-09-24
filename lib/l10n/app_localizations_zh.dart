@@ -371,4 +371,58 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get onbBody3 => '在设置中填入 Webhook、OSC 或 MQTT 地址，用「测试」按钮验证连通性，保存后即实时推送。';
+
+  @override
+  String get stPermissionFailed => '权限检查失败';
+
+  @override
+  String get stConnectFailed => '连接失败';
+
+  @override
+  String get stWaitingBroadcast => '等待设备广播...';
+
+  @override
+  String get stReconnectGaveUp => '自动重连失败，请手动选择设备重试';
+
+  @override
+  String get stWaitingRebroadcast => '等待设备重新广播...';
+
+  @override
+  String get stHrServiceMissingXiaomi => '未找到心率服务，请开启手表的「心率广播」';
+
+  @override
+  String get stHrServiceMissing => '设备未提供标准心率服务';
+
+  @override
+  String get stConnectedSubscribing => '已连接，订阅心率中...';
+
+  @override
+  String get stDisconnecting => '断开中...';
+
+  @override
+  String get stDisconnectedDone => '已断开';
+
+  @override
+  String get stResubscribeFailedReconnecting => '订阅心率失败，正在重连...';
+
+  @override
+  String get stSubscribing => '订阅心率中...';
+
+  @override
+  String get stDiscovering => '发现服务中...';
+
+  @override
+  String get stSubscribeRetrying => '订阅心率重试中...';
+
+  @override
+  String get stSubscribeFailed => '订阅心率失败';
+
+  @override
+  String get stConnectTimeout => '连接超时';
+
+  @override
+  String get stConnectCancelled => '连接取消';
+
+  @override
+  String get stDeviceDisconnected => '设备断开';
 }

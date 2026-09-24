@@ -4,6 +4,7 @@ import 'package:flutter/cupertino.dart';
 import 'package:provider/provider.dart';
 
 import '../heart_rate_manager.dart';
+import '../l10n/l10n_keys.dart';
 import '../theme/design_system.dart';
 import 'glass_surface.dart';
 
@@ -132,7 +133,9 @@ class HeroCard extends StatelessWidget {
                         ? l10n.connecting
                         : mgr.isAutoReconnecting
                         ? l10n.autoReconnecting
-                        : l10n.waitingForConnection,
+                        // Surface the live manager status (scanning,
+                        // waiting, errors) instead of a static label.
+                        : localizedStatus(l10n, mgr.status),
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     style: AppTypography.caption.copyWith(
@@ -332,71 +335,78 @@ class _AnimatedHeartState extends State<_AnimatedHeart>
   Widget build(BuildContext context) {
     final heartColor = AppColors.heart.resolveFrom(context);
 
-    return SizedBox(
-      width: 120, // Increased size for ripples
-      height: 120,
-      child: Stack(
-        alignment: Alignment.center,
-        children: [
-          // Ripple Effect
-          AnimatedBuilder(
-            animation: _rippleCtrl,
-            builder: (context, child) {
-              // Only show ripple if animating
-              if (!_rippleCtrl.isAnimating) return const SizedBox();
-              return Transform.scale(
-                scale: _rippleScale.value,
-                child: Container(
-                  width: 50,
-                  height: 50,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    color: heartColor.withValues(alpha: _rippleOpacity.value),
-                  ),
-                ),
-              );
-            },
-          ),
-
-          // Main Heart
-          AnimatedBuilder(
-            animation: _ctrl,
-            builder: (context, child) {
-              return Transform.scale(
-                scale: _scale.value,
-                child: Container(
-                  width: 80,
-                  height: 80,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    gradient: RadialGradient(
-                      colors: [
-                        heartColor.withValues(
-                          alpha: _opacity.value,
-                        ), // Pulsing inner
-                        heartColor.withValues(alpha: 0.1), // Fixed outer
-                      ],
-                      stops: const [0.6, 1.0],
+    // RepaintBoundary keeps the per-frame animation repaints from cascading
+    // into the glass BackdropFilter behind the card.
+    return RepaintBoundary(
+      child: SizedBox(
+        width: 120, // Increased size for ripples
+        height: 120,
+        child: Stack(
+          alignment: Alignment.center,
+          children: [
+            // Ripple Effect
+            AnimatedBuilder(
+              animation: _rippleCtrl,
+              builder: (context, child) {
+                // Only show ripple if animating
+                if (!_rippleCtrl.isAnimating) return const SizedBox();
+                return Transform.scale(
+                  scale: _rippleScale.value,
+                  child: Container(
+                    width: 50,
+                    height: 50,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: heartColor.withValues(alpha: _rippleOpacity.value),
                     ),
-                    boxShadow: [
-                      BoxShadow(
-                        color: heartColor.withValues(alpha: 0.3),
-                        blurRadius: 10 * _scale.value, // Shadow breathes
-                        spreadRadius: 2,
+                  ),
+                );
+              },
+            ),
+
+            // Main Heart. Shadow blurRadius stays fixed — animated blur
+            // re-rasterizes the shadow layer every frame on Impeller/Skia;
+            // only the transform and inner glow animate.
+            AnimatedBuilder(
+              animation: _ctrl,
+              builder: (context, child) {
+                return Transform.scale(
+                  scale: _scale.value,
+                  child: Container(
+                    width: 80,
+                    height: 80,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      gradient: RadialGradient(
+                        colors: [
+                          heartColor.withValues(
+                            alpha: _opacity.value,
+                          ), // Pulsing inner
+                          heartColor.withValues(alpha: 0.1), // Fixed outer
+                        ],
+                        stops: const [0.6, 1.0],
                       ),
-                    ],
+                      boxShadow: [
+                        BoxShadow(
+                          color: heartColor.withValues(alpha: 0.3),
+                          blurRadius: 12,
+                          spreadRadius: 2,
+                        ),
+                      ],
+                    ),
+                    alignment: Alignment.center,
+                    child: child,
                   ),
-                  alignment: Alignment.center,
-                  child: Icon(
-                    CupertinoIcons.heart_fill,
-                    color: heartColor, // Solid heart
-                    size: 44, // Slightly larger icon
-                  ),
-                ),
-              );
-            },
-          ),
-        ],
+                );
+              },
+              child: Icon(
+                CupertinoIcons.heart_fill,
+                color: heartColor, // Solid heart
+                size: 44, // Slightly larger icon
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

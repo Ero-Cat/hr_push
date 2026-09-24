@@ -26,7 +26,8 @@ class HrForegroundService : Service() {
         val bpm = intent?.getIntExtra(EXTRA_BPM, 0) ?: 0
         val deviceName = intent?.getStringExtra(EXTRA_DEVICE_NAME).orEmpty()
         val isConnected = intent?.getBooleanExtra(EXTRA_CONNECTED, false) ?: false
-        showForegroundNotification(bpm, deviceName, isConnected)
+        val status = intent?.getStringExtra(EXTRA_STATUS).orEmpty()
+        showForegroundNotification(bpm, deviceName, isConnected, status)
         return START_STICKY
     }
 
@@ -39,15 +40,16 @@ class HrForegroundService : Service() {
         bpm: Int,
         deviceName: String,
         isConnected: Boolean,
+        status: String,
     ) {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
             startForeground(
                 NOTIFICATION_ID,
-                buildNotification(bpm, deviceName, isConnected),
+                buildNotification(bpm, deviceName, isConnected, status),
                 ServiceInfo.FOREGROUND_SERVICE_TYPE_CONNECTED_DEVICE,
             )
         } else {
-            startForeground(NOTIFICATION_ID, buildNotification(bpm, deviceName, isConnected))
+            startForeground(NOTIFICATION_ID, buildNotification(bpm, deviceName, isConnected, status))
         }
     }
 
@@ -55,6 +57,7 @@ class HrForegroundService : Service() {
         bpm: Int,
         deviceName: String,
         isConnected: Boolean,
+        status: String,
     ): Notification {
         createNotificationChannel()
 
@@ -62,12 +65,12 @@ class HrForegroundService : Service() {
         if (isConnected) {
             val bpmText = if (bpm > 0) "$bpm BPM" else "-- BPM"
             views.setTextViewText(R.id.bpm_value, bpmText)
-            views.setTextViewText(R.id.status_text, "Connected to $deviceName")
+            views.setTextViewText(R.id.status_text, status.ifEmpty { "Connected to $deviceName" })
             views.setTextViewText(R.id.time_text, "LIVE")
             views.setTextColor(R.id.time_text, Color.parseColor("#34C759"))
         } else {
             views.setTextViewText(R.id.bpm_value, "--")
-            views.setTextViewText(R.id.status_text, "Disconnected")
+            views.setTextViewText(R.id.status_text, status.ifEmpty { "Disconnected" })
             views.setTextViewText(R.id.time_text, "OFF")
             views.setTextColor(R.id.time_text, Color.parseColor("#86868B"))
         }
@@ -122,11 +125,18 @@ class HrForegroundService : Service() {
         private const val EXTRA_BPM = "bpm"
         private const val EXTRA_DEVICE_NAME = "deviceName"
         private const val EXTRA_CONNECTED = "isConnected"
+        private const val EXTRA_STATUS = "status"
         private const val NOTIFICATION_ID = 1001
         private const val NOTIFICATION_CHANNEL_ID = "hr_push_live"
 
-        fun start(context: Context, bpm: Int, deviceName: String, isConnected: Boolean) {
-            val intent = serviceIntent(context, ACTION_START, bpm, deviceName, isConnected)
+        fun start(
+            context: Context,
+            bpm: Int,
+            deviceName: String,
+            isConnected: Boolean,
+            status: String,
+        ) {
+            val intent = serviceIntent(context, ACTION_START, bpm, deviceName, isConnected, status)
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
                 context.startForegroundService(intent)
             } else {
@@ -134,8 +144,14 @@ class HrForegroundService : Service() {
             }
         }
 
-        fun update(context: Context, bpm: Int, deviceName: String, isConnected: Boolean) {
-            context.startService(serviceIntent(context, ACTION_UPDATE, bpm, deviceName, isConnected))
+        fun update(
+            context: Context,
+            bpm: Int,
+            deviceName: String,
+            isConnected: Boolean,
+            status: String,
+        ) {
+            context.startService(serviceIntent(context, ACTION_UPDATE, bpm, deviceName, isConnected, status))
         }
 
         fun stop(context: Context) {
@@ -148,11 +164,13 @@ class HrForegroundService : Service() {
             bpm: Int,
             deviceName: String,
             isConnected: Boolean,
+            status: String,
         ) = Intent(context, HrForegroundService::class.java).apply {
             this.action = action
             putExtra(EXTRA_BPM, bpm)
             putExtra(EXTRA_DEVICE_NAME, deviceName)
             putExtra(EXTRA_CONNECTED, isConnected)
+            putExtra(EXTRA_STATUS, status)
         }
     }
 }

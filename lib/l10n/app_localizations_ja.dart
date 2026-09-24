@@ -373,4 +373,59 @@ class AppLocalizationsJa extends AppLocalizations {
   @override
   String get onbBody3 =>
       '設定から Webhook・OSC・MQTT のアドレスを入力し、「テスト」ボタンで接続を確認します。保存後はリアルタイムでプッシュされます。';
+
+  @override
+  String get stPermissionFailed => '権限チェックに失敗しました';
+
+  @override
+  String get stConnectFailed => '接続に失敗しました';
+
+  @override
+  String get stWaitingBroadcast => 'デバイスのブロードキャストを待機しています...';
+
+  @override
+  String get stReconnectGaveUp => '自動再接続に失敗しました。手動でデバイスを選択してください';
+
+  @override
+  String get stWaitingRebroadcast => 'デバイスの再アドバタイズを待機しています...';
+
+  @override
+  String get stHrServiceMissingXiaomi =>
+      '心拍数サービスが見つかりません。ウォッチで「心拍数ブロードキャスト」を有効にしてください';
+
+  @override
+  String get stHrServiceMissing => 'デバイスが標準の心拍数サービスを提供していません';
+
+  @override
+  String get stConnectedSubscribing => '接続済み、心拍数を購読中...';
+
+  @override
+  String get stDisconnecting => '切断中...';
+
+  @override
+  String get stDisconnectedDone => '切断されました';
+
+  @override
+  String get stResubscribeFailedReconnecting => '購読に失敗しました。再接続しています...';
+
+  @override
+  String get stSubscribing => '心拍数を購読中...';
+
+  @override
+  String get stDiscovering => 'サービスを検出中...';
+
+  @override
+  String get stSubscribeRetrying => '購読を再試行中...';
+
+  @override
+  String get stSubscribeFailed => '購読に失敗しました';
+
+  @override
+  String get stConnectTimeout => '接続がタイムアウトしました';
+
+  @override
+  String get stConnectCancelled => '接続がキャンセルされました';
+
+  @override
+  String get stDeviceDisconnected => 'デバイスが切断されました';
 }

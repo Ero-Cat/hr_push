@@ -29,7 +29,7 @@ void main() {
       final service = BleConnectionService(
         adapter: adapter,
         onLog: (_, {error}) {},
-        onStatusChange: (_, {force = false}) {},
+        onStatusChange: (_, {force = false, param}) {},
         onHeartRateData: (_) {},
         onConnectionStateChange: (_) {},
       );
@@ -71,7 +71,7 @@ void main() {
       final service = BleConnectionService(
         adapter: adapter,
         onLog: (_, {error}) {},
-        onStatusChange: (_, {force = false}) {},
+        onStatusChange: (_, {force = false, param}) {},
         onHeartRateData: (_) {},
         onConnectionStateChange: (_) {},
       );
@@ -93,7 +93,7 @@ void main() {
     final service = BleConnectionService(
       adapter: adapter,
       onLog: (_, {error}) {},
-      onStatusChange: (_, {force = false}) {},
+      onStatusChange: (_, {force = false, param}) {},
       onHeartRateData: (_) {},
       onConnectionStateChange: (_) {},
       onHrServiceMissing: missingReports.add,

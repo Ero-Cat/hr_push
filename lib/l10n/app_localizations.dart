@@ -819,6 +819,114 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Open Settings to enter your webhook, OSC or MQTT address. Use the Test button to verify connectivity; data pushes in real time after saving.'**
   String get onbBody3;
+
+  /// No description provided for @stPermissionFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Permission check failed'**
+  String get stPermissionFailed;
+
+  /// No description provided for @stConnectFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Connection failed'**
+  String get stConnectFailed;
+
+  /// No description provided for @stWaitingBroadcast.
+  ///
+  /// In en, this message translates to:
+  /// **'Waiting for device broadcast...'**
+  String get stWaitingBroadcast;
+
+  /// No description provided for @stReconnectGaveUp.
+  ///
+  /// In en, this message translates to:
+  /// **'Auto reconnect failed; please pick the device manually'**
+  String get stReconnectGaveUp;
+
+  /// No description provided for @stWaitingRebroadcast.
+  ///
+  /// In en, this message translates to:
+  /// **'Waiting for the device to advertise again...'**
+  String get stWaitingRebroadcast;
+
+  /// No description provided for @stHrServiceMissingXiaomi.
+  ///
+  /// In en, this message translates to:
+  /// **'Heart rate service not found; enable \"Heart Rate Broadcast\" on the watch'**
+  String get stHrServiceMissingXiaomi;
+
+  /// No description provided for @stHrServiceMissing.
+  ///
+  /// In en, this message translates to:
+  /// **'Device does not expose the standard heart rate service'**
+  String get stHrServiceMissing;
+
+  /// No description provided for @stConnectedSubscribing.
+  ///
+  /// In en, this message translates to:
+  /// **'Connected, subscribing to heart rate...'**
+  String get stConnectedSubscribing;
+
+  /// No description provided for @stDisconnecting.
+  ///
+  /// In en, this message translates to:
+  /// **'Disconnecting...'**
+  String get stDisconnecting;
+
+  /// No description provided for @stDisconnectedDone.
+  ///
+  /// In en, this message translates to:
+  /// **'Disconnected'**
+  String get stDisconnectedDone;
+
+  /// No description provided for @stResubscribeFailedReconnecting.
+  ///
+  /// In en, this message translates to:
+  /// **'Subscribe failed, reconnecting...'**
+  String get stResubscribeFailedReconnecting;
+
+  /// No description provided for @stSubscribing.
+  ///
+  /// In en, this message translates to:
+  /// **'Subscribing to heart rate...'**
+  String get stSubscribing;
+
+  /// No description provided for @stDiscovering.
+  ///
+  /// In en, this message translates to:
+  /// **'Discovering services...'**
+  String get stDiscovering;
+
+  /// No description provided for @stSubscribeRetrying.
+  ///
+  /// In en, this message translates to:
+  /// **'Retrying subscription...'**
+  String get stSubscribeRetrying;
+
+  /// No description provided for @stSubscribeFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Subscription failed'**
+  String get stSubscribeFailed;
+
+  /// No description provided for @stConnectTimeout.
+  ///
+  /// In en, this message translates to:
+  /// **'Connection timed out'**
+  String get stConnectTimeout;
+
+  /// No description provided for @stConnectCancelled.
+  ///
+  /// In en, this message translates to:
+  /// **'Connection cancelled'**
+  String get stConnectCancelled;
+
+  /// No description provided for @stDeviceDisconnected.
+  ///
+  /// In en, this message translates to:
+  /// **'Device disconnected'**
+  String get stDeviceDisconnected;
 }
 
 class _AppLocalizationsDelegate

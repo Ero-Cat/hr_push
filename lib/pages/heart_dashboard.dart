@@ -3,6 +3,7 @@ import '../l10n/app_localizations.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:provider/provider.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:window_manager/window_manager.dart';
 
 import '../heart_rate_manager.dart';
@@ -10,6 +11,7 @@ import '../models/models.dart';
 import '../theme/design_system.dart';
 import '../widgets/hero_card.dart';
 import '../widgets/nearby_list.dart';
+import 'onboarding_page.dart';
 import 'settings_page.dart';
 
 class HeartDashboard extends StatefulWidget {
@@ -23,6 +25,8 @@ class _HeartDashboardState extends State<HeartDashboard> {
   HeartRateManager? _manager;
   bool _guideShowing = false;
 
+  static const _kOnboardingDone = 'onboarding_done';
+
   @override
   void initState() {
     super.initState();
@@ -32,7 +36,24 @@ class _HeartDashboardState extends State<HeartDashboard> {
       _manager = mgr;
       mgr.addListener(_onManagerUpdate);
       _onManagerUpdate();
+      _maybeShowOnboarding();
     });
+  }
+
+  Future<void> _maybeShowOnboarding() async {
+    final prefs = await SharedPreferences.getInstance();
+    if (prefs.getBool(_kOnboardingDone) ?? false) return;
+    if (!mounted) return;
+
+    // Whether finished, skipped or backed out, mark as seen.
+    await Navigator.of(context).push<bool>(
+      CupertinoPageRoute(
+        fullscreenDialog: true,
+        builder: (_) =>
+            OnboardingPage(onFinished: (_) => Navigator.of(context).pop(true)),
+      ),
+    );
+    await prefs.setBool(_kOnboardingDone, true);
   }
 
   @override
@@ -114,20 +135,32 @@ class _HeartDashboardState extends State<HeartDashboard> {
                 CupertinoButton(
                   padding: EdgeInsets.zero,
                   onPressed: () => _openSettings(context),
-                  child: const Icon(CupertinoIcons.gear_alt_fill),
+                  child: Semantics(
+                    label: l10n.settingsTitle,
+                    button: true,
+                    child: const Icon(CupertinoIcons.gear_alt_fill),
+                  ),
                 ),
                 if (isWindows) ...[
                   const SizedBox(width: 16),
                   CupertinoButton(
                     padding: EdgeInsets.zero,
                     onPressed: () => windowManager.minimize(),
-                    child: const Icon(CupertinoIcons.minus, size: 20),
+                    child: Semantics(
+                      label: 'Minimize',
+                      button: true,
+                      child: const Icon(CupertinoIcons.minus, size: 20),
+                    ),
                   ),
                   const SizedBox(width: 8),
                   CupertinoButton(
                     padding: EdgeInsets.zero,
                     onPressed: () => windowManager.close(),
-                    child: const Icon(CupertinoIcons.xmark, size: 20),
+                    child: Semantics(
+                      label: 'Close',
+                      button: true,
+                      child: const Icon(CupertinoIcons.xmark, size: 20),
+                    ),
                   ),
                 ],
               ],

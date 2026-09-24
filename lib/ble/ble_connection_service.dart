@@ -8,7 +8,8 @@ import 'ble_adapter.dart';
 import 'ble_scanner.dart';
 
 /// Callbacks for BLE connection events
-typedef OnStatusChange = void Function(String status, {bool force});
+typedef OnStatusChange =
+    void Function(String status, {bool force, String? param});
 typedef OnLog = void Function(String message, {Object? error});
 typedef OnHeartRateData = void Function(Uint8List data);
 typedef OnConnectionStateChange = void Function(AdapterConnectionState state);
@@ -67,7 +68,7 @@ class BleConnectionService {
     _connectedDeviceName = displayName;
 
     final label = displayName ?? deviceId;
-    onStatusChange('正在连接 $label...');
+    onStatusChange('connectingTo', param: label);
     onLog('connect start: $deviceId name=$label');
 
     // A pending resubscribe from a previous attempt must never fire into a
@@ -85,7 +86,7 @@ class BleConnectionService {
 
       if (state == AdapterConnectionState.connected) {
         _connectedAt = DateTime.now();
-        onStatusChange('已连接', force: true);
+        onStatusChange('deviceConnected', force: true);
       }
 
       if (state == AdapterConnectionState.disconnected) {
@@ -99,7 +100,7 @@ class BleConnectionService {
       await _adapter.connect(deviceId, timeout: const Duration(seconds: 10));
 
       _connectedAt = DateTime.now();
-      onStatusChange('已连接，订阅心率中...', force: true);
+      onStatusChange('stConnectedSubscribing', force: true);
       onLog('connected to $deviceId');
 
       // Subscribe to heart rate
@@ -108,7 +109,7 @@ class BleConnectionService {
       return subscribeSuccess;
     } catch (e) {
       onLog('connect failed', error: e);
-      onStatusChange(_formatError(e, '连接失败'), force: true);
+      onStatusChange(_formatError(e, 'stConnectFailed'), force: true);
       _connectedAt = null;
       _connecting = false;
       return false;
@@ -124,7 +125,7 @@ class BleConnectionService {
   /// Disconnect from current device
   Future<void> disconnect() async {
     onLog('disconnect requested');
-    onStatusChange('断开中...');
+    onStatusChange('stDisconnecting');
 
     _resubscribeTimer?.cancel();
 
@@ -142,7 +143,7 @@ class BleConnectionService {
       _connectedDeviceName = null;
       _connectedAt = null;
       _connecting = false;
-      onStatusChange('已断开', force: true);
+      onStatusChange('stDisconnectedDone', force: true);
     }
   }
 
@@ -151,7 +152,7 @@ class BleConnectionService {
     onLog('force reconnect: $reason');
     if (_connectedDeviceId == null) return;
 
-    onStatusChange('订阅心率失败，正在重连...', force: true);
+    onStatusChange('stResubscribeFailedReconnecting', force: true);
 
     try {
       await _adapter.disconnect(_connectedDeviceId!);
@@ -176,7 +177,7 @@ class BleConnectionService {
           ? _gattStableDelayWindows
           : _gattStableDelay;
       if (attempt == 0) {
-        onStatusChange('订阅心率中...', force: true);
+        onStatusChange('stSubscribing', force: true);
       }
       await Future.delayed(delay);
 
@@ -193,7 +194,7 @@ class BleConnectionService {
 
       // Discover services
       onLog('discovering services...');
-      onStatusChange('发现服务中...', force: true);
+      onStatusChange('stDiscovering', force: true);
 
       final services = await _discoverServicesWithRetry(deviceId);
       final serviceUuids = services.map((s) => s.uuid).join(', ');
@@ -231,12 +232,12 @@ class BleConnectionService {
       onLog('subscribe hr failed: $e\nStack: $stackTrace');
 
       if (e is PlatformException && attempt < 1) {
-        onStatusChange('订阅心率重试中...', force: true);
+        onStatusChange('stSubscribeRetrying', force: true);
         await Future.delayed(const Duration(milliseconds: 800));
         return _subscribeHeartRate(deviceId, attempt: attempt + 1);
       }
 
-      onStatusChange(_formatError(e, '订阅心率失败'), force: true);
+      onStatusChange(_formatError(e, 'stSubscribeFailed'), force: true);
       _scheduleResubscribe(deviceId, attempt: attempt + 1);
       return false;
     }
@@ -328,7 +329,7 @@ class BleConnectionService {
         _resubscribeTimer?.cancel();
         _subscribed = true;
         _missingHrNotified = false;
-        onStatusChange('已连接', force: true);
+        onStatusChange('deviceConnected', force: true);
         return true;
       } catch (e) {
         await _heartRateSub?.cancel();
@@ -342,9 +343,11 @@ class BleConnectionService {
 
   String _formatError(Object error, String fallback) {
     final msg = error.toString().toLowerCase();
-    if (msg.contains('timeout')) return '连接超时';
-    if (msg.contains('cancelled') || msg.contains('canceled')) return '连接取消';
-    if (msg.contains('disconnected')) return '设备断开';
+    if (msg.contains('timeout')) return 'stConnectTimeout';
+    if (msg.contains('cancelled') || msg.contains('canceled')) {
+      return 'stConnectCancelled';
+    }
+    if (msg.contains('disconnected')) return 'stDeviceDisconnected';
     return fallback;
   }
 
