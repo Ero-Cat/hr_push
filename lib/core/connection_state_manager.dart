@@ -84,14 +84,14 @@ class ConnectionStateManager {
     _connectionState = AdapterConnectionState.disconnected;
     _connectedAt = null;
     _connecting = false;
-    
+
     if (userInitiated) {
       _userInitiatedDisconnect = true;
       _autoReconnect = false;
       _connectedDeviceId = null;
       _connectedDeviceName = null;
     }
-    
+
     _notifyStateChange();
   }
 
@@ -135,11 +135,13 @@ class ConnectionStateManager {
   }
 
   void _notifyStateChange() {
-    onStateChange(ConnectionStateEvent(
-      connected: isConnected,
-      deviceId: _connectedDeviceId,
-      deviceName: _connectedDeviceName,
-      timestamp: DateTime.now(),
-    ));
+    onStateChange(
+      ConnectionStateEvent(
+        connected: isConnected,
+        deviceId: _connectedDeviceId,
+        deviceName: _connectedDeviceName,
+        timestamp: DateTime.now(),
+      ),
+    );
   }
 }

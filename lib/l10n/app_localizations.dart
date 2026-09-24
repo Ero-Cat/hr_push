@@ -579,6 +579,30 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Connected'**
   String get deviceConnected;
+
+  /// No description provided for @xiaomiGuideTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Heart rate service not found'**
+  String get xiaomiGuideTitle;
+
+  /// No description provided for @xiaomiGuideBody.
+  ///
+  /// In en, this message translates to:
+  /// **'Xiaomi/Redmi watches only expose the standard heart rate service after you enable Heart Rate Broadcast on the watch:\n\n1. On the watch, open Settings → Heart Rate and turn on \"Heart Rate Broadcast\" (or \"Share HR\")\n2. Make sure the watch is not connected to the Mi Fitness app\n3. Come back here and rescan, then connect'**
+  String get xiaomiGuideBody;
+
+  /// No description provided for @xiaomiGuideRescan.
+  ///
+  /// In en, this message translates to:
+  /// **'Rescan'**
+  String get xiaomiGuideRescan;
+
+  /// No description provided for @xiaomiGuideGotIt.
+  ///
+  /// In en, this message translates to:
+  /// **'Got it'**
+  String get xiaomiGuideGotIt;
 }
 
 class _AppLocalizationsDelegate

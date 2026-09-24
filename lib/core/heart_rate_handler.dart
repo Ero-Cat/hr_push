@@ -134,7 +134,9 @@ class HeartRateHandler {
 
     if (_hrOnline != wasOnline || forceOsc) {
       onHrOnlineChange(_hrOnline);
-      unawaited(_pushCoordinator.sendConnectionStatus(_hrOnline, force: forceOsc));
+      unawaited(
+        _pushCoordinator.sendConnectionStatus(_hrOnline, force: forceOsc),
+      );
     }
   }
 

@@ -34,6 +34,7 @@ class HeartRateManager extends ChangeNotifier {
       onStatusChange: _setStatus,
       onHeartRateData: _handleHeartRateData,
       onConnectionStateChange: _onConnectionStateChange,
+      onHrServiceMissing: _handleHrServiceMissing,
     );
   }
 
@@ -100,12 +101,17 @@ class HeartRateManager extends ChangeNotifier {
 
   static const Duration _hrStaleThreshold = Duration(seconds: 6);
   static const Duration _hrInitialOnlineGrace = Duration(seconds: 3);
+  // 连接成功后从未收到心率的最长等待，超过视为无数据连接（如未开启心率广播的小米手表）
+  static const Duration _noHrDataTimeout = Duration(seconds: 20);
+  // 连续自动重连上限，超过后停止并等待用户手动操作
+  static const int _maxReconnectAttempts = 10;
   DateTime? _prevHeartRateAt;
   DateTime? _lastActionAt;
   static const Duration _actionCooldown = Duration(seconds: 2);
   Timer? _scanLoopTimer;
   bool _scanLoopStarting = false;
   int _reconnectAttempts = 0;
+  bool _xiaomiGuidePending = false;
 
   List<NearbyDevice> get nearbyDevices => _scanner.nearbyDevices;
 
@@ -144,6 +150,7 @@ class HeartRateManager extends ChangeNotifier {
   OscStatus get oscStatus => _pushCoordinator.oscStatus;
   bool get isConnected => _connectionState == AdapterConnectionState.connected;
   bool get isBluetoothOn => _adapterState == BleAdapterState.on;
+  bool get xiaomiGuidePending => _xiaomiGuidePending;
   @visibleForTesting
   static bool computeHrOnline({
     required bool userInitiatedDisconnect,
@@ -215,6 +222,20 @@ class HeartRateManager extends ChangeNotifier {
     if (_isTestEnv) return;
 
     _log('start');
+
+    // Load settings even on unsupported platforms (e.g. Linux) so they
+    // persist across restarts and push services stay configurable.
+    final prefs = await SharedPreferences.getInstance();
+    _prefs = prefs;
+    _settings = HeartRateSettings.fromPrefs(prefs);
+    _pushCoordinator.updateSettings(_settings);
+    AppLog.setEnabled(_settings.logEnabled);
+    _savedDeviceId = prefs.getString('last_device_id');
+    _savedDeviceName = prefs.getString('last_device_name');
+    if (_savedDeviceId != null) {
+      _autoConnectEnabled = true; // 曾连接过，自动尝试重连
+    }
+
     if (!_isBleSupportedPlatform) {
       _setStatus('当前平台暂不支持蓝牙扫描');
       _adapterState = BleAdapterState.off;
@@ -227,16 +248,6 @@ class HeartRateManager extends ChangeNotifier {
 
     final ready = await _ensurePermissionsAndBluetooth();
     if (!ready) return;
-
-    _prefs = await SharedPreferences.getInstance();
-    _settings = HeartRateSettings.fromPrefs(_prefs);
-    _pushCoordinator.updateSettings(_settings);
-    AppLog.setEnabled(_settings.logEnabled);
-    _savedDeviceId = _prefs?.getString('last_device_id');
-    _savedDeviceName = _prefs?.getString('last_device_name');
-    if (_savedDeviceId != null) {
-      _autoConnectEnabled = true; // 曾连接过，自动尝试重连
-    }
 
     if (Platform.isAndroid) {
       try {
@@ -306,27 +317,50 @@ class HeartRateManager extends ChangeNotifier {
     if (_connecting) return;
     if (_connectionState != AdapterConnectionState.connected) return;
 
-    final last = _lastUpdated ?? _prevHeartRateAt;
-    if (last == null) return;
-
-    // 若超过两倍心率失效阈值仍无数据，判定为掉线，主动重连（Windows 上常见）.
-    if (now.difference(last) > _hrStaleThreshold * 2) {
-      _log('stale connection, forcing reconnect');
-      _setStatus('连接失活，自动重连...');
-      _connectionState = AdapterConnectionState.disconnected;
-      _connectedAt = null;
-      // RSSI Polling removed
-      unawaited(() async {
-        try {
-          if (_connectedDeviceId != null) {
-            await _bleAdapter.disconnect(_connectedDeviceId!);
-          }
-        } catch (_) {}
-      }());
-      _notifyConnectionState();
-      notifyListeners();
-      _scheduleReconnect(immediate: true);
+    if (!shouldForceReconnect(
+      now: now,
+      lastHeartRateAt: _lastUpdated ?? _prevHeartRateAt,
+      connectedAt: _connectedAt,
+    )) {
+      return;
     }
+
+    _log('stale connection, forcing reconnect');
+    _setStatus('连接失活，自动重连...');
+    _connectionState = AdapterConnectionState.disconnected;
+    _connectedAt = null;
+    // RSSI Polling removed
+    unawaited(() async {
+      try {
+        if (_connectedDeviceId != null) {
+          await _bleAdapter.disconnect(_connectedDeviceId!);
+        }
+      } catch (_) {}
+    }());
+    _notifyConnectionState();
+    notifyListeners();
+    _scheduleReconnect(immediate: true);
+  }
+
+  /// Decides whether a "connected" device should be force-reconnected.
+  ///
+  /// Falls back to [connectedAt] when no heart rate was ever received —
+  /// without that fallback a zombie connection (device never sends data,
+  /// e.g. a Xiaomi watch without heart-rate broadcast enabled) would never
+  /// be detected.
+  @visibleForTesting
+  static bool shouldForceReconnect({
+    required DateTime now,
+    required DateTime? lastHeartRateAt,
+    required DateTime? connectedAt,
+  }) {
+    final last = lastHeartRateAt ?? connectedAt;
+    if (last == null) return false;
+
+    final limit = lastHeartRateAt == null
+        ? _noHrDataTimeout
+        : _hrStaleThreshold * 2;
+    return now.difference(last) > limit;
   }
 
   Future<void> _tryStartScan() async {
@@ -394,9 +428,7 @@ class HeartRateManager extends ChangeNotifier {
         _connectionState != AdapterConnectionState.connected &&
         r.connectable &&
         !_connecting) {
-      final name = NearbyDevice.fixWindowsDeviceName(
-        r.name.trim().isNotEmpty ? r.name : '未命名设备',
-      );
+      final name = NearbyDevice.fixWindowsDeviceName(r.name.trim());
       _pendingConnectName = name;
       _log('auto connect: $name (${r.id})');
       _connectTo(r.id);
@@ -510,7 +542,9 @@ class HeartRateManager extends ChangeNotifier {
         _connectedDeviceId = null;
         _connectedDeviceName = null;
       } else if (_autoReconnect && _connectedDeviceId != null) {
-        _reconnectAttempts = 0;
+        // 注意：不在此处重置 _reconnectAttempts——每次断开都清零会让退避
+        // 永远从头开始，抖动的设备会制造无限 0-3-6-9s 连接风暴。
+        // 计数只在连接并订阅成功后（_connectTo 成功分支）重置。
         _scheduleReconnect(immediate: true);
       }
     }
@@ -528,6 +562,8 @@ class HeartRateManager extends ChangeNotifier {
     _log('manual connect: ${target.name} (${target.id})');
     _autoReconnect = true; // 用户重新连接后恢复自动重连
     _autoConnectEnabled = true; // 用户主动操作后再允许自动连接
+    _reconnectAttempts = 0; // 手动重试重新计数
+    _xiaomiGuidePending = false;
     _lastActionAt = DateTime.now();
     _pendingConnectName = target.name;
     await _connectTo(target.id);
@@ -597,6 +633,7 @@ class HeartRateManager extends ChangeNotifier {
     _autoConnectEnabled = false;
     _reconnectAttempts = 0;
     _connecting = false;
+    final deviceId = _connectedDeviceId;
 
     // Delegate to connection service
     await _connectionService.disconnect();
@@ -621,6 +658,11 @@ class HeartRateManager extends ChangeNotifier {
     _syncHrOnline(now: DateTime.now(), forceOsc: true);
     _notifyConnectionState();
     notifyListeners();
+
+    // Release per-device adapter state (matters for rotating-MAC devices).
+    if (deviceId != null) {
+      _bleAdapter.cleanupDevice(deviceId);
+    }
 
     await Future.delayed(const Duration(milliseconds: 300));
     await restartScan();
@@ -650,17 +692,25 @@ class HeartRateManager extends ChangeNotifier {
       return;
     }
 
+    // 连续失败达到上限后停止自动重连，等待用户手动操作，避免无限连接风暴
+    final delay = reconnectDelayFor(
+      _reconnectAttempts + 1,
+      immediate: immediate,
+    );
+    if (delay == null) {
+      _log('auto reconnect gave up after $_reconnectAttempts attempts');
+      _autoReconnect = false;
+      _setStatus('自动重连失败，请手动选择设备重试', force: true);
+      notifyListeners();
+      return;
+    }
+
     // Logic: find target device ID and try to connect.
     final targetId = _savedDeviceId;
     if (targetId == null) return;
 
-    // Exponential backoff
     _reconnectAttempts++;
-    final delaySeconds = immediate
-        ? 0
-        : (_reconnectAttempts > 5
-              ? 30
-              : (_reconnectAttempts > 3 ? 10 : 3 * _reconnectAttempts));
+    final delaySeconds = delay.inSeconds;
 
     _log('scheduleReconnect in ${delaySeconds}s (attempt $_reconnectAttempts)');
 
@@ -682,13 +732,22 @@ class HeartRateManager extends ChangeNotifier {
           .where((d) => d.id == targetId)
           .firstOrNull;
 
-      if (nearby == null && (_savedDeviceName?.trim().isNotEmpty ?? false)) {
+      // Xiaomi/Redmi wearables rotate their MAC address, so the saved id
+      // stops matching. Fall back to the saved name; for Xiaomi devices pick
+      // the strongest signal when multiple advertise the same name.
+      final savedName = _savedDeviceName?.trim() ?? '';
+      if (nearby == null && savedName.isNotEmpty) {
         final matches = nearbyDevices
             .where(
-              (d) => d.connectable && d.name.trim() == _savedDeviceName!.trim(),
+              (d) =>
+                  d.connectable &&
+                  d.name.trim().toLowerCase() == savedName.toLowerCase(),
             )
             .toList();
         if (matches.length == 1) {
+          nearby = matches.first;
+        } else if (matches.length > 1 && BleScanner.isXiaomiDevice(savedName)) {
+          matches.sort((a, b) => b.rssi.compareTo(a.rssi));
           nearby = matches.first;
         }
       }
@@ -712,6 +771,17 @@ class HeartRateManager extends ChangeNotifier {
       _log('auto reconnect: ${nearby.name} (${nearby.id})');
       await _connectTo(deviceIdForReconnect);
     });
+  }
+
+  /// Backoff delay before the Nth reconnect attempt, or null when auto
+  /// reconnect should give up (consecutive failures reached the cap).
+  @visibleForTesting
+  static Duration? reconnectDelayFor(int attempt, {required bool immediate}) {
+    if (attempt >= _maxReconnectAttempts) return null;
+    if (immediate) return Duration.zero;
+    if (attempt > 5) return const Duration(seconds: 30);
+    if (attempt > 3) return const Duration(seconds: 10);
+    return Duration(seconds: 3 * attempt);
   }
 
   void _setUiScanning(bool scanning) {
@@ -894,6 +964,28 @@ class HeartRateManager extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// Called by the connection service when service discovery finished but no
+  /// standard heart rate service (0x180D) was found. Xiaomi/Redmi wearables
+  /// only expose it after "Heart Rate Broadcast" is enabled on the device.
+  void _handleHrServiceMissing(String deviceName) {
+    _log('hr service missing on device: $deviceName');
+    if (BleScanner.isXiaomiDevice(deviceName)) {
+      if (_xiaomiGuidePending) return;
+      _xiaomiGuidePending = true;
+      _setStatus('未找到心率服务，请开启手表的「心率广播」', force: true);
+      notifyListeners();
+    } else {
+      _setStatus('设备未提供标准心率服务', force: true);
+      notifyListeners();
+    }
+  }
+
+  /// Called by the UI after the guidance dialog has been shown.
+  void dismissXiaomiGuide() {
+    _xiaomiGuidePending = false;
+    notifyListeners();
+  }
+
   @override
   void dispose() {
     _log('dispose');
@@ -906,6 +998,7 @@ class HeartRateManager extends ChangeNotifier {
     _scanLoopTimer?.cancel();
     _uiNotifyTimer?.cancel();
     _pushCoordinator.dispose();
+    _bleAdapter.dispose();
     unawaited(_notificationService.stop());
     super.dispose();
   }

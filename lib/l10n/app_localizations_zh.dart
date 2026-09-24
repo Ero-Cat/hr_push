@@ -249,4 +249,17 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get deviceConnected => '已连接';
+
+  @override
+  String get xiaomiGuideTitle => '未检测到心率服务';
+
+  @override
+  String get xiaomiGuideBody =>
+      '小米/Redmi 手表需要在手表端开启「心率广播」才会开放标准心率服务：\n\n1. 打开手表的 设置 → 心率，开启「心率广播」（部分型号为「分享心率」）\n2. 确认手表未被小米运动健康 App 占用连接\n3. 回到此处重新扫描并连接';
+
+  @override
+  String get xiaomiGuideRescan => '重新扫描';
+
+  @override
+  String get xiaomiGuideGotIt => '我知道了';
 }

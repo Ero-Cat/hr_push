@@ -13,6 +13,7 @@ typedef OnLog = void Function(String message, {Object? error});
 typedef OnHeartRateData = void Function(Uint8List data);
 typedef OnConnectionStateChange = void Function(AdapterConnectionState state);
 typedef OnSubscriptionComplete = void Function(bool success);
+typedef OnHrServiceMissing = void Function(String deviceName);
 
 /// Service for managing BLE device connections and heart rate subscriptions
 class BleConnectionService {
@@ -22,6 +23,7 @@ class BleConnectionService {
     required this.onStatusChange,
     required this.onHeartRateData,
     required this.onConnectionStateChange,
+    this.onHrServiceMissing,
   }) : _adapter = adapter;
 
   final BleAdapter _adapter;
@@ -29,6 +31,7 @@ class BleConnectionService {
   final OnStatusChange onStatusChange;
   final OnHeartRateData onHeartRateData;
   final OnConnectionStateChange onConnectionStateChange;
+  final OnHrServiceMissing? onHrServiceMissing;
 
   static const String _heartRateServiceUuid =
       '0000180d-0000-1000-8000-00805f9b34fb';
@@ -66,6 +69,10 @@ class BleConnectionService {
     final label = displayName ?? deviceId;
     onStatusChange('正在连接 $label...');
     onLog('connect start: $deviceId name=$label');
+
+    // A pending resubscribe from a previous attempt must never fire into a
+    // fresh connection (it would race on _heartRateSub).
+    _resubscribeTimer?.cancel();
 
     await _adapter.stopScan();
 
@@ -210,10 +217,12 @@ class BleConnectionService {
 
       if (!foundHr) {
         onLog('HR service not found! Available: $serviceUuids');
-      }
-
-      if (!_missingHrNotified) {
-        _missingHrNotified = true;
+        if (!_missingHrNotified) {
+          _missingHrNotified = true;
+          // Surface once per connection episode: Xiaomi/Redmi wearables only
+          // expose 0x180D after "Heart Rate Broadcast" is enabled on-device.
+          onHrServiceMissing?.call(_connectedDeviceName ?? deviceId);
+        }
       }
 
       _scheduleResubscribe(deviceId, attempt: attempt + 1);

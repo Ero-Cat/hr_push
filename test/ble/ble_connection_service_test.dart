@@ -48,6 +48,66 @@ void main() {
       expect(adapter.activeValueListeners, 1);
     },
   );
+
+  test(
+    'forwards a connect timeout instead of relying on the 60s default',
+    () async {
+      final adapter = _FakeBleAdapter(
+        services: [
+          BleServiceInfo(
+            uuid: '0000180d-0000-1000-8000-00805f9b34fb',
+            characteristics: [
+              BleCharacteristicInfo(
+                uuid: '00002a37-0000-1000-8000-00805f9b34fb',
+                serviceUuid: '0000180d-0000-1000-8000-00805f9b34fb',
+                canNotify: true,
+              ),
+            ],
+          ),
+        ],
+      );
+      addTearDown(adapter.dispose);
+
+      final service = BleConnectionService(
+        adapter: adapter,
+        onLog: (_, {error}) {},
+        onStatusChange: (_, {force = false}) {},
+        onHeartRateData: (_) {},
+        onConnectionStateChange: (_) {},
+      );
+      addTearDown(service.dispose);
+
+      await service.connect('band-1', displayName: 'Redmi Watch');
+
+      expect(adapter.lastConnectTimeout, const Duration(seconds: 10));
+    },
+  );
+
+  test('reports missing HR service once per connection episode', () async {
+    final adapter = _FakeBleAdapter(
+      services: [BleServiceInfo(uuid: '0000fee7-0000-1000-8000-00805f9b34fb')],
+    );
+    addTearDown(adapter.dispose);
+
+    final missingReports = <String>[];
+    final service = BleConnectionService(
+      adapter: adapter,
+      onLog: (_, {error}) {},
+      onStatusChange: (_, {force = false}) {},
+      onHeartRateData: (_) {},
+      onConnectionStateChange: (_) {},
+      onHrServiceMissing: missingReports.add,
+    );
+    addTearDown(service.dispose);
+
+    // First attempt: discovery finishes without 0x180D -> callback fires once.
+    final success = await service.connect(
+      'watch-1',
+      displayName: 'Redmi Watch',
+    );
+    expect(success, isFalse);
+    expect(missingReports, ['Redmi Watch']);
+  });
 }
 
 class _FakeBleAdapter implements BleAdapter {
@@ -62,6 +122,10 @@ class _FakeBleAdapter implements BleAdapter {
   final _valueController = StreamController<Uint8List>.broadcast();
 
   int activeValueListeners = 0;
+  Duration? lastConnectTimeout;
+
+  @override
+  void cleanupDevice(String deviceId) {}
 
   @override
   Stream<BleDeviceInfo> get scanStream => _scanController.stream;
@@ -97,6 +161,7 @@ class _FakeBleAdapter implements BleAdapter {
 
   @override
   Future<void> connect(String deviceId, {Duration? timeout}) async {
+    lastConnectTimeout = timeout;
     _connectionController.add(AdapterConnectionState.connected);
   }
 

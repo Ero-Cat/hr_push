@@ -1,4 +1,3 @@
-
 import 'dart:ui';
 import 'package:flutter/cupertino.dart';
 import '../theme/design_system.dart';
@@ -21,21 +20,21 @@ class GlassSurface extends StatelessWidget {
   Widget build(BuildContext context) {
     final isDark = CupertinoTheme.brightnessOf(context) == Brightness.dark;
     final bgOpacity = isDark ? GlassStyle.opacityDark : GlassStyle.opacityLight;
-    final bgColor = isDark 
-        ? CupertinoColors.black.withValues(alpha: bgOpacity) 
+    final bgColor = isDark
+        ? CupertinoColors.black.withValues(alpha: bgOpacity)
         : CupertinoColors.white.withValues(alpha: bgOpacity);
 
     final content = Container(
       decoration: BoxDecoration(
-        boxShadow: [ AppShadows.card ],
+        boxShadow: [AppShadows.card],
         borderRadius: BorderRadius.circular(AppRadius.r20),
       ),
       child: ClipRRect(
         borderRadius: BorderRadius.circular(AppRadius.r20),
         child: BackdropFilter(
           filter: ImageFilter.blur(
-            sigmaX: GlassStyle.blurAmount, 
-            sigmaY: GlassStyle.blurAmount
+            sigmaX: GlassStyle.blurAmount,
+            sigmaY: GlassStyle.blurAmount,
           ),
           child: Container(
             padding: padding ?? const EdgeInsets.all(AppSpacing.cardPadding),
@@ -77,7 +76,7 @@ class GlassSurface extends StatelessWidget {
         child: content,
       );
     }
-    
+
     return content;
   }
 }

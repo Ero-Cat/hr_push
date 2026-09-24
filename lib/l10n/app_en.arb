@@ -86,5 +86,9 @@
       }
     }
   },
-  "deviceConnected": "Connected"
+  "deviceConnected": "Connected",
+  "xiaomiGuideTitle": "Heart rate service not found",
+  "xiaomiGuideBody": "Xiaomi/Redmi watches only expose the standard heart rate service after you enable Heart Rate Broadcast on the watch:\n\n1. On the watch, open Settings → Heart Rate and turn on \"Heart Rate Broadcast\" (or \"Share HR\")\n2. Make sure the watch is not connected to the Mi Fitness app\n3. Come back here and rescan, then connect",
+  "xiaomiGuideRescan": "Rescan",
+  "xiaomiGuideGotIt": "Got it"
 }

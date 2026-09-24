@@ -12,8 +12,79 @@ import '../widgets/hero_card.dart';
 import '../widgets/nearby_list.dart';
 import 'settings_page.dart';
 
-class HeartDashboard extends StatelessWidget {
+class HeartDashboard extends StatefulWidget {
   const HeartDashboard({super.key});
+
+  @override
+  State<HeartDashboard> createState() => _HeartDashboardState();
+}
+
+class _HeartDashboardState extends State<HeartDashboard> {
+  HeartRateManager? _manager;
+  bool _guideShowing = false;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      final mgr = context.read<HeartRateManager>();
+      _manager = mgr;
+      mgr.addListener(_onManagerUpdate);
+      _onManagerUpdate();
+    });
+  }
+
+  @override
+  void dispose() {
+    _manager?.removeListener(_onManagerUpdate);
+    super.dispose();
+  }
+
+  void _onManagerUpdate() {
+    final mgr = _manager;
+    if (mgr == null || !mounted) return;
+    if (mgr.xiaomiGuidePending && !_guideShowing) {
+      _guideShowing = true;
+      _showXiaomiGuide(mgr);
+    }
+  }
+
+  /// Guidance for Xiaomi/Redmi wearables that connect but never expose the
+  /// standard heart rate service: they need "Heart Rate Broadcast" enabled
+  /// on the watch first.
+  void _showXiaomiGuide(HeartRateManager mgr) {
+    final l10n = AppLocalizations.of(context)!;
+    final result = showCupertinoDialog<String>(
+      context: context,
+      barrierDismissible: true,
+      builder: (dialogContext) => CupertinoAlertDialog(
+        title: Text(l10n.xiaomiGuideTitle),
+        content: Padding(
+          padding: const EdgeInsets.only(top: 8),
+          child: Text(l10n.xiaomiGuideBody),
+        ),
+        actions: [
+          CupertinoDialogAction(
+            onPressed: () => Navigator.of(dialogContext).pop('rescan'),
+            child: Text(l10n.xiaomiGuideRescan),
+          ),
+          CupertinoDialogAction(
+            isDefaultAction: true,
+            onPressed: () => Navigator.of(dialogContext).pop(),
+            child: Text(l10n.xiaomiGuideGotIt),
+          ),
+        ],
+      ),
+    );
+    result.then((action) {
+      _guideShowing = false;
+      mgr.dismissXiaomiGuide();
+      if (action == 'rescan') {
+        mgr.restartScan();
+      }
+    });
+  }
 
   @override
   Widget build(BuildContext context) {

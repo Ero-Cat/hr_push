@@ -6,10 +6,7 @@ import '../app_log.dart';
 
 /// HTTP/WebSocket Service for pushing heart rate data
 class HttpWsService {
-  HttpWsService({
-    required this.endpoint,
-    this.onLog,
-  });
+  HttpWsService({required this.endpoint, this.onLog});
 
   final String endpoint;
   final void Function(String message, {Object? error})? onLog;
@@ -18,7 +15,7 @@ class HttpWsService {
   bool _wsConnecting = false;
 
   bool get isEnabled => endpoint.trim().isNotEmpty;
-  
+
   Uri? get _uri => Uri.tryParse(endpoint.trim());
 
   void _log(String message, {Object? error}) {

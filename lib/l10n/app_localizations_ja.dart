@@ -249,4 +249,17 @@ class AppLocalizationsJa extends AppLocalizations {
 
   @override
   String get deviceConnected => '接続済み';
+
+  @override
+  String get xiaomiGuideTitle => '心拍数サービスが見つかりません';
+
+  @override
+  String get xiaomiGuideBody =>
+      'Xiaomi/Redmi ウォッチは、本体で「心拍数ブロードキャスト」を有効にすると初めて標準の心拍数サービスを公開します：\n\n1. ウォッチの 設定 → 心拍数 で「心拍数ブロードキャスト」をオンにします\n2. ウォッチが Mi Fitness アプリに接続されていないことを確認します\n3. ここに戻って再スキャンし、接続してください';
+
+  @override
+  String get xiaomiGuideRescan => '再スキャン';
+
+  @override
+  String get xiaomiGuideGotIt => '了解しました';
 }

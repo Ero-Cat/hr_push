@@ -1,4 +1,3 @@
-
 import 'package:flutter/cupertino.dart';
 import '../l10n/app_localizations.dart';
 
@@ -23,16 +22,23 @@ class NearbyList extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     if (!mgr.isBluetoothOn) {
-       // Optional: Show empty state or hint if Bluetooth is off, 
-       // but typically the HeroCard handles the primary state notice.
-       // We'll keep it simple for the list.
-       return const SizedBox.shrink();
+      // Optional: Show empty state or hint if Bluetooth is off,
+      // but typically the HeroCard handles the primary state notice.
+      // We'll keep it simple for the list.
+      return const SizedBox.shrink();
     }
 
     final l10n = AppLocalizations.of(context)!;
-    final devices = mgr.nearbyDevices.take(5).toList();
+    // Redmi/Xiaomi wearables advertise sparsely (screen off); showing more
+    // entries keeps weak-signal devices reachable instead of being cut off.
+    final devices = mgr.nearbyDevices.take(15).toList();
     final header = Padding(
-      padding: const EdgeInsets.fromLTRB(AppSpacing.s20, 0, AppSpacing.s20, AppSpacing.s8),
+      padding: const EdgeInsets.fromLTRB(
+        AppSpacing.s20,
+        0,
+        AppSpacing.s20,
+        AppSpacing.s8,
+      ),
       child: Row(
         children: [
           Text(
@@ -47,7 +53,7 @@ class NearbyList extends StatelessWidget {
             const CupertinoActivityIndicator(radius: 8)
           else if (_scanEnabled())
             CupertinoButton(
-              padding: EdgeInsets.zero,
+              padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 8),
               minimumSize: Size.zero,
               onPressed: mgr.restartScan,
               child: Text(
@@ -76,7 +82,7 @@ class NearbyList extends StatelessWidget {
         return Column(
           children: [
             header,
-             _EmptyStateTile(text: l10n.noDevicesFound),
+            _EmptyStateTile(text: l10n.noDevicesFound),
           ],
         );
       }
@@ -88,7 +94,7 @@ class NearbyList extends StatelessWidget {
         Container(
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(AppRadius.r12),
-            boxShadow: [ AppShadows.card ],
+            boxShadow: [AppShadows.card],
           ),
           child: ClipRRect(
             borderRadius: BorderRadius.circular(AppRadius.r12),
@@ -98,15 +104,12 @@ class NearbyList extends StatelessWidget {
                 children: [
                   for (var i = 0; i < devices.length; i++) ...[
                     if (i > 0)
-                       Container(
-                         height: 0.5, 
-                         margin: const EdgeInsetsDirectional.only(start: 56), 
-                         color: AppColors.separator.resolveFrom(context)
-                       ),
-                    _DeviceTile(
-                      device: devices[i],
-                      mgr: mgr,
-                    ),
+                      Container(
+                        height: 0.5,
+                        margin: const EdgeInsetsDirectional.only(start: 56),
+                        color: AppColors.separator.resolveFrom(context),
+                      ),
+                    _DeviceTile(device: devices[i], mgr: mgr),
                   ],
                 ],
               ),
@@ -118,7 +121,6 @@ class NearbyList extends StatelessWidget {
   }
 }
 
-
 class _DeviceTile extends StatelessWidget {
   const _DeviceTile({required this.device, required this.mgr});
 
@@ -127,20 +129,21 @@ class _DeviceTile extends StatelessWidget {
 
   // Helper for signal icon (doesn't need localization)
   IconData _signalIcon(int rssi) {
-     if (rssi >= -60) return CupertinoIcons.wifi;
-     if (rssi >= -80) return CupertinoIcons.wifi_exclamationmark;
-     return CupertinoIcons.wifi_slash;
+    if (rssi >= -60) return CupertinoIcons.wifi;
+    if (rssi >= -80) return CupertinoIcons.wifi_exclamationmark;
+    return CupertinoIcons.wifi_slash;
   }
 
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
     final isConnected = mgr.activeDeviceId == device.id && mgr.isConnected;
-    final isConnecting = mgr.activeDeviceId == device.id &&
+    final isConnecting =
+        mgr.activeDeviceId == device.id &&
         (mgr.isConnecting || mgr.isAutoReconnecting);
-    
-    final displayName = device.name.isNotEmpty 
-        ? device.name 
+
+    final displayName = device.name.isNotEmpty
+        ? device.name
         : '${l10n.unknownDevice} (${device.id.substring(device.id.length - 4)})';
 
     // Localized signal text
@@ -154,93 +157,111 @@ class _DeviceTile extends StatelessWidget {
     }
 
     return CupertinoButton(
-       padding: EdgeInsets.zero,
-       color: AppColors.bgSecondary.resolveFrom(context),
-       onPressed: () async {
-         if (mgr.isConnecting || mgr.isAutoReconnecting) return;
-         await mgr.manualConnect(device);
-       },
-       child: Padding(
-         padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 18), // Breathable padding
-         child: Row(
-           children: [
-             // Leading Icon with soft background
-             Container(
-               width: 44,
-               height: 44,
-               decoration: BoxDecoration(
-                 color: AppColors.accent.resolveFrom(context).withValues(alpha: 0.1),
-                 shape: BoxShape.circle,
-               ),
-               alignment: Alignment.center,
-               child: Icon(
-                 CupertinoIcons.heart_fill,
-                 color: AppColors.accent.resolveFrom(context),
-                 size: 24,
-               ),
-             ),
-             const SizedBox(width: 16),
-             
-             // Content
-             Expanded(
-               child: Column(
-                 crossAxisAlignment: CrossAxisAlignment.start,
-                 children: [
-                   Text(
-                     displayName,
-                     style: AppTypography.body.copyWith(
-                       color: AppColors.textPrimary.resolveFrom(context),
-                       fontWeight: FontWeight.w600,
-                     ),
-                     maxLines: 1,
-                     overflow: TextOverflow.ellipsis,
-                   ),
-                   const SizedBox(height: 2),
-                   Row(
-                     children: [
-                       Icon(_signalIcon(device.rssi), size: 12, color: AppColors.textTertiary.resolveFrom(context)),
-                       const SizedBox(width: 4),
-                       Text(
-                         '$signalText (${device.rssi} dBm)',
-                         style: AppTypography.caption.copyWith(
-                           color: AppColors.textSecondary.resolveFrom(context),
-                         ),
-                       ),
-                     ],
-                   ),
-                 ],
-               ),
-             ),
-             const SizedBox(width: 12),
-             
-             // Action
-             if (isConnecting)
-               const CupertinoActivityIndicator()
-             else if (isConnected)
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                  decoration: BoxDecoration(
-                    color: AppColors.success.resolveFrom(context).withValues(alpha: 0.1),
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: AppColors.success.resolveFrom(context).withValues(alpha: 0.2)),
-                  ),
-                  child: Text(
-                    l10n.deviceOnline,
-                    style: AppTypography.caption.copyWith(
-                      color: AppColors.success.resolveFrom(context),
+      padding: EdgeInsets.zero,
+      color: AppColors.bgSecondary.resolveFrom(context),
+      onPressed: () async {
+        if (mgr.isConnecting || mgr.isAutoReconnecting) return;
+        await mgr.manualConnect(device);
+      },
+      child: Padding(
+        padding: const EdgeInsets.symmetric(
+          horizontal: 20,
+          vertical: 18,
+        ), // Breathable padding
+        child: Row(
+          children: [
+            // Leading Icon with soft background
+            Container(
+              width: 44,
+              height: 44,
+              decoration: BoxDecoration(
+                color: AppColors.accent
+                    .resolveFrom(context)
+                    .withValues(alpha: 0.1),
+                shape: BoxShape.circle,
+              ),
+              alignment: Alignment.center,
+              child: Icon(
+                CupertinoIcons.heart_fill,
+                color: AppColors.accent.resolveFrom(context),
+                size: 24,
+              ),
+            ),
+            const SizedBox(width: 16),
+
+            // Content
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    displayName,
+                    style: AppTypography.body.copyWith(
+                      color: AppColors.textPrimary.resolveFrom(context),
                       fontWeight: FontWeight.w600,
                     ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
                   ),
-                )
-             else
-               Icon(
-                 CupertinoIcons.chevron_right,
-                 color: AppColors.textTertiary.resolveFrom(context),
-                 size: 20,
-               ),
-           ],
-         ),
-       ),
+                  const SizedBox(height: 2),
+                  Row(
+                    children: [
+                      Icon(
+                        _signalIcon(device.rssi),
+                        size: 12,
+                        color: AppColors.textTertiary.resolveFrom(context),
+                      ),
+                      const SizedBox(width: 4),
+                      Text(
+                        '$signalText (${device.rssi} dBm)',
+                        style: AppTypography.caption.copyWith(
+                          color: AppColors.textSecondary.resolveFrom(context),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(width: 12),
+
+            // Action
+            if (isConnecting)
+              const CupertinoActivityIndicator()
+            else if (isConnected)
+              Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 10,
+                  vertical: 4,
+                ),
+                decoration: BoxDecoration(
+                  color: AppColors.success
+                      .resolveFrom(context)
+                      .withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(
+                    color: AppColors.success
+                        .resolveFrom(context)
+                        .withValues(alpha: 0.2),
+                  ),
+                ),
+                child: Text(
+                  l10n.deviceOnline,
+                  style: AppTypography.caption.copyWith(
+                    color: AppColors.success.resolveFrom(context),
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              )
+            else
+              Icon(
+                CupertinoIcons.chevron_right,
+                color: AppColors.textTertiary.resolveFrom(context),
+                size: 20,
+              ),
+          ],
+        ),
+      ),
     );
   }
 }
@@ -261,7 +282,11 @@ class _EmptyStateTile extends StatelessWidget {
       alignment: Alignment.center,
       child: Column(
         children: [
-          Icon(CupertinoIcons.search, size: 32, color: AppColors.textTertiary.resolveFrom(context)),
+          Icon(
+            CupertinoIcons.search,
+            size: 32,
+            color: AppColors.textTertiary.resolveFrom(context),
+          ),
           const SizedBox(height: 12),
           Text(
             text,

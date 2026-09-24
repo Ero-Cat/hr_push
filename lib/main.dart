@@ -20,24 +20,26 @@ Future<void> main() async {
   // Desktop configuration for a phone-like feel
   if (!kIsWeb && (Platform.isWindows || Platform.isMacOS || Platform.isLinux)) {
     await windowManager.ensureInitialized();
-    const size = Size(430, 800); 
+    const size = Size(430, 800);
     final options = const WindowOptions(
       size: size,
       minimumSize: size,
       // maximumSize: size, // Allow resizing if desired, but keep it phone-like default
       center: true,
       title: 'Heart Rate',
-      backgroundColor: Color(0x00000000), // Transparent for glass effects if supported
-      titleBarStyle: TitleBarStyle.hidden, 
+      backgroundColor: Color(
+        0x00000000,
+      ), // Transparent for glass effects if supported
+      titleBarStyle: TitleBarStyle.hidden,
     );
-    
+
     windowManager.waitUntilReadyToShow(options, () async {
       await windowManager.setHasShadow(true);
       await windowManager.show();
       await windowManager.focus();
     });
   }
-  
+
   // Set system UI style (transparent status bar for edge-to-edge)
   if (Platform.isAndroid) {
     SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
@@ -82,11 +84,13 @@ class HrOscApp extends StatelessWidget {
           ),
         ),
         builder: (context, child) {
-          // Wrap with a custom title bar for desktop if needed, 
+          // Wrap with a custom title bar for desktop if needed,
           // or just generic system UI sync.
           return MediaQuery(
             // Ensure fonts scale appropriately
-            data: MediaQuery.of(context).copyWith(textScaler: const TextScaler.linear(1.0)), 
+            data: MediaQuery.of(
+              context,
+            ).copyWith(textScaler: const TextScaler.linear(1.0)),
             child: child!,
           );
         },

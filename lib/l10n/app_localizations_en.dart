@@ -249,4 +249,17 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get deviceConnected => 'Connected';
+
+  @override
+  String get xiaomiGuideTitle => 'Heart rate service not found';
+
+  @override
+  String get xiaomiGuideBody =>
+      'Xiaomi/Redmi watches only expose the standard heart rate service after you enable Heart Rate Broadcast on the watch:\n\n1. On the watch, open Settings → Heart Rate and turn on \"Heart Rate Broadcast\" (or \"Share HR\")\n2. Make sure the watch is not connected to the Mi Fitness app\n3. Come back here and rescan, then connect';
+
+  @override
+  String get xiaomiGuideRescan => 'Rescan';
+
+  @override
+  String get xiaomiGuideGotIt => 'Got it';
 }

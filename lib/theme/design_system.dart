@@ -1,4 +1,3 @@
-
 import 'package:flutter/cupertino.dart';
 
 // --- Semantic Colors (Light / Dark) ---
@@ -36,7 +35,7 @@ class AppColors {
     color: Color(0xFFC6C6C8),
     darkColor: Color(0xFF38383A),
   );
-  
+
   // Functional Colors
   static const accent = CupertinoDynamicColor.withBrightness(
     color: Color(0xFF007AFF),
@@ -68,10 +67,10 @@ class AppColors {
 
 class AppShadows {
   static final card = BoxShadow(
-     color: const Color(0x1F000000), // Black with ~12% opacity
-     offset: const Offset(0, 4),
-     blurRadius: 12,
-     spreadRadius: 0,
+    color: const Color(0x1F000000), // Black with ~12% opacity
+    offset: const Offset(0, 4),
+    blurRadius: 12,
+    spreadRadius: 0,
   );
 }
 
@@ -86,7 +85,7 @@ class AppTypography {
     height: 1.2,
     color: CupertinoColors.label,
   );
-  
+
   static const title1 = TextStyle(
     inherit: false,
     fontFamily: '.SF Pro Display',
@@ -146,7 +145,7 @@ class AppTypography {
     height: 1.3,
     color: CupertinoColors.secondaryLabel,
   );
-  
+
   static const caption = TextStyle(
     inherit: false,
     fontFamily: '.SF Pro Text',
@@ -168,7 +167,7 @@ class AppSpacing {
   static const double s24 = 24.0;
   static const double s32 = 32.0;
   static const double s40 = 40.0;
-  
+
   static const double cardPadding = 20.0;
   static const double screenPadding = 16.0;
 }

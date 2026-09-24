@@ -1,6 +1,7 @@
 import 'dart:io' show Platform;
 
 import 'package:flutter/cupertino.dart';
+import '../app_metadata.dart';
 import '../l10n/app_localizations.dart';
 import '../hr_notification_service.dart';
 import '../models/models.dart';
@@ -352,7 +353,7 @@ class _SettingsPageState extends State<SettingsPage> {
             const SizedBox(height: 20),
             Center(
               child: Text(
-                'v1.7.3',
+                'v$appVersion',
                 style: AppTypography.caption.copyWith(
                   color: AppColors.textTertiary.resolveFrom(context),
                 ),

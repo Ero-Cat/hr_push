@@ -65,10 +65,10 @@ class MqttService {
     try {
       final brokerStr = broker.trim();
       if (brokerStr.isEmpty) return;
-      
+
       var host = brokerStr;
       var actualPort = port > 0 ? port : 1883;
-      
+
       if (brokerStr.contains('://')) {
         final uri = Uri.tryParse(brokerStr);
         if (uri != null && uri.host.isNotEmpty) {
@@ -78,7 +78,7 @@ class MqttService {
           }
         }
       }
-      
+
       final usernameStr = username.trim();
       final rawClientId = clientId.trim();
       final actualClientId = rawClientId.isNotEmpty
@@ -86,7 +86,7 @@ class MqttService {
           : 'hr_push_${DateTime.now().millisecondsSinceEpoch}';
 
       _log('mqtt connecting: $host:$actualPort clientId=$actualClientId');
-      
+
       final client = MqttServerClient(host, actualClientId)
         ..port = actualPort
         ..keepAlivePeriod = 20
