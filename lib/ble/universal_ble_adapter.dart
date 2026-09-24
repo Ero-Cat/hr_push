@@ -134,11 +134,19 @@ class UniversalBleAdapter implements BleAdapter {
     if (_isScanning) return;
     _isScanning = true;
 
-    await UniversalBle.startScan(
-      scanFilter: withServices != null
-          ? ScanFilter(withServices: withServices)
-          : null,
-    );
+    try {
+      await UniversalBle.startScan(
+        scanFilter: withServices != null
+            ? ScanFilter(withServices: withServices)
+            : null,
+      );
+    } catch (_) {
+      // Android throttles frequent scan restarts ("scanning too frequently").
+      // Without resetting the flag here every later startScan call would
+      // silently no-op until an explicit stopScan.
+      _isScanning = false;
+      rethrow;
+    }
   }
 
   @override
@@ -153,7 +161,10 @@ class UniversalBleAdapter implements BleAdapter {
     _getConnectionController(deviceId).add(AdapterConnectionState.connecting);
 
     try {
-      await UniversalBle.connect(deviceId);
+      // universal_ble defaults to a 60s timeout when none is passed, which
+      // hangs the whole connect path on uncooperative devices; honor the
+      // caller's timeout instead.
+      await UniversalBle.connect(deviceId, timeout: timeout);
     } catch (e) {
       _getConnectionController(
         deviceId,
@@ -270,9 +281,24 @@ class UniversalBleAdapter implements BleAdapter {
     );
   }
 
+  /// Release per-device resources. Call after a device disconnects so the
+  /// controller maps do not grow unboundedly (Xiaomi devices rotate MACs, so
+  /// long sessions would otherwise accumulate one entry per address).
+  @override
+  void cleanupDevice(String deviceId) {
+    _connectionControllers.remove(deviceId)?.close();
+    _valueControllers.removeWhere((key, _) => key.startsWith('$deviceId:'));
+  }
+
   @override
   void dispose() {
+    UniversalBle.onAvailabilityChange = null;
+    UniversalBle.onScanResult = null;
+    UniversalBle.onConnectionChange = null;
+    UniversalBle.onValueChange = null;
+
     _scanController.close();
+    _adapterStateController.close();
     for (final controller in _connectionControllers.values) {
       controller.close();
     }

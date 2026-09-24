@@ -2,8 +2,9 @@ import 'package:flutter_loggy/flutter_loggy.dart';
 import 'package:loggy/loggy.dart' as loggy;
 
 class AppLog {
-  static final AppStreamPrinter _streamPrinter =
-      AppStreamPrinter(const PrettyDeveloperPrinter());
+  static final AppStreamPrinter _streamPrinter = AppStreamPrinter(
+    const PrettyDeveloperPrinter(),
+  );
   static bool _enabled = false;
   static bool _initialized = false;
 
@@ -12,8 +13,9 @@ class AppLog {
     _initialized = true;
     loggy.Loggy.initLoggy(
       logPrinter: _streamPrinter,
-      logOptions:
-          loggy.LogOptions(enabled ? loggy.LogLevel.all : loggy.LogLevel.off),
+      logOptions: loggy.LogOptions(
+        enabled ? loggy.LogLevel.all : loggy.LogLevel.off,
+      ),
     );
   }
 
@@ -25,8 +27,9 @@ class AppLog {
     }
     loggy.Loggy.initLoggy(
       logPrinter: _streamPrinter,
-      logOptions:
-          loggy.LogOptions(enabled ? loggy.LogLevel.all : loggy.LogLevel.off),
+      logOptions: loggy.LogOptions(
+        enabled ? loggy.LogLevel.all : loggy.LogLevel.off,
+      ),
     );
     if (!enabled) {
       clear();

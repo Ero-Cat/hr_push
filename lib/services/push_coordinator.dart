@@ -142,33 +142,67 @@ class PushCoordinator {
         old.mqttTopic != value.mqttTopic ||
         old.mqttUsername != value.mqttUsername ||
         old.mqttPassword != value.mqttPassword ||
-        old.mqttClientId != value.mqttClientId;
+        old.mqttClientId != value.mqttClientId ||
+        old.mqttUseTls != value.mqttUseTls ||
+        old.mqttLwtTopic != value.mqttLwtTopic;
     if (mqttChanged) {
       _mqttService?.dispose();
       _mqttService = null;
     }
   }
 
-  /// Send heart rate data to all configured push endpoints
+  /// Send heart rate data to all configured push endpoints.
+  ///
+  /// Protocols fan out in parallel so a slow HTTP/MQTT endpoint cannot delay
+  /// the VRChat OSC send of the same beat.
   Future<void> sendHeartRate({
     required int bpm,
     required double? percent,
     required DateTime timestamp,
+    String event = 'heartRate',
+    bool? connected,
+    String? device,
   }) async {
-    final payload = {
+    final payload = <String, dynamic>{
+      'event': event,
+      // Both key styles: heart_rate is the legacy wire format, heartRate
+      // matches the documented README schema.
       'heart_rate': bpm,
-      'timestamp': timestamp.toIso8601String(),
+      'heartRate': bpm,
       if (percent != null) 'percent': percent,
+      if (connected != null) 'connected': connected,
+      if (device != null && device.isNotEmpty) 'device': device,
+      'timestamp': timestamp.toIso8601String(),
     };
 
-    // HTTP/WebSocket push
-    await _sendHttpWs(payload);
+    await Future.wait([
+      _safeSend('http/ws', () => _sendHttpWs(payload)),
+      _safeSend('mqtt', () => _sendMqtt(payload)),
+      _safeSend('osc', () => _sendOscHeartRate(bpm, percent)),
+    ]);
+  }
 
-    // MQTT push
-    await _sendMqtt(payload);
+  /// Send a lifecycle event (e.g. connection/disconnection) to HTTP/WS/MQTT.
+  Future<void> sendEvent({
+    required Map<String, dynamic> payload,
+    required DateTime timestamp,
+  }) async {
+    final event = <String, dynamic>{
+      ...payload,
+      'timestamp': timestamp.toIso8601String(),
+    };
+    await Future.wait([
+      _safeSend('http/ws', () => _sendHttpWs(event)),
+      _safeSend('mqtt', () => _sendMqtt(event)),
+    ]);
+  }
 
-    // OSC push
-    await _sendOscHeartRate(bpm, percent);
+  Future<void> _safeSend(String channel, Future<void> Function() send) async {
+    try {
+      await send();
+    } catch (e) {
+      onLog('push $channel failed', error: e);
+    }
   }
 
   /// Send connection status via OSC
@@ -223,6 +257,8 @@ class PushCoordinator {
       username: _settings.mqttUsername,
       password: _settings.mqttPassword,
       clientId: _settings.mqttClientId,
+      useTls: _settings.mqttUseTls,
+      lwtTopic: _settings.mqttLwtTopic,
       onLog: onLog,
     );
     await _mqttService!.send(payload);

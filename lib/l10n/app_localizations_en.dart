@@ -249,4 +249,191 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get deviceConnected => 'Connected';
+
+  @override
+  String get xiaomiGuideTitle => 'Heart rate service not found';
+
+  @override
+  String get xiaomiGuideBody =>
+      'Xiaomi/Redmi watches only expose the standard heart rate service after you enable Heart Rate Broadcast on the watch:\n\n1. On the watch, open Settings → Heart Rate and turn on \"Heart Rate Broadcast\" (or \"Share HR\")\n2. Make sure the watch is not connected to the Mi Fitness app\n3. Come back here and rescan, then connect';
+
+  @override
+  String get xiaomiGuideRescan => 'Rescan';
+
+  @override
+  String get xiaomiGuideGotIt => 'Got it';
+
+  @override
+  String get sectionGeneral => 'General';
+
+  @override
+  String get showAdvanced => 'Show advanced';
+
+  @override
+  String get hideAdvanced => 'Hide advanced';
+
+  @override
+  String get hintOscEmpty => 'Leave empty to disable OSC push';
+
+  @override
+  String get btnFillDefault => 'Use default';
+
+  @override
+  String get btnTest => 'Test';
+
+  @override
+  String get testSuccess => 'Test passed';
+
+  @override
+  String get testFailed => 'Failed';
+
+  @override
+  String get hintOscNote =>
+      'OSC is connectionless; the test only verifies the datagram can be sent';
+
+  @override
+  String get errInvalidUrl => 'Enter a valid http/https/ws/wss URL';
+
+  @override
+  String get errInvalidOscAddress => 'Expected host:port (port 1-65535)';
+
+  @override
+  String get errInvalidOscPath => 'OSC path must start with /';
+
+  @override
+  String get errInvalidPort => 'Port must be between 1 and 65535';
+
+  @override
+  String get errInvalidInterval => 'Interval must be between 250 and 60000 ms';
+
+  @override
+  String get errInvalidMaxHr => 'Max heart rate must be between 100 and 250';
+
+  @override
+  String get errInvalidPulseDuration =>
+      'Pulse duration must be between 20 and 1000 ms';
+
+  @override
+  String get unsavedTitle => 'Unsaved changes';
+
+  @override
+  String get unsavedBody => 'Leaving will discard your changes. Continue?';
+
+  @override
+  String get unsavedDiscard => 'Discard';
+
+  @override
+  String get unsavedKeepEditing => 'Keep editing';
+
+  @override
+  String get savedToast => 'Settings saved';
+
+  @override
+  String get fixErrorsBeforeSave => 'Fix the highlighted fields first';
+
+  @override
+  String get fieldMqttTls => 'Use TLS (mqtts)';
+
+  @override
+  String get fieldMqttLwtTopic => 'Last-will topic (optional)';
+
+  @override
+  String get hintMqttLwt =>
+      'Publishes an offline message to this topic on abnormal disconnect';
+
+  @override
+  String get hintClientId => 'Uses a default client ID when empty';
+
+  @override
+  String get showPassword => 'Show password';
+
+  @override
+  String get onbSkip => 'Skip';
+
+  @override
+  String get onbNext => 'Next';
+
+  @override
+  String get onbDone => 'Get started';
+
+  @override
+  String get onbTitle1 => 'Welcome to HR PUSH';
+
+  @override
+  String get onbBody1 =>
+      'Read live heart rate from your strap or watch and push it to HTTP/WebSocket, VRChat OSC and MQTT.';
+
+  @override
+  String get onbTitle2 => 'Connect a device';
+
+  @override
+  String get onbBody2 =>
+      'Wear your heart rate device and tap it under \"Nearby devices\" to connect.\n\nXiaomi/Redmi watches: enable \"Heart Rate Broadcast\" on the watch first (Settings → Heart Rate).';
+
+  @override
+  String get onbTitle3 => 'Set up push';
+
+  @override
+  String get onbBody3 =>
+      'Open Settings to enter your webhook, OSC or MQTT address. Use the Test button to verify connectivity; data pushes in real time after saving.';
+
+  @override
+  String get stPermissionFailed => 'Permission check failed';
+
+  @override
+  String get stConnectFailed => 'Connection failed';
+
+  @override
+  String get stWaitingBroadcast => 'Waiting for device broadcast...';
+
+  @override
+  String get stReconnectGaveUp =>
+      'Auto reconnect failed; please pick the device manually';
+
+  @override
+  String get stWaitingRebroadcast =>
+      'Waiting for the device to advertise again...';
+
+  @override
+  String get stHrServiceMissingXiaomi =>
+      'Heart rate service not found; enable \"Heart Rate Broadcast\" on the watch';
+
+  @override
+  String get stHrServiceMissing =>
+      'Device does not expose the standard heart rate service';
+
+  @override
+  String get stConnectedSubscribing =>
+      'Connected, subscribing to heart rate...';
+
+  @override
+  String get stDisconnecting => 'Disconnecting...';
+
+  @override
+  String get stDisconnectedDone => 'Disconnected';
+
+  @override
+  String get stResubscribeFailedReconnecting =>
+      'Subscribe failed, reconnecting...';
+
+  @override
+  String get stSubscribing => 'Subscribing to heart rate...';
+
+  @override
+  String get stDiscovering => 'Discovering services...';
+
+  @override
+  String get stSubscribeRetrying => 'Retrying subscription...';
+
+  @override
+  String get stSubscribeFailed => 'Subscription failed';
+
+  @override
+  String get stConnectTimeout => 'Connection timed out';
+
+  @override
+  String get stConnectCancelled => 'Connection cancelled';
+
+  @override
+  String get stDeviceDisconnected => 'Device disconnected';
 }

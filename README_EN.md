@@ -17,11 +17,13 @@ A cross-platform BLE heart rate monitor and push tool built with Flutter. After 
 
 ## ✨ Highlights
 - **BLE scan & connect**: Filters irrelevant advertisements and prioritizes heart-rate services / common wearables.
-- **Smart auto reconnect**: Remembers the last device; auto-reconnects on disconnection or stale data.
+- **Smart auto reconnect**: Remembers the last device; reconnects with backoff on disconnection or stale data (stops after repeated failures).
 - **Realtime display**: BPM, last update time, and RSSI. RSSI polling follows the refresh interval.
 - **Multi-protocol push**: HTTP/WS, OSC, and MQTT can be enabled independently with a unified JSON payload.
 - **Debug view**: Nearby advertisements, Service UUID, RSSI, manufacturer data length.
-- **Desktop UX**: Fixed portrait window on Windows/macOS/Linux; Windows tray support.
+- **Desktop UX**: Fixed portrait window on Windows/macOS/Linux; Windows minimizes to tray and keeps pushing.
+- **Setup UX**: First-run onboarding, inline validation, one-tap connection tests for HTTP/WS/OSC/MQTT.
+- **iOS Live Activity**: Live heart rate on the lock screen / Dynamic Island (iOS 16.1+).
 - **Android persistent notification**: Shows heart rate and connection status in the notification bar.
 
 ## 🗺️ Use Cases
@@ -44,7 +46,7 @@ A cross-platform BLE heart rate monitor and push tool built with Flutter. After 
 ## 🔗 Protocols & Data
 ### Protocols
 - **HTTP**: POST JSON to `http(s)://` endpoints (3s timeout).
-- **WebSocket**: Send JSON text to `ws(s)://` endpoints, auto-reconnects on disconnect.
+- **WebSocket**: Send JSON text to `ws(s)://` endpoints; auto-reconnects with exponential backoff (1-30s).
 - **OSC**: Send UDP messages to `host:port`, supports bool/int/float and ChatBox text.
 - **MQTT**: Enable by broker address; supports port/topic/user/pass/client ID, publishes with QoS 1.
 
@@ -75,6 +77,8 @@ All protocols use the same JSON payload.
 
 `percent = heartRate / maxHeartRate`, range 0-1.
 
+Heart-rate events carry both `heartRate` and `heart_rate` keys (same value): the former matches this document, the latter is the legacy-compatible key for existing webhooks.
+
 ## ⚙️ Settings
 | Item | Description | Default |
 | --- | --- | --- |
@@ -89,7 +93,9 @@ All protocols use the same JSON payload.
 | MQTT Port | Used when broker has no port | `1883` |
 | MQTT Topic | Publishes JSON payload | `hr_push` |
 | MQTT User/Pass | Optional | Empty |
-| MQTT Client ID | Auto-generated when empty | Empty |
+| MQTT Client ID | Default ID when empty | Empty |
+| MQTT TLS | Enable mqtts (usually port 8883) | Off |
+| MQTT Last-will topic | Publishes offline message on abnormal disconnect (optional) | Empty |
 | Max heart rate | For percent calculation | `200` |
 | Update interval (ms) | UI refresh, push throttle, RSSI poll | `1000` |
 
@@ -107,7 +113,7 @@ All protocols use the same JSON payload.
 ### Verified devices
 **BLE broadcast senders**
 1. Garmin Enduro 2 (watch HR broadcast)
-2. Xiaomi Smart Band 9 (enable HR broadcast in settings after firmware 1.3.206+; older bands may be unsupported or untested)
+2. Xiaomi Smart Band 9/10, Redmi Watch series (enable "Heart Rate Broadcast" on the device first — see below)
 
 **BLE broadcast receivers**
 1. iPhone 15 Pro (self-signing supported)
@@ -132,6 +138,16 @@ All protocols use the same JSON payload.
 - On Windows, running from non-ASCII paths may fail. Prefer an ASCII-only path.
 
 ## 🧾 Changelog
+### v1.8.0
+- **Redmi/Xiaomi watch compatibility**: scan filter accepts Redmi devices and unnamed heart-rate broadcasters; connect timeout honored, reconnect storms fixed (backoff + failure cap), zombie no-data connections detected, rotating-MAC name-based reconnect; a tri-lingual "enable Heart Rate Broadcast" guide appears when the HR service is missing.
+- **Settings page rebuild**: protocol-grouped sections with progressive disclosure, inline validation, one-tap HTTP/WS/OSC/MQTT connection tests, unsaved-changes guard, save feedback, live OSC status, first-run onboarding.
+- **MQTT**: TLS (mqtts/8883), password visibility toggle, last-will topic, stable default client ID.
+- **Push performance**: persistent HTTP connection reuse, parallel protocol fan-out (slow endpoints no longer block VRChat OSC), WebSocket exponential-backoff reconnect, OSC DNS caching, `hr_connected` sent on state change only.
+- **Payload**: added `event`/`connected`/`device` fields plus a `heart_rate` compatibility key; connection lifecycle events now reach HTTP/WS/MQTT.
+- **Platform features**: iOS Live Activities (lock screen / Dynamic Island, iOS 16.1+), Windows minimize-to-tray background running.
+- **UX & accessibility**: fully localized status text (incl. Android notification), OS text-scaling support, semantics labels, heart animation repaint optimizations.
+- **Stability**: Android scan-throttling self-healing, nearby list expanded to 15 with anti-flicker TTL, resource-dispose fixes; removed 5 dead modules; tests 25 → 51.
+
 ### v1.6.1
 - **Android Optimization**: Updated Proguard rules and optimized build minification.
 - **BLE Adapter Refinement**: Fine-tuned `universal_ble` adapter layer for better stability.
@@ -207,3 +223,14 @@ MIT License. See `LICENSE` for details.
 
 ## 🤝 Feedback
 Issues and PRs are welcome. Please attach logs and environment info if possible.
+
+### 🔴 Xiaomi / Redmi watches (important)
+
+Xiaomi and Redmi watches use Xiaomi's proprietary BLE protocol (server-based pairing) by default and do NOT expose the standard heart rate service. To use them with HR PUSH, enable "Heart Rate Broadcast" on the watch:
+
+1. On the watch, open **Settings → Heart Rate** and enable **Heart Rate Broadcast** (a.k.a. "Share HR").
+2. Make sure the watch is not connected to the Mi Fitness app (BLE allows a single connection).
+3. Rescan in HR PUSH and connect.
+
+Once enabled the watch advertises the standard heart rate service (0x180D) and connects without pairing. If the HR service is still missing after connecting, the app shows this guidance automatically.
+

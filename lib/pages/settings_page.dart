@@ -1,443 +1,162 @@
-import 'dart:io' show Platform;
-
 import 'package:flutter/cupertino.dart';
+
+import '../heart_rate_manager.dart';
 import '../l10n/app_localizations.dart';
-import '../hr_notification_service.dart';
+import '../l10n/l10n_keys.dart';
 import '../models/models.dart';
 import '../theme/design_system.dart';
-import 'log_detail_page.dart';
+import '../widgets/settings/settings_toast.dart';
+import 'settings/general_section.dart';
+import 'settings/mqtt_section.dart';
+import 'settings/osc_section.dart';
+import 'settings/push_section.dart';
+import 'settings/settings_section_contract.dart';
 
+/// Settings page shell: owns save/dirty handling and composes the protocol
+/// sections (each section validates its own fields).
 class SettingsPage extends StatefulWidget {
-  const SettingsPage({super.key, required this.initial});
+  const SettingsPage({super.key, required this.initial, this.manager});
 
   final HeartRateSettings initial;
+  final HeartRateManager? manager;
 
   @override
   State<SettingsPage> createState() => _SettingsPageState();
 }
 
 class _SettingsPageState extends State<SettingsPage> {
-  // Controllers
-  late final TextEditingController _pushCtrl;
-  late final TextEditingController _oscCtrl;
-  late final TextEditingController _oscConnectedCtrl;
-  late final TextEditingController _oscValueCtrl;
-  late final TextEditingController _oscPercentCtrl;
-  late final TextEditingController _oscHeartbeatIntCtrl;
-  late final TextEditingController _oscHeartbeatPulseCtrl;
-  late final TextEditingController _oscHeartbeatToggleCtrl;
-  late final TextEditingController _oscHeartbeatPulseDurationCtrl;
-  late final TextEditingController _oscChatboxTemplateCtrl;
-  late final TextEditingController _maxHrCtrl;
-  late final TextEditingController _intervalCtrl;
-  late final TextEditingController _mqttBrokerCtrl;
-  late final TextEditingController _mqttPortCtrl;
-  late final TextEditingController _mqttTopicCtrl;
-  late final TextEditingController _mqttUsernameCtrl;
-  late final TextEditingController _mqttPasswordCtrl;
-  late final TextEditingController _mqttClientIdCtrl;
+  final _pushKey = GlobalKey<PushSettingsSectionState>();
+  final _oscKey = GlobalKey<OscSettingsSectionState>();
+  final _mqttKey = GlobalKey<MqttSettingsSectionState>();
+  final _generalKey = GlobalKey<GeneralSettingsSectionState>();
 
-  bool _oscChatboxEnabled = false;
-  bool _oscHeartbeatIntEnabled = false;
-  bool _oscHeartbeatPulseEnabled = false;
-  bool _oscHeartbeatToggleEnabled = false;
-  bool _logEnabled = false;
+  bool _dirty = false;
 
-  @override
-  void initState() {
-    super.initState();
-    // Initialize with values
-    _pushCtrl = TextEditingController(text: widget.initial.pushEndpoint);
-    _oscCtrl = TextEditingController(text: widget.initial.oscAddress);
-    _oscConnectedCtrl = TextEditingController(
-      text: widget.initial.oscHrConnectedPath,
-    );
-    _oscValueCtrl = TextEditingController(text: widget.initial.oscHrValuePath);
-    _oscPercentCtrl = TextEditingController(
-      text: widget.initial.oscHrPercentPath,
-    );
-    _oscHeartbeatIntCtrl = TextEditingController(
-      text: widget.initial.oscHeartbeatIntPath,
-    );
-    _oscHeartbeatPulseCtrl = TextEditingController(
-      text: widget.initial.oscHeartbeatPulsePath,
-    );
-    _oscHeartbeatToggleCtrl = TextEditingController(
-      text: widget.initial.oscHeartbeatTogglePath,
-    );
-    _oscHeartbeatPulseDurationCtrl = TextEditingController(
-      text: widget.initial.oscHeartbeatPulseDurationMs.toString(),
-    );
-    _oscChatboxTemplateCtrl = TextEditingController(
-      text: widget.initial.oscChatboxTemplate,
-    );
-    _maxHrCtrl = TextEditingController(
-      text: widget.initial.maxHeartRate.toString(),
-    );
-    _intervalCtrl = TextEditingController(
-      text: widget.initial.updateIntervalMs.toString(),
-    );
-
-    _oscChatboxEnabled = widget.initial.oscChatboxEnabled;
-    _oscHeartbeatIntEnabled = widget.initial.oscHeartbeatIntEnabled;
-    _oscHeartbeatPulseEnabled = widget.initial.oscHeartbeatPulseEnabled;
-    _oscHeartbeatToggleEnabled = widget.initial.oscHeartbeatToggleEnabled;
-    _logEnabled = widget.initial.logEnabled;
-
-    _mqttBrokerCtrl = TextEditingController(text: widget.initial.mqttBroker);
-    _mqttPortCtrl = TextEditingController(
-      text: widget.initial.mqttPort.toString(),
-    );
-    _mqttTopicCtrl = TextEditingController(text: widget.initial.mqttTopic);
-    _mqttUsernameCtrl = TextEditingController(
-      text: widget.initial.mqttUsername,
-    );
-    _mqttPasswordCtrl = TextEditingController(
-      text: widget.initial.mqttPassword,
-    );
-    _mqttClientIdCtrl = TextEditingController(
-      text: widget.initial.mqttClientId,
-    );
-
-    // Set defaults if empty
-    if (_oscCtrl.text.isEmpty) {
-      _oscCtrl.text = '127.0.0.1:9000';
-    }
-    if (_mqttTopicCtrl.text.isEmpty) {
-      _mqttTopicCtrl.text = 'hr_push';
-    }
-    if (_oscConnectedCtrl.text.isEmpty) {
-      _oscConnectedCtrl.text = '/avatar/parameters/hr_connected';
-    }
-    if (_oscValueCtrl.text.isEmpty) {
-      _oscValueCtrl.text = '/avatar/parameters/hr_val';
-    }
-    if (_oscPercentCtrl.text.isEmpty) {
-      _oscPercentCtrl.text = '/avatar/parameters/hr_percent';
-    }
-    if (_oscHeartbeatIntCtrl.text.isEmpty) {
-      _oscHeartbeatIntCtrl.text = '/avatar/parameters/HeartBeatInt';
-    }
-    if (_oscHeartbeatPulseCtrl.text.isEmpty) {
-      _oscHeartbeatPulseCtrl.text = '/avatar/parameters/HeartBeatPulse';
-    }
-    if (_oscHeartbeatToggleCtrl.text.isEmpty) {
-      _oscHeartbeatToggleCtrl.text = '/avatar/parameters/HeartBeatToggle';
-    }
-    if (_oscChatboxTemplateCtrl.text.isEmpty) {
-      _oscChatboxTemplateCtrl.text = '💓{hr}';
-    }
+  void _onSectionChanged() {
+    final dirty = _allSections.any((s) => s.isDirty());
+    if (dirty != _dirty) setState(() => _dirty = dirty);
   }
 
-  @override
-  void dispose() {
-    _pushCtrl.dispose();
-    _oscCtrl.dispose();
-    _oscConnectedCtrl.dispose();
-    _oscValueCtrl.dispose();
-    _oscPercentCtrl.dispose();
-    _oscHeartbeatIntCtrl.dispose();
-    _oscHeartbeatPulseCtrl.dispose();
-    _oscHeartbeatToggleCtrl.dispose();
-    _oscHeartbeatPulseDurationCtrl.dispose();
-    _oscChatboxTemplateCtrl.dispose();
-    _maxHrCtrl.dispose();
-    _intervalCtrl.dispose();
-    _mqttBrokerCtrl.dispose();
-    _mqttPortCtrl.dispose();
-    _mqttTopicCtrl.dispose();
-    _mqttUsernameCtrl.dispose();
-    _mqttPasswordCtrl.dispose();
-    _mqttClientIdCtrl.dispose();
-    super.dispose();
+  /// Sections that have been built. Sections below the fold of the lazy
+  /// ListView are absent — untouched fields equal the initial settings, so
+  /// they cannot be dirty or invalid.
+  List<SettingsSectionContract> get _allSections => [
+    _pushKey.currentState,
+    _oscKey.currentState,
+    _mqttKey.currentState,
+    _generalKey.currentState,
+  ].whereType<SettingsSectionContract>().toList();
+
+  Future<void> _onSave() async {
+    final l10n = AppLocalizations.of(context)!;
+    final errors = <String>[
+      for (final section in _allSections) ...section.validate(),
+    ];
+    if (errors.isNotEmpty) {
+      showSettingsToast(
+        context,
+        resolveL10nKey(l10n, 'fixErrorsBeforeSave'),
+        isError: true,
+      );
+      return;
+    }
+
+    var settings = widget.initial;
+    for (final section in _allSections) {
+      settings = section.merge(settings);
+    }
+
+    setState(() => _dirty = false);
+    showSettingsToast(context, resolveL10nKey(l10n, 'savedToast'));
+    await Future<void>.delayed(const Duration(milliseconds: 500));
+    if (mounted) Navigator.of(context).pop(settings);
+  }
+
+  Future<bool> _confirmDiscard() async {
+    final l10n = AppLocalizations.of(context)!;
+    final discard = await showCupertinoDialog<bool>(
+      context: context,
+      builder: (dialogContext) => CupertinoAlertDialog(
+        title: Text(l10n.unsavedTitle),
+        content: Padding(
+          padding: const EdgeInsets.only(top: 8),
+          child: Text(l10n.unsavedBody),
+        ),
+        actions: [
+          CupertinoDialogAction(
+            onPressed: () => Navigator.of(dialogContext).pop(false),
+            isDefaultAction: true,
+            child: Text(l10n.unsavedKeepEditing),
+          ),
+          CupertinoDialogAction(
+            onPressed: () => Navigator.of(dialogContext).pop(true),
+            isDestructiveAction: true,
+            child: Text(l10n.unsavedDiscard),
+          ),
+        ],
+      ),
+    );
+    return discard ?? false;
   }
 
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
 
-    return CupertinoPageScaffold(
-      backgroundColor: AppColors.bgPrimary,
-      navigationBar: CupertinoNavigationBar(
-        middle: Text(l10n.settingsTitle),
-        previousPageTitle: l10n.back,
-        trailing: CupertinoButton(
-          padding: EdgeInsets.zero,
-          onPressed: _onSave,
-          child: Text(l10n.save),
+    return PopScope(
+      canPop: !_dirty,
+      onPopInvokedWithResult: (didPop, result) async {
+        if (didPop) return;
+        final navigator = Navigator.of(context);
+        final discard = await _confirmDiscard();
+        if (!mounted) return;
+        if (discard) navigator.pop();
+      },
+      child: CupertinoPageScaffold(
+        backgroundColor: AppColors.bgPrimary,
+        navigationBar: CupertinoNavigationBar(
+          middle: Text(l10n.settingsTitle),
+          previousPageTitle: l10n.back,
+          trailing: CupertinoButton(
+            padding: EdgeInsets.zero,
+            onPressed: _onSave,
+            child: Text(
+              l10n.save,
+              style: _dirty
+                  ? const TextStyle(fontWeight: FontWeight.w700)
+                  : const TextStyle(),
+            ),
+          ),
         ),
-      ),
-      child: SafeArea(
-        child: ListView(
-          children: [
-            _buildSection(
-              header: l10n.sectionWebHttp,
-              children: [
-                _buildInput(
-                  controller: _pushCtrl,
-                  label: l10n.fieldEndpoint,
-                  placeholder: 'http:// or ws://',
-                ),
-                _buildInput(
-                  controller: _intervalCtrl,
-                  label: l10n.fieldInterval,
-                  keyboardType: TextInputType.number,
-                ),
-              ],
-            ),
-
-            _buildSection(
-              header: l10n.sectionVrchatOsc,
-              children: [
-                _buildInput(
-                  controller: _oscCtrl,
-                  label: l10n.fieldAddress,
-                  placeholder: '127.0.0.1:9000',
-                ),
-                _buildInput(
-                  controller: _oscConnectedCtrl,
-                  label: l10n.fieldConnectedParam,
-                ),
-                _buildInput(
-                  controller: _oscValueCtrl,
-                  label: l10n.fieldHrValueParam,
-                ),
-                _buildInput(
-                  controller: _oscPercentCtrl,
-                  label: l10n.fieldHrPercentParam,
-                ),
-                CupertinoFormRow(
-                  prefix: Text(l10n.fieldHeartbeatInt),
-                  child: CupertinoSwitch(
-                    value: _oscHeartbeatIntEnabled,
-                    activeTrackColor: AppColors.accent,
-                    onChanged: (value) =>
-                        setState(() => _oscHeartbeatIntEnabled = value),
-                  ),
-                ),
-                if (_oscHeartbeatIntEnabled)
-                  _buildInput(
-                    controller: _oscHeartbeatIntCtrl,
-                    label: l10n.fieldHeartbeatIntPath,
-                  ),
-                CupertinoFormRow(
-                  prefix: Text(l10n.fieldHeartbeatPulse),
-                  child: CupertinoSwitch(
-                    value: _oscHeartbeatPulseEnabled,
-                    activeTrackColor: AppColors.accent,
-                    onChanged: (value) =>
-                        setState(() => _oscHeartbeatPulseEnabled = value),
-                  ),
-                ),
-                if (_oscHeartbeatPulseEnabled)
-                  _buildInput(
-                    controller: _oscHeartbeatPulseCtrl,
-                    label: l10n.fieldHeartbeatPulsePath,
-                  ),
-                CupertinoFormRow(
-                  prefix: Text(l10n.fieldHeartbeatToggle),
-                  child: CupertinoSwitch(
-                    value: _oscHeartbeatToggleEnabled,
-                    activeTrackColor: AppColors.accent,
-                    onChanged: (value) =>
-                        setState(() => _oscHeartbeatToggleEnabled = value),
-                  ),
-                ),
-                if (_oscHeartbeatToggleEnabled)
-                  _buildInput(
-                    controller: _oscHeartbeatToggleCtrl,
-                    label: l10n.fieldHeartbeatTogglePath,
-                  ),
-                _buildInput(
-                  controller: _oscHeartbeatPulseDurationCtrl,
-                  label: l10n.fieldHeartbeatDuration,
-                  keyboardType: TextInputType.number,
-                ),
-                _buildInput(
-                  controller: _maxHrCtrl,
-                  label: l10n.fieldMaxHr,
-                  keyboardType: TextInputType.number,
-                ),
-              ],
-            ),
-
-            _buildSection(
-              header: l10n.sectionOscChatbox,
-              children: [
-                CupertinoFormRow(
-                  prefix: Text(l10n.fieldEnabled),
-                  child: CupertinoSwitch(
-                    value: _oscChatboxEnabled,
-                    activeTrackColor: AppColors.accent,
-                    onChanged: (v) => setState(() => _oscChatboxEnabled = v),
-                  ),
-                ),
-                if (_oscChatboxEnabled)
-                  _buildInput(
-                    controller: _oscChatboxTemplateCtrl,
-                    label: l10n.fieldTemplate,
-                    placeholder: '💓{hr}',
-                  ),
-              ],
-            ),
-
-            if (Platform.isAndroid)
-              _buildSection(
-                header: l10n.sectionBackgroundRuntime,
-                children: [
-                  CupertinoButton(
-                    onPressed: () async {
-                      await HrNotificationService()
-                          .openBackgroundRuntimeSettings();
-                    },
-                    child: Text(l10n.btnBackgroundRuntime),
-                  ),
-                ],
+        child: SafeArea(
+          child: ListView(
+            children: [
+              PushSettingsSection(
+                key: _pushKey,
+                initial: widget.initial,
+                onChanged: _onSectionChanged,
               ),
-
-            _buildSection(
-              header: l10n.sectionMqtt,
-              children: [
-                _buildInput(
-                  controller: _mqttBrokerCtrl,
-                  label: l10n.fieldBroker,
-                  placeholder: 'broker.hivemq.com',
-                ),
-                _buildInput(
-                  controller: _mqttPortCtrl,
-                  label: l10n.fieldPort,
-                  keyboardType: TextInputType.number,
-                ),
-                _buildInput(controller: _mqttTopicCtrl, label: l10n.fieldTopic),
-                _buildInput(
-                  controller: _mqttUsernameCtrl,
-                  label: l10n.fieldUsername,
-                ),
-                _buildInput(
-                  controller: _mqttPasswordCtrl,
-                  label: l10n.fieldPassword,
-                  obscureText: true,
-                ),
-                _buildInput(
-                  controller: _mqttClientIdCtrl,
-                  label: l10n.fieldClientId,
-                ),
-              ],
-            ),
-
-            _buildSection(
-              header: l10n.sectionDebugging,
-              children: [
-                CupertinoFormRow(
-                  prefix: Text(l10n.fieldEnableLogs),
-                  child: CupertinoSwitch(
-                    value: _logEnabled,
-                    activeTrackColor: AppColors.accent,
-                    onChanged: (v) => setState(() => _logEnabled = v),
-                  ),
-                ),
-                if (_logEnabled)
-                  CupertinoButton(
-                    child: Text(l10n.btnViewLogs),
-                    onPressed: () {
-                      Navigator.of(context).push(
-                        CupertinoPageRoute(
-                          builder: (_) => const LogDetailPage(),
-                        ),
-                      );
-                    },
-                  ),
-              ],
-            ),
-            const SizedBox(height: 20),
-            Center(
-              child: Text(
-                'v1.7.3',
-                style: AppTypography.caption.copyWith(
-                  color: AppColors.textTertiary.resolveFrom(context),
-                ),
+              OscSettingsSection(
+                key: _oscKey,
+                initial: widget.initial,
+                manager: widget.manager,
+                onChanged: _onSectionChanged,
               ),
-            ),
-            const SizedBox(height: 30),
-          ],
+              MqttSettingsSection(
+                key: _mqttKey,
+                initial: widget.initial,
+                onChanged: _onSectionChanged,
+              ),
+              GeneralSettingsSection(
+                key: _generalKey,
+                initial: widget.initial,
+                onChanged: _onSectionChanged,
+              ),
+              const SizedBox(height: 30),
+            ],
+          ),
         ),
       ),
     );
-  }
-
-  Widget _buildSection({
-    required String header,
-    required List<Widget> children,
-  }) {
-    return CupertinoFormSection.insetGrouped(
-      header: Text(header.toUpperCase()),
-      backgroundColor: AppColors.bgPrimary,
-      decoration: BoxDecoration(
-        color: AppColors.bgSecondary.resolveFrom(context),
-        borderRadius: BorderRadius.circular(AppRadius.r12),
-      ),
-      children: children,
-    );
-  }
-
-  Widget _buildInput({
-    required TextEditingController controller,
-    required String label,
-    String? placeholder,
-    TextInputType? keyboardType,
-    bool obscureText = false,
-  }) {
-    return CupertinoFormRow(
-      prefix: Text(label),
-      child: CupertinoTextField(
-        controller: controller,
-        placeholder: placeholder,
-        keyboardType: keyboardType,
-        obscureText: obscureText,
-        textAlign: TextAlign.end,
-        decoration: null,
-        style: AppTypography.body.copyWith(
-          color: AppColors.textPrimary.resolveFrom(context),
-        ),
-        placeholderStyle: AppTypography.body.copyWith(
-          color: AppColors.textTertiary.resolveFrom(context),
-        ),
-      ),
-    );
-  }
-
-  void _onSave() {
-    final pulseDuration = int.tryParse(
-      _oscHeartbeatPulseDurationCtrl.text.trim(),
-    );
-    final updated = widget.initial.copyWith(
-      pushEndpoint: _pushCtrl.text.trim(),
-      oscAddress: _oscCtrl.text.trim(),
-      oscHrConnectedPath: _oscConnectedCtrl.text.trim(),
-      oscHrValuePath: _oscValueCtrl.text.trim(),
-      oscHrPercentPath: _oscPercentCtrl.text.trim(),
-      oscHeartbeatIntPath: _oscHeartbeatIntCtrl.text.trim(),
-      oscHeartbeatPulsePath: _oscHeartbeatPulseCtrl.text.trim(),
-      oscHeartbeatTogglePath: _oscHeartbeatToggleCtrl.text.trim(),
-      oscHeartbeatIntEnabled: _oscHeartbeatIntEnabled,
-      oscHeartbeatPulseEnabled: _oscHeartbeatPulseEnabled,
-      oscHeartbeatToggleEnabled: _oscHeartbeatToggleEnabled,
-      oscHeartbeatPulseDurationMs:
-          pulseDuration != null && pulseDuration >= 20 && pulseDuration <= 1000
-          ? pulseDuration
-          : 120,
-      oscChatboxEnabled: _oscChatboxEnabled,
-      oscChatboxTemplate: _oscChatboxTemplateCtrl.text.trim(),
-      maxHeartRate: int.tryParse(_maxHrCtrl.text.trim()) ?? 200,
-      updateIntervalMs: int.tryParse(_intervalCtrl.text.trim()) ?? 1000,
-      logEnabled: _logEnabled,
-      mqttBroker: _mqttBrokerCtrl.text.trim(),
-      mqttPort: int.tryParse(_mqttPortCtrl.text.trim()) ?? 1883,
-      mqttTopic: _mqttTopicCtrl.text.trim(),
-      mqttUsername: _mqttUsernameCtrl.text.trim(),
-      mqttPassword: _mqttPasswordCtrl.text,
-      mqttClientId: _mqttClientIdCtrl.text.trim(),
-    );
-    Navigator.of(context).pop(updated);
   }
 }

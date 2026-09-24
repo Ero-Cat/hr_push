@@ -3,6 +3,7 @@ import '../l10n/app_localizations.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:provider/provider.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:window_manager/window_manager.dart';
 
 import '../heart_rate_manager.dart';
@@ -10,10 +11,101 @@ import '../models/models.dart';
 import '../theme/design_system.dart';
 import '../widgets/hero_card.dart';
 import '../widgets/nearby_list.dart';
+import 'onboarding_page.dart';
 import 'settings_page.dart';
 
-class HeartDashboard extends StatelessWidget {
+class HeartDashboard extends StatefulWidget {
   const HeartDashboard({super.key});
+
+  @override
+  State<HeartDashboard> createState() => _HeartDashboardState();
+}
+
+class _HeartDashboardState extends State<HeartDashboard> {
+  HeartRateManager? _manager;
+  bool _guideShowing = false;
+
+  static const _kOnboardingDone = 'onboarding_done';
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      final mgr = context.read<HeartRateManager>();
+      _manager = mgr;
+      mgr.addListener(_onManagerUpdate);
+      _onManagerUpdate();
+      _maybeShowOnboarding();
+    });
+  }
+
+  Future<void> _maybeShowOnboarding() async {
+    final prefs = await SharedPreferences.getInstance();
+    if (prefs.getBool(_kOnboardingDone) ?? false) return;
+    if (!mounted) return;
+
+    // Whether finished, skipped or backed out, mark as seen.
+    await Navigator.of(context).push<bool>(
+      CupertinoPageRoute(
+        fullscreenDialog: true,
+        builder: (_) =>
+            OnboardingPage(onFinished: (_) => Navigator.of(context).pop(true)),
+      ),
+    );
+    await prefs.setBool(_kOnboardingDone, true);
+  }
+
+  @override
+  void dispose() {
+    _manager?.removeListener(_onManagerUpdate);
+    super.dispose();
+  }
+
+  void _onManagerUpdate() {
+    final mgr = _manager;
+    if (mgr == null || !mounted) return;
+    if (mgr.xiaomiGuidePending && !_guideShowing) {
+      _guideShowing = true;
+      _showXiaomiGuide(mgr);
+    }
+  }
+
+  /// Guidance for Xiaomi/Redmi wearables that connect but never expose the
+  /// standard heart rate service: they need "Heart Rate Broadcast" enabled
+  /// on the watch first.
+  void _showXiaomiGuide(HeartRateManager mgr) {
+    final l10n = AppLocalizations.of(context)!;
+    final result = showCupertinoDialog<String>(
+      context: context,
+      barrierDismissible: true,
+      builder: (dialogContext) => CupertinoAlertDialog(
+        title: Text(l10n.xiaomiGuideTitle),
+        content: Padding(
+          padding: const EdgeInsets.only(top: 8),
+          child: Text(l10n.xiaomiGuideBody),
+        ),
+        actions: [
+          CupertinoDialogAction(
+            onPressed: () => Navigator.of(dialogContext).pop('rescan'),
+            child: Text(l10n.xiaomiGuideRescan),
+          ),
+          CupertinoDialogAction(
+            isDefaultAction: true,
+            onPressed: () => Navigator.of(dialogContext).pop(),
+            child: Text(l10n.xiaomiGuideGotIt),
+          ),
+        ],
+      ),
+    );
+    result.then((action) {
+      _guideShowing = false;
+      mgr.dismissXiaomiGuide();
+      if (action == 'rescan') {
+        mgr.restartScan();
+      }
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -43,20 +135,32 @@ class HeartDashboard extends StatelessWidget {
                 CupertinoButton(
                   padding: EdgeInsets.zero,
                   onPressed: () => _openSettings(context),
-                  child: const Icon(CupertinoIcons.gear_alt_fill),
+                  child: Semantics(
+                    label: l10n.settingsTitle,
+                    button: true,
+                    child: const Icon(CupertinoIcons.gear_alt_fill),
+                  ),
                 ),
                 if (isWindows) ...[
                   const SizedBox(width: 16),
                   CupertinoButton(
                     padding: EdgeInsets.zero,
                     onPressed: () => windowManager.minimize(),
-                    child: const Icon(CupertinoIcons.minus, size: 20),
+                    child: Semantics(
+                      label: 'Minimize',
+                      button: true,
+                      child: const Icon(CupertinoIcons.minus, size: 20),
+                    ),
                   ),
                   const SizedBox(width: 8),
                   CupertinoButton(
                     padding: EdgeInsets.zero,
                     onPressed: () => windowManager.close(),
-                    child: const Icon(CupertinoIcons.xmark, size: 20),
+                    child: Semantics(
+                      label: 'Close',
+                      button: true,
+                      child: const Icon(CupertinoIcons.xmark, size: 20),
+                    ),
                   ),
                 ],
               ],
@@ -95,7 +199,9 @@ class HeartDashboard extends StatelessWidget {
   Future<void> _openSettings(BuildContext context) async {
     final mgr = context.read<HeartRateManager>();
     final updated = await Navigator.of(context).push<HeartRateSettings>(
-      CupertinoPageRoute(builder: (_) => SettingsPage(initial: mgr.settings)),
+      CupertinoPageRoute(
+        builder: (_) => SettingsPage(initial: mgr.settings, manager: mgr),
+      ),
     );
     if (updated != null) {
       await mgr.updateSettings(updated);

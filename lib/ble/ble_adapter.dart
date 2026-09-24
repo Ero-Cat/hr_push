@@ -142,6 +142,10 @@ abstract class BleAdapter {
     bool withResponse = true,
   });
 
+  /// Release per-device resources after disconnect so long sessions do not
+  /// accumulate state for every address seen (relevant for rotating MACs).
+  void cleanupDevice(String deviceId) {}
+
   /// Dispose resources
   void dispose();
 }

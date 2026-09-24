@@ -1,8 +1,9 @@
 import 'dart:io' show Platform;
 
-import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
+
+import 'app_log.dart';
 
 class HrNotificationService {
   static const _channel = MethodChannel('moe.iacg.hrpush/notification');
@@ -52,9 +53,10 @@ class HrNotificationService {
         'bpm': 0,
         'deviceName': '',
         'isConnected': false,
+        'status': status ?? '',
       });
     } catch (e) {
-      debugPrint('Error updating notification: $e');
+      _logError('updateNotification', e);
     }
   }
 
@@ -62,6 +64,7 @@ class HrNotificationService {
     required String deviceName,
     int? bpm,
     DateTime? lastUpdated,
+    String? status,
   }) async {
     if (!_isAndroid()) return;
     try {
@@ -69,9 +72,10 @@ class HrNotificationService {
         'bpm': bpm ?? 0,
         'deviceName': deviceName,
         'isConnected': true,
+        'status': status ?? '',
       });
     } catch (e) {
-      debugPrint('Error updating notification: $e');
+      _logError('updateNotification', e);
     }
   }
 
@@ -85,7 +89,7 @@ class HrNotificationService {
       });
       return true;
     } catch (e) {
-      debugPrint('Error starting foreground service: $e');
+      _logError('startForegroundService', e);
       return false;
     }
   }
@@ -98,7 +102,7 @@ class HrNotificationService {
           ) ??
           false;
     } catch (e) {
-      debugPrint('Error opening background runtime settings: $e');
+      _logError('openBackgroundRuntimeSettings', e);
       return false;
     }
   }
@@ -108,9 +112,15 @@ class HrNotificationService {
     try {
       await _channel.invokeMethod('stopForegroundService');
     } catch (e) {
-      debugPrint('Error stopping foreground service: $e');
+      _logError('stopForegroundService', e);
     }
   }
 
   Future<void> cancel() => stop();
+
+  void _logError(String op, Object e) {
+    // Route through AppLog so failures are visible in the in-app log viewer
+    // instead of only in console output.
+    AppLog.error('notification $op failed', error: e);
+  }
 }

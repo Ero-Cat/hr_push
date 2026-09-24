@@ -579,6 +579,354 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Connected'**
   String get deviceConnected;
+
+  /// No description provided for @xiaomiGuideTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Heart rate service not found'**
+  String get xiaomiGuideTitle;
+
+  /// No description provided for @xiaomiGuideBody.
+  ///
+  /// In en, this message translates to:
+  /// **'Xiaomi/Redmi watches only expose the standard heart rate service after you enable Heart Rate Broadcast on the watch:\n\n1. On the watch, open Settings → Heart Rate and turn on \"Heart Rate Broadcast\" (or \"Share HR\")\n2. Make sure the watch is not connected to the Mi Fitness app\n3. Come back here and rescan, then connect'**
+  String get xiaomiGuideBody;
+
+  /// No description provided for @xiaomiGuideRescan.
+  ///
+  /// In en, this message translates to:
+  /// **'Rescan'**
+  String get xiaomiGuideRescan;
+
+  /// No description provided for @xiaomiGuideGotIt.
+  ///
+  /// In en, this message translates to:
+  /// **'Got it'**
+  String get xiaomiGuideGotIt;
+
+  /// No description provided for @sectionGeneral.
+  ///
+  /// In en, this message translates to:
+  /// **'General'**
+  String get sectionGeneral;
+
+  /// No description provided for @showAdvanced.
+  ///
+  /// In en, this message translates to:
+  /// **'Show advanced'**
+  String get showAdvanced;
+
+  /// No description provided for @hideAdvanced.
+  ///
+  /// In en, this message translates to:
+  /// **'Hide advanced'**
+  String get hideAdvanced;
+
+  /// No description provided for @hintOscEmpty.
+  ///
+  /// In en, this message translates to:
+  /// **'Leave empty to disable OSC push'**
+  String get hintOscEmpty;
+
+  /// No description provided for @btnFillDefault.
+  ///
+  /// In en, this message translates to:
+  /// **'Use default'**
+  String get btnFillDefault;
+
+  /// No description provided for @btnTest.
+  ///
+  /// In en, this message translates to:
+  /// **'Test'**
+  String get btnTest;
+
+  /// No description provided for @testSuccess.
+  ///
+  /// In en, this message translates to:
+  /// **'Test passed'**
+  String get testSuccess;
+
+  /// No description provided for @testFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Failed'**
+  String get testFailed;
+
+  /// No description provided for @hintOscNote.
+  ///
+  /// In en, this message translates to:
+  /// **'OSC is connectionless; the test only verifies the datagram can be sent'**
+  String get hintOscNote;
+
+  /// No description provided for @errInvalidUrl.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter a valid http/https/ws/wss URL'**
+  String get errInvalidUrl;
+
+  /// No description provided for @errInvalidOscAddress.
+  ///
+  /// In en, this message translates to:
+  /// **'Expected host:port (port 1-65535)'**
+  String get errInvalidOscAddress;
+
+  /// No description provided for @errInvalidOscPath.
+  ///
+  /// In en, this message translates to:
+  /// **'OSC path must start with /'**
+  String get errInvalidOscPath;
+
+  /// No description provided for @errInvalidPort.
+  ///
+  /// In en, this message translates to:
+  /// **'Port must be between 1 and 65535'**
+  String get errInvalidPort;
+
+  /// No description provided for @errInvalidInterval.
+  ///
+  /// In en, this message translates to:
+  /// **'Interval must be between 250 and 60000 ms'**
+  String get errInvalidInterval;
+
+  /// No description provided for @errInvalidMaxHr.
+  ///
+  /// In en, this message translates to:
+  /// **'Max heart rate must be between 100 and 250'**
+  String get errInvalidMaxHr;
+
+  /// No description provided for @errInvalidPulseDuration.
+  ///
+  /// In en, this message translates to:
+  /// **'Pulse duration must be between 20 and 1000 ms'**
+  String get errInvalidPulseDuration;
+
+  /// No description provided for @unsavedTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Unsaved changes'**
+  String get unsavedTitle;
+
+  /// No description provided for @unsavedBody.
+  ///
+  /// In en, this message translates to:
+  /// **'Leaving will discard your changes. Continue?'**
+  String get unsavedBody;
+
+  /// No description provided for @unsavedDiscard.
+  ///
+  /// In en, this message translates to:
+  /// **'Discard'**
+  String get unsavedDiscard;
+
+  /// No description provided for @unsavedKeepEditing.
+  ///
+  /// In en, this message translates to:
+  /// **'Keep editing'**
+  String get unsavedKeepEditing;
+
+  /// No description provided for @savedToast.
+  ///
+  /// In en, this message translates to:
+  /// **'Settings saved'**
+  String get savedToast;
+
+  /// No description provided for @fixErrorsBeforeSave.
+  ///
+  /// In en, this message translates to:
+  /// **'Fix the highlighted fields first'**
+  String get fixErrorsBeforeSave;
+
+  /// No description provided for @fieldMqttTls.
+  ///
+  /// In en, this message translates to:
+  /// **'Use TLS (mqtts)'**
+  String get fieldMqttTls;
+
+  /// No description provided for @fieldMqttLwtTopic.
+  ///
+  /// In en, this message translates to:
+  /// **'Last-will topic (optional)'**
+  String get fieldMqttLwtTopic;
+
+  /// No description provided for @hintMqttLwt.
+  ///
+  /// In en, this message translates to:
+  /// **'Publishes an offline message to this topic on abnormal disconnect'**
+  String get hintMqttLwt;
+
+  /// No description provided for @hintClientId.
+  ///
+  /// In en, this message translates to:
+  /// **'Uses a default client ID when empty'**
+  String get hintClientId;
+
+  /// No description provided for @showPassword.
+  ///
+  /// In en, this message translates to:
+  /// **'Show password'**
+  String get showPassword;
+
+  /// No description provided for @onbSkip.
+  ///
+  /// In en, this message translates to:
+  /// **'Skip'**
+  String get onbSkip;
+
+  /// No description provided for @onbNext.
+  ///
+  /// In en, this message translates to:
+  /// **'Next'**
+  String get onbNext;
+
+  /// No description provided for @onbDone.
+  ///
+  /// In en, this message translates to:
+  /// **'Get started'**
+  String get onbDone;
+
+  /// No description provided for @onbTitle1.
+  ///
+  /// In en, this message translates to:
+  /// **'Welcome to HR PUSH'**
+  String get onbTitle1;
+
+  /// No description provided for @onbBody1.
+  ///
+  /// In en, this message translates to:
+  /// **'Read live heart rate from your strap or watch and push it to HTTP/WebSocket, VRChat OSC and MQTT.'**
+  String get onbBody1;
+
+  /// No description provided for @onbTitle2.
+  ///
+  /// In en, this message translates to:
+  /// **'Connect a device'**
+  String get onbTitle2;
+
+  /// No description provided for @onbBody2.
+  ///
+  /// In en, this message translates to:
+  /// **'Wear your heart rate device and tap it under \"Nearby devices\" to connect.\n\nXiaomi/Redmi watches: enable \"Heart Rate Broadcast\" on the watch first (Settings → Heart Rate).'**
+  String get onbBody2;
+
+  /// No description provided for @onbTitle3.
+  ///
+  /// In en, this message translates to:
+  /// **'Set up push'**
+  String get onbTitle3;
+
+  /// No description provided for @onbBody3.
+  ///
+  /// In en, this message translates to:
+  /// **'Open Settings to enter your webhook, OSC or MQTT address. Use the Test button to verify connectivity; data pushes in real time after saving.'**
+  String get onbBody3;
+
+  /// No description provided for @stPermissionFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Permission check failed'**
+  String get stPermissionFailed;
+
+  /// No description provided for @stConnectFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Connection failed'**
+  String get stConnectFailed;
+
+  /// No description provided for @stWaitingBroadcast.
+  ///
+  /// In en, this message translates to:
+  /// **'Waiting for device broadcast...'**
+  String get stWaitingBroadcast;
+
+  /// No description provided for @stReconnectGaveUp.
+  ///
+  /// In en, this message translates to:
+  /// **'Auto reconnect failed; please pick the device manually'**
+  String get stReconnectGaveUp;
+
+  /// No description provided for @stWaitingRebroadcast.
+  ///
+  /// In en, this message translates to:
+  /// **'Waiting for the device to advertise again...'**
+  String get stWaitingRebroadcast;
+
+  /// No description provided for @stHrServiceMissingXiaomi.
+  ///
+  /// In en, this message translates to:
+  /// **'Heart rate service not found; enable \"Heart Rate Broadcast\" on the watch'**
+  String get stHrServiceMissingXiaomi;
+
+  /// No description provided for @stHrServiceMissing.
+  ///
+  /// In en, this message translates to:
+  /// **'Device does not expose the standard heart rate service'**
+  String get stHrServiceMissing;
+
+  /// No description provided for @stConnectedSubscribing.
+  ///
+  /// In en, this message translates to:
+  /// **'Connected, subscribing to heart rate...'**
+  String get stConnectedSubscribing;
+
+  /// No description provided for @stDisconnecting.
+  ///
+  /// In en, this message translates to:
+  /// **'Disconnecting...'**
+  String get stDisconnecting;
+
+  /// No description provided for @stDisconnectedDone.
+  ///
+  /// In en, this message translates to:
+  /// **'Disconnected'**
+  String get stDisconnectedDone;
+
+  /// No description provided for @stResubscribeFailedReconnecting.
+  ///
+  /// In en, this message translates to:
+  /// **'Subscribe failed, reconnecting...'**
+  String get stResubscribeFailedReconnecting;
+
+  /// No description provided for @stSubscribing.
+  ///
+  /// In en, this message translates to:
+  /// **'Subscribing to heart rate...'**
+  String get stSubscribing;
+
+  /// No description provided for @stDiscovering.
+  ///
+  /// In en, this message translates to:
+  /// **'Discovering services...'**
+  String get stDiscovering;
+
+  /// No description provided for @stSubscribeRetrying.
+  ///
+  /// In en, this message translates to:
+  /// **'Retrying subscription...'**
+  String get stSubscribeRetrying;
+
+  /// No description provided for @stSubscribeFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Subscription failed'**
+  String get stSubscribeFailed;
+
+  /// No description provided for @stConnectTimeout.
+  ///
+  /// In en, this message translates to:
+  /// **'Connection timed out'**
+  String get stConnectTimeout;
+
+  /// No description provided for @stConnectCancelled.
+  ///
+  /// In en, this message translates to:
+  /// **'Connection cancelled'**
+  String get stConnectCancelled;
+
+  /// No description provided for @stDeviceDisconnected.
+  ///
+  /// In en, this message translates to:
+  /// **'Device disconnected'**
+  String get stDeviceDisconnected;
 }
 
 class _AppLocalizationsDelegate

@@ -26,6 +26,8 @@ class HeartRateSettings {
     required this.mqttUsername,
     required this.mqttPassword,
     required this.mqttClientId,
+    required this.mqttUseTls,
+    required this.mqttLwtTopic,
   });
 
   final String pushEndpoint;
@@ -51,6 +53,8 @@ class HeartRateSettings {
   final String mqttUsername;
   final String mqttPassword;
   final String mqttClientId;
+  final bool mqttUseTls;
+  final String mqttLwtTopic;
 
   // Default values
   static const _defaultPushEndpoint = '';
@@ -77,6 +81,8 @@ class HeartRateSettings {
   static const _defaultMqttUsername = '';
   static const _defaultMqttPassword = '';
   static const _defaultMqttClientId = '';
+  static const _defaultMqttUseTls = false;
+  static const _defaultMqttLwtTopic = '';
 
   // SharedPreferences keys
   static const _kPushEndpointKey = 'cfg_push_endpoint';
@@ -105,6 +111,8 @@ class HeartRateSettings {
   static const _kMqttUsernameKey = 'cfg_mqtt_username';
   static const _kMqttPasswordKey = 'cfg_mqtt_password';
   static const _kMqttClientIdKey = 'cfg_mqtt_client_id';
+  static const _kMqttUseTlsKey = 'cfg_mqtt_use_tls';
+  static const _kMqttLwtTopicKey = 'cfg_mqtt_lwt_topic';
 
   factory HeartRateSettings.defaults() {
     return const HeartRateSettings(
@@ -131,6 +139,8 @@ class HeartRateSettings {
       mqttUsername: _defaultMqttUsername,
       mqttPassword: _defaultMqttPassword,
       mqttClientId: _defaultMqttClientId,
+      mqttUseTls: _defaultMqttUseTls,
+      mqttLwtTopic: _defaultMqttLwtTopic,
     );
   }
 
@@ -179,6 +189,8 @@ class HeartRateSettings {
       mqttUsername: prefs.getString(_kMqttUsernameKey) ?? _defaultMqttUsername,
       mqttPassword: prefs.getString(_kMqttPasswordKey) ?? _defaultMqttPassword,
       mqttClientId: prefs.getString(_kMqttClientIdKey) ?? _defaultMqttClientId,
+      mqttUseTls: prefs.getBool(_kMqttUseTlsKey) ?? _defaultMqttUseTls,
+      mqttLwtTopic: prefs.getString(_kMqttLwtTopicKey) ?? _defaultMqttLwtTopic,
     );
   }
 
@@ -216,6 +228,8 @@ class HeartRateSettings {
     await prefs.setString(_kMqttUsernameKey, mqttUsername);
     await prefs.setString(_kMqttPasswordKey, mqttPassword);
     await prefs.setString(_kMqttClientIdKey, mqttClientId);
+    await prefs.setBool(_kMqttUseTlsKey, mqttUseTls);
+    await prefs.setString(_kMqttLwtTopicKey, mqttLwtTopic);
   }
 
   HeartRateSettings copyWith({
@@ -242,6 +256,8 @@ class HeartRateSettings {
     String? mqttUsername,
     String? mqttPassword,
     String? mqttClientId,
+    bool? mqttUseTls,
+    String? mqttLwtTopic,
   }) {
     return HeartRateSettings(
       pushEndpoint: pushEndpoint ?? this.pushEndpoint,
@@ -273,6 +289,8 @@ class HeartRateSettings {
       mqttUsername: mqttUsername ?? this.mqttUsername,
       mqttPassword: mqttPassword ?? this.mqttPassword,
       mqttClientId: mqttClientId ?? this.mqttClientId,
+      mqttUseTls: mqttUseTls ?? this.mqttUseTls,
+      mqttLwtTopic: mqttLwtTopic ?? this.mqttLwtTopic,
     );
   }
 }

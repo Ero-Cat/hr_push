@@ -12,6 +12,7 @@ import 'ble/ble_connection_service.dart';
 import 'ble/ble_scanner.dart';
 import 'ble/universal_ble_adapter.dart';
 import 'models/models.dart';
+import 'services/live_activity_service.dart';
 import 'services/services.dart';
 import 'utils/utils.dart';
 
@@ -34,6 +35,7 @@ class HeartRateManager extends ChangeNotifier {
       onStatusChange: _setStatus,
       onHeartRateData: _handleHeartRateData,
       onConnectionStateChange: _onConnectionStateChange,
+      onHrServiceMissing: _handleHrServiceMissing,
     );
   }
 
@@ -65,6 +67,7 @@ class HeartRateManager extends ChangeNotifier {
   bool _connecting = false;
 
   final HrNotificationService _notificationService = HrNotificationService();
+  final LiveActivityService _liveActivity = LiveActivityService();
 
   bool _autoReconnect = true;
   bool _userInitiatedDisconnect = false;
@@ -86,11 +89,14 @@ class HeartRateManager extends ChangeNotifier {
   int? _rssi;
   DateTime? _lastUpdated;
   DateTime? _lastHrSeenAt;
-  String _status = '等待蓝牙...';
+  String _status = 'waitingBluetooth';
+  String? _statusParam;
   BleAdapterState _adapterState = BleAdapterState.unknown;
   DateTime? _connectedAt;
 
   DateTime? _lastStatusChange;
+  DateTime? _lastOscConnectedRefreshAt;
+  DateTime? _lastNearbyReorgAt;
 
   // 扫描周期 1000ms
   static const Duration _scanInterval = Duration(milliseconds: 1000);
@@ -100,12 +106,17 @@ class HeartRateManager extends ChangeNotifier {
 
   static const Duration _hrStaleThreshold = Duration(seconds: 6);
   static const Duration _hrInitialOnlineGrace = Duration(seconds: 3);
+  // 连接成功后从未收到心率的最长等待，超过视为无数据连接（如未开启心率广播的小米手表）
+  static const Duration _noHrDataTimeout = Duration(seconds: 20);
+  // 连续自动重连上限，超过后停止并等待用户手动操作
+  static const int _maxReconnectAttempts = 10;
   DateTime? _prevHeartRateAt;
   DateTime? _lastActionAt;
   static const Duration _actionCooldown = Duration(seconds: 2);
   Timer? _scanLoopTimer;
   bool _scanLoopStarting = false;
   int _reconnectAttempts = 0;
+  bool _xiaomiGuidePending = false;
 
   List<NearbyDevice> get nearbyDevices => _scanner.nearbyDevices;
 
@@ -130,6 +141,17 @@ class HeartRateManager extends ChangeNotifier {
       ? _lastUpdated!.difference(_prevHeartRateAt!).inMilliseconds
       : null;
   String get status => _status;
+
+  /// Localized status text for platform notifications; resolved via the
+  /// localizer injected by the app shell (falls back to the raw key).
+  static String Function(String key, String? param)? statusLocalizer;
+
+  String get statusText {
+    final localizer = statusLocalizer;
+    if (localizer != null) return localizer(_status, _statusParam);
+    return _status;
+  }
+
   DateTime? get lastUpdated => _lastUpdated;
   String get connectedName {
     if (_connectionState != AdapterConnectionState.connected) return '';
@@ -144,6 +166,7 @@ class HeartRateManager extends ChangeNotifier {
   OscStatus get oscStatus => _pushCoordinator.oscStatus;
   bool get isConnected => _connectionState == AdapterConnectionState.connected;
   bool get isBluetoothOn => _adapterState == BleAdapterState.on;
+  bool get xiaomiGuidePending => _xiaomiGuidePending;
   @visibleForTesting
   static bool computeHrOnline({
     required bool userInitiatedDisconnect,
@@ -190,8 +213,20 @@ class HeartRateManager extends ChangeNotifier {
     }
   }
 
-  void _setStatus(String value, {bool force = false}) {
-    if (!force && _status == value) return;
+  /// While online, re-assert the OSC connected parameter periodically so
+  /// avatar reloads in VRChat recover without waiting for a transition.
+  void _maybeRefreshOscConnected(DateTime now) {
+    if (!_hrOnline) return;
+    final last = _lastOscConnectedRefreshAt;
+    if (last != null && now.difference(last) < const Duration(seconds: 60)) {
+      return;
+    }
+    _lastOscConnectedRefreshAt = now;
+    unawaited(_sendOscConnectedIfNeeded(true, force: true));
+  }
+
+  void _setStatus(String value, {bool force = false, String? param}) {
+    if (!force && _status == value && _statusParam == param) return;
     final now = DateTime.now();
     // 避免 UI 闪烁，状态更新至少间隔 500ms
     if (!force && _lastStatusChange != null) {
@@ -199,6 +234,7 @@ class HeartRateManager extends ChangeNotifier {
       if (delta.inMilliseconds < 500) return;
     }
     _status = value;
+    _statusParam = param;
     _lastStatusChange = now;
   }
 
@@ -215,8 +251,22 @@ class HeartRateManager extends ChangeNotifier {
     if (_isTestEnv) return;
 
     _log('start');
+
+    // Load settings even on unsupported platforms (e.g. Linux) so they
+    // persist across restarts and push services stay configurable.
+    final prefs = await SharedPreferences.getInstance();
+    _prefs = prefs;
+    _settings = HeartRateSettings.fromPrefs(prefs);
+    _pushCoordinator.updateSettings(_settings);
+    AppLog.setEnabled(_settings.logEnabled);
+    _savedDeviceId = prefs.getString('last_device_id');
+    _savedDeviceName = prefs.getString('last_device_name');
+    if (_savedDeviceId != null) {
+      _autoConnectEnabled = true; // 曾连接过，自动尝试重连
+    }
+
     if (!_isBleSupportedPlatform) {
-      _setStatus('当前平台暂不支持蓝牙扫描');
+      _setStatus('platformNotSupported');
       _adapterState = BleAdapterState.off;
       notifyListeners();
       return;
@@ -228,16 +278,6 @@ class HeartRateManager extends ChangeNotifier {
     final ready = await _ensurePermissionsAndBluetooth();
     if (!ready) return;
 
-    _prefs = await SharedPreferences.getInstance();
-    _settings = HeartRateSettings.fromPrefs(_prefs);
-    _pushCoordinator.updateSettings(_settings);
-    AppLog.setEnabled(_settings.logEnabled);
-    _savedDeviceId = _prefs?.getString('last_device_id');
-    _savedDeviceName = _prefs?.getString('last_device_name');
-    if (_savedDeviceId != null) {
-      _autoConnectEnabled = true; // 曾连接过，自动尝试重连
-    }
-
     if (Platform.isAndroid) {
       try {
         await _notificationService.initialize();
@@ -247,10 +287,10 @@ class HeartRateManager extends ChangeNotifier {
         }
         final granted = await _notificationService.ensurePermission();
         if (!granted) {
-          _setStatus('通知权限未授予，无法显示常驻心率卡片');
+          _setStatus('notificationPermissionDenied');
           notifyListeners();
         }
-        await _notificationService.showDisconnected(status: _status);
+        await _notificationService.showDisconnected(status: statusText);
       } catch (error, stackTrace) {
         _log(
           'foreground service initialization failed',
@@ -260,10 +300,13 @@ class HeartRateManager extends ChangeNotifier {
       }
     }
 
+    // iOS Live Activity (lock screen / Dynamic Island) when supported.
+    unawaited(_liveActivity.initialize());
+
     _adapterStateSub = _bleAdapter.adapterStateStream.listen((state) {
       _adapterState = state;
       if (state != BleAdapterState.on) {
-        _setStatus('请开启蓝牙');
+        _setStatus('pleaseEnableBluetooth');
       }
       _log('adapter state=$state');
       _syncHrOnline(now: DateTime.now(), forceOsc: true);
@@ -283,7 +326,7 @@ class HeartRateManager extends ChangeNotifier {
     final helper = PermissionHelper(bleAdapter: _bleAdapter, onLog: _log);
     final result = await helper.ensurePermissionsAndBluetooth();
     if (!result.success) {
-      _setStatus(result.errorMessage ?? '权限检查失败');
+      _setStatus(result.errorMessage ?? 'stPermissionFailed');
       notifyListeners();
       return false;
     }
@@ -297,6 +340,7 @@ class HeartRateManager extends ChangeNotifier {
       _pruneNearby(now);
       _checkStaleConnection(now);
       _syncHrOnline(now: now);
+      _maybeRefreshOscConnected(now);
       _tryStartScan();
     });
   }
@@ -306,27 +350,50 @@ class HeartRateManager extends ChangeNotifier {
     if (_connecting) return;
     if (_connectionState != AdapterConnectionState.connected) return;
 
-    final last = _lastUpdated ?? _prevHeartRateAt;
-    if (last == null) return;
-
-    // 若超过两倍心率失效阈值仍无数据，判定为掉线，主动重连（Windows 上常见）.
-    if (now.difference(last) > _hrStaleThreshold * 2) {
-      _log('stale connection, forcing reconnect');
-      _setStatus('连接失活，自动重连...');
-      _connectionState = AdapterConnectionState.disconnected;
-      _connectedAt = null;
-      // RSSI Polling removed
-      unawaited(() async {
-        try {
-          if (_connectedDeviceId != null) {
-            await _bleAdapter.disconnect(_connectedDeviceId!);
-          }
-        } catch (_) {}
-      }());
-      _notifyConnectionState();
-      notifyListeners();
-      _scheduleReconnect(immediate: true);
+    if (!shouldForceReconnect(
+      now: now,
+      lastHeartRateAt: _lastUpdated ?? _prevHeartRateAt,
+      connectedAt: _connectedAt,
+    )) {
+      return;
     }
+
+    _log('stale connection, forcing reconnect');
+    _setStatus('staleConnectionReconnecting');
+    _connectionState = AdapterConnectionState.disconnected;
+    _connectedAt = null;
+    // RSSI Polling removed
+    unawaited(() async {
+      try {
+        if (_connectedDeviceId != null) {
+          await _bleAdapter.disconnect(_connectedDeviceId!);
+        }
+      } catch (_) {}
+    }());
+    _notifyConnectionState();
+    notifyListeners();
+    _scheduleReconnect(immediate: true);
+  }
+
+  /// Decides whether a "connected" device should be force-reconnected.
+  ///
+  /// Falls back to [connectedAt] when no heart rate was ever received —
+  /// without that fallback a zombie connection (device never sends data,
+  /// e.g. a Xiaomi watch without heart-rate broadcast enabled) would never
+  /// be detected.
+  @visibleForTesting
+  static bool shouldForceReconnect({
+    required DateTime now,
+    required DateTime? lastHeartRateAt,
+    required DateTime? connectedAt,
+  }) {
+    final last = lastHeartRateAt ?? connectedAt;
+    if (last == null) return false;
+
+    final limit = lastHeartRateAt == null
+        ? _noHrDataTimeout
+        : _hrStaleThreshold * 2;
+    return now.difference(last) > limit;
   }
 
   Future<void> _tryStartScan() async {
@@ -349,7 +416,7 @@ class HeartRateManager extends ChangeNotifier {
     if (_isTestEnv) return;
     if (!_isBleSupportedPlatform) return;
     try {
-      _setStatus('扫描附近设备...');
+      _setStatus('scanningDevices');
       _setUiScanning(true);
       notifyListeners();
       _log('scan start');
@@ -358,7 +425,7 @@ class HeartRateManager extends ChangeNotifier {
       await _bleAdapter.startScan();
     } catch (e) {
       _log('scan start failed', error: e);
-      _setStatus('未连接', force: true);
+      _setStatus('disconnected', force: true);
       _setUiScanning(false);
       notifyListeners();
     }
@@ -367,7 +434,7 @@ class HeartRateManager extends ChangeNotifier {
   Future<void> restartScan() async {
     if (_isTestEnv) return;
     if (!_isBleSupportedPlatform) {
-      _setStatus('当前平台不支持蓝牙扫描');
+      _setStatus('scanNotSupported');
       notifyListeners();
       return;
     }
@@ -394,16 +461,22 @@ class HeartRateManager extends ChangeNotifier {
         _connectionState != AdapterConnectionState.connected &&
         r.connectable &&
         !_connecting) {
-      final name = NearbyDevice.fixWindowsDeviceName(
-        r.name.trim().isNotEmpty ? r.name : '未命名设备',
-      );
+      final name = NearbyDevice.fixWindowsDeviceName(r.name.trim());
       _pendingConnectName = name;
       _log('auto connect: $name (${r.id})');
       _connectTo(r.id);
     }
 
-    _scanner.pruneNearby();
-    _scanner.sortByRssi();
+    // Prune+sort at most every 500ms instead of per scan result; scanning
+    // floods results and O(n log n) per packet wastes battery.
+    final now = DateTime.now();
+    if (_lastNearbyReorgAt == null ||
+        now.difference(_lastNearbyReorgAt!) >=
+            const Duration(milliseconds: 500)) {
+      _lastNearbyReorgAt = now;
+      _scanner.pruneNearby();
+      _scanner.sortByRssi();
+    }
     _notifyUi();
   }
 
@@ -433,7 +506,7 @@ class HeartRateManager extends ChangeNotifier {
   Future<void> _connectTo(String deviceId) async {
     if (_isTestEnv) return;
     if (!_isBleSupportedPlatform) {
-      _setStatus('当前平台不支持蓝牙连接');
+      _setStatus('connectNotSupported');
       notifyListeners();
       return;
     }
@@ -477,7 +550,10 @@ class HeartRateManager extends ChangeNotifier {
       }
     } catch (e) {
       _log('connect failed', error: e);
-      _setStatus(_formatErrorForStatus(e, fallback: '连接失败'), force: true);
+      _setStatus(
+        _formatErrorForStatus(e, fallback: 'stConnectFailed'),
+        force: true,
+      );
       _connectionState = AdapterConnectionState.disconnected;
       _connectedAt = null;
       await restartScan();
@@ -510,7 +586,9 @@ class HeartRateManager extends ChangeNotifier {
         _connectedDeviceId = null;
         _connectedDeviceName = null;
       } else if (_autoReconnect && _connectedDeviceId != null) {
-        _reconnectAttempts = 0;
+        // 注意：不在此处重置 _reconnectAttempts——每次断开都清零会让退避
+        // 永远从头开始，抖动的设备会制造无限 0-3-6-9s 连接风暴。
+        // 计数只在连接并订阅成功后（_connectTo 成功分支）重置。
         _scheduleReconnect(immediate: true);
       }
     }
@@ -521,13 +599,15 @@ class HeartRateManager extends ChangeNotifier {
 
   Future<void> manualConnect(NearbyDevice target) async {
     if (!_isBleSupportedPlatform) {
-      _setStatus('当前平台不支持蓝牙连接');
+      _setStatus('connectNotSupported');
       notifyListeners();
       return;
     }
     _log('manual connect: ${target.name} (${target.id})');
     _autoReconnect = true; // 用户重新连接后恢复自动重连
     _autoConnectEnabled = true; // 用户主动操作后再允许自动连接
+    _reconnectAttempts = 0; // 手动重试重新计数
+    _xiaomiGuidePending = false;
     _lastActionAt = DateTime.now();
     _pendingConnectName = target.name;
     await _connectTo(target.id);
@@ -555,7 +635,7 @@ class HeartRateManager extends ChangeNotifier {
       return;
     }
 
-    _setStatus('等待设备广播...', force: true);
+    _setStatus('stWaitingBroadcast', force: true);
     notifyListeners();
     await restartScan();
   }
@@ -585,7 +665,7 @@ class HeartRateManager extends ChangeNotifier {
 
   Future<void> disconnect() async {
     if (!_isBleSupportedPlatform) {
-      _setStatus('当前平台不支持蓝牙连接');
+      _setStatus('connectNotSupported');
       notifyListeners();
       return;
     }
@@ -597,6 +677,7 @@ class HeartRateManager extends ChangeNotifier {
     _autoConnectEnabled = false;
     _reconnectAttempts = 0;
     _connecting = false;
+    final deviceId = _connectedDeviceId;
 
     // Delegate to connection service
     await _connectionService.disconnect();
@@ -621,6 +702,11 @@ class HeartRateManager extends ChangeNotifier {
     _syncHrOnline(now: DateTime.now(), forceOsc: true);
     _notifyConnectionState();
     notifyListeners();
+
+    // Release per-device adapter state (matters for rotating-MAC devices).
+    if (deviceId != null) {
+      _bleAdapter.cleanupDevice(deviceId);
+    }
 
     await Future.delayed(const Duration(milliseconds: 300));
     await restartScan();
@@ -650,17 +736,25 @@ class HeartRateManager extends ChangeNotifier {
       return;
     }
 
+    // 连续失败达到上限后停止自动重连，等待用户手动操作，避免无限连接风暴
+    final delay = reconnectDelayFor(
+      _reconnectAttempts + 1,
+      immediate: immediate,
+    );
+    if (delay == null) {
+      _log('auto reconnect gave up after $_reconnectAttempts attempts');
+      _autoReconnect = false;
+      _setStatus('stReconnectGaveUp', force: true);
+      notifyListeners();
+      return;
+    }
+
     // Logic: find target device ID and try to connect.
     final targetId = _savedDeviceId;
     if (targetId == null) return;
 
-    // Exponential backoff
     _reconnectAttempts++;
-    final delaySeconds = immediate
-        ? 0
-        : (_reconnectAttempts > 5
-              ? 30
-              : (_reconnectAttempts > 3 ? 10 : 3 * _reconnectAttempts));
+    final delaySeconds = delay.inSeconds;
 
     _log('scheduleReconnect in ${delaySeconds}s (attempt $_reconnectAttempts)');
 
@@ -682,36 +776,51 @@ class HeartRateManager extends ChangeNotifier {
           .where((d) => d.id == targetId)
           .firstOrNull;
 
-      if (nearby == null && (_savedDeviceName?.trim().isNotEmpty ?? false)) {
+      // Xiaomi/Redmi wearables rotate their MAC address, so the saved id
+      // stops matching. Fall back to the saved name; for Xiaomi devices pick
+      // the strongest signal when multiple advertise the same name.
+      final savedName = _savedDeviceName?.trim() ?? '';
+      if (nearby == null && savedName.isNotEmpty) {
         final matches = nearbyDevices
             .where(
-              (d) => d.connectable && d.name.trim() == _savedDeviceName!.trim(),
+              (d) =>
+                  d.connectable &&
+                  d.name.trim().toLowerCase() == savedName.toLowerCase(),
             )
             .toList();
         if (matches.length == 1) {
+          nearby = matches.first;
+        } else if (matches.length > 1 && BleScanner.isXiaomiDevice(savedName)) {
+          matches.sort((a, b) => b.rssi.compareTo(a.rssi));
           nearby = matches.first;
         }
       }
 
       if (nearby == null) {
-        _setStatus('等待设备重新广播...');
+        _setStatus('stWaitingRebroadcast');
         notifyListeners();
         _log('reconnect waiting for broadcast');
         _scheduleReconnect();
         return;
       }
 
-      final deviceIdForReconnect = nearby.id;
-      if (deviceIdForReconnect != _connectedDeviceId) {
-        // Update target if shifted? Usually same ID.
-      }
-
       _pendingConnectName = nearby.name;
-      _setStatus('自动重连中...');
+      _setStatus('autoReconnecting');
       notifyListeners();
       _log('auto reconnect: ${nearby.name} (${nearby.id})');
-      await _connectTo(deviceIdForReconnect);
+      await _connectTo(nearby.id);
     });
+  }
+
+  /// Backoff delay before the Nth reconnect attempt, or null when auto
+  /// reconnect should give up (consecutive failures reached the cap).
+  @visibleForTesting
+  static Duration? reconnectDelayFor(int attempt, {required bool immediate}) {
+    if (attempt >= _maxReconnectAttempts) return null;
+    if (immediate) return Duration.zero;
+    if (attempt > 5) return const Duration(seconds: 30);
+    if (attempt > 3) return const Duration(seconds: 10);
+    return Duration(seconds: 3 * attempt);
   }
 
   void _setUiScanning(bool scanning) {
@@ -780,6 +889,14 @@ class HeartRateManager extends ChangeNotifier {
     }
   }
 
+  /// Notification status line for the connected state, localized when a
+  /// localizer is available.
+  String _connectedNotifText(String deviceName) {
+    final localizer = statusLocalizer;
+    final prefix = localizer?.call('deviceConnected', null) ?? 'Connected';
+    return deviceName.isEmpty ? prefix : '$prefix · $deviceName';
+  }
+
   void _notifyHeartRateUpdate() {
     final bpm = _heartRate;
     if (bpm == null) return;
@@ -800,8 +917,7 @@ class HeartRateManager extends ChangeNotifier {
     );
 
     unawaited(_sendPushPayload(payload));
-    unawaited(_sendOscConnectedIfNeeded(_hrOnline, force: true));
-    unawaited(_sendOscHeartRate(bpm, percent));
+    unawaited(_sendOscConnectedIfNeeded(_hrOnline));
     unawaited(_sendOscChatboxIfNeeded(bpm, percent));
 
     unawaited(
@@ -809,6 +925,13 @@ class HeartRateManager extends ChangeNotifier {
         deviceName: _connectedDeviceName ?? '',
         bpm: bpm,
         lastUpdated: _lastUpdated,
+        status: _connectedNotifText(_connectedDeviceName ?? ''),
+      ),
+    );
+    unawaited(
+      _liveActivity.update(
+        bpm: bpm,
+        status: _connectedNotifText(_connectedDeviceName ?? ''),
       ),
     );
   }
@@ -831,10 +954,12 @@ class HeartRateManager extends ChangeNotifier {
           deviceName: _connectedDeviceName ?? '',
           bpm: heartRate,
           lastUpdated: _lastUpdated,
+          status: _connectedNotifText(_connectedDeviceName ?? ''),
         ),
       );
     } else {
-      unawaited(_notificationService.showDisconnected(status: _status));
+      unawaited(_notificationService.showDisconnected(status: statusText));
+      unawaited(_liveActivity.end());
     }
   }
 
@@ -842,12 +967,21 @@ class HeartRateManager extends ChangeNotifier {
     final bpm = payload['heartRate'] as int?;
     final timestamp = DateTime.tryParse(payload['timestamp'] as String? ?? '');
     final percent = payload['percent'] as double?;
-    if (bpm == null || timestamp == null) return;
+    if (timestamp == null) return;
+
+    if (bpm == null) {
+      // Lifecycle events (connection/disconnect) reach HTTP/WS/MQTT too.
+      await _pushCoordinator.sendEvent(payload: payload, timestamp: timestamp);
+      return;
+    }
 
     await _pushCoordinator.sendHeartRate(
       bpm: bpm,
       percent: percent,
       timestamp: timestamp,
+      event: payload['event'] as String? ?? 'heartRate',
+      connected: payload['connected'] as bool?,
+      device: payload['device'] as String?,
     );
   }
 
@@ -856,10 +990,6 @@ class HeartRateManager extends ChangeNotifier {
     bool force = false,
   }) async {
     await _pushCoordinator.sendConnectionStatus(connected, force: force);
-  }
-
-  Future<void> _sendOscHeartRate(int bpm, double? percent) async {
-    // Now handled by _sendPushPayload via PushCoordinator
   }
 
   Future<void> _sendOscChatboxIfNeeded(int bpm, double? percent) async {
@@ -891,6 +1021,30 @@ class HeartRateManager extends ChangeNotifier {
   }
 
   void _handleOscStatusChanged(OscStatus status) {
+    // Throttled: sent->acknowledged transitions fire ~2x/s otherwise and
+    // would rebuild listeners on every beat on top of the HR updates.
+    _notifyUi();
+  }
+
+  /// Called by the connection service when service discovery finished but no
+  /// standard heart rate service (0x180D) was found. Xiaomi/Redmi wearables
+  /// only expose it after "Heart Rate Broadcast" is enabled on the device.
+  void _handleHrServiceMissing(String deviceName) {
+    _log('hr service missing on device: $deviceName');
+    if (BleScanner.isXiaomiDevice(deviceName)) {
+      if (_xiaomiGuidePending) return;
+      _xiaomiGuidePending = true;
+      _setStatus('stHrServiceMissingXiaomi', force: true);
+      notifyListeners();
+    } else {
+      _setStatus('stHrServiceMissing', force: true);
+      notifyListeners();
+    }
+  }
+
+  /// Called by the UI after the guidance dialog has been shown.
+  void dismissXiaomiGuide() {
+    _xiaomiGuidePending = false;
     notifyListeners();
   }
 
@@ -906,6 +1060,8 @@ class HeartRateManager extends ChangeNotifier {
     _scanLoopTimer?.cancel();
     _uiNotifyTimer?.cancel();
     _pushCoordinator.dispose();
+    _bleAdapter.dispose();
+    _liveActivity.dispose();
     unawaited(_notificationService.stop());
     super.dispose();
   }

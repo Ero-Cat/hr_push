@@ -39,7 +39,8 @@ class NearbyDevice {
     if (name.isEmpty) return name;
 
     // Check if the name contains replacement characters or garbled patterns
-    final hasGarbledChars = name.contains('¿') ||
+    final hasGarbledChars =
+        name.contains('¿') ||
         name.contains('½') ||
         name.contains('ï') ||
         name.codeUnits.any((c) => c >= 0x80 && c <= 0xFF);
@@ -54,7 +55,9 @@ class NearbyDevice {
 
       // If decoded contains actual valid characters (not just replacement chars),
       // and it's different from the original, use it.
-      if (decoded != name && decoded.isNotEmpty && !decoded.contains('\uFFFD')) {
+      if (decoded != name &&
+          decoded.isNotEmpty &&
+          !decoded.contains('\uFFFD')) {
         return decoded;
       }
     } catch (_) {

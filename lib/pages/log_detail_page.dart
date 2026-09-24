@@ -1,4 +1,3 @@
-
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart' show Theme, ThemeData, TextTheme;
 import 'package:flutter_loggy/flutter_loggy.dart';
@@ -43,9 +42,18 @@ class _LogDetailPageState extends State<LogDetailPage> {
               groupValue: _level,
               onValueChanged: (v) => setState(() => _level = v),
               children: {
-                loggy.LogLevel.all: Padding(padding: const EdgeInsets.symmetric(horizontal: 10), child: Text(l10n.filterAll)),
-                loggy.LogLevel.info: Padding(padding: const EdgeInsets.symmetric(horizontal: 10), child: Text(l10n.filterInfo)),
-                loggy.LogLevel.error: Padding(padding: const EdgeInsets.symmetric(horizontal: 10), child: Text(l10n.filterError)),
+                loggy.LogLevel.all: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 10),
+                  child: Text(l10n.filterAll),
+                ),
+                loggy.LogLevel.info: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 10),
+                  child: Text(l10n.filterInfo),
+                ),
+                loggy.LogLevel.error: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 10),
+                  child: Text(l10n.filterError),
+                ),
               },
             ),
             const SizedBox(height: 12),
@@ -54,7 +62,9 @@ class _LogDetailPageState extends State<LogDetailPage> {
                 margin: const EdgeInsets.all(16),
                 decoration: BoxDecoration(
                   color: AppColors.bgSecondary.resolveFrom(context),
-                  border: Border.all(color: AppColors.separator.resolveFrom(context)),
+                  border: Border.all(
+                    color: AppColors.separator.resolveFrom(context),
+                  ),
                   borderRadius: BorderRadius.circular(AppRadius.r12),
                 ),
                 child: ClipRRect(
@@ -63,7 +73,10 @@ class _LogDetailPageState extends State<LogDetailPage> {
                     data: ThemeData(
                       brightness: isDark ? Brightness.dark : Brightness.light,
                       textTheme: const TextTheme(
-                        bodyMedium: TextStyle(fontFamily: 'Courier', fontSize: 12),
+                        bodyMedium: TextStyle(
+                          fontFamily: 'Courier',
+                          fontSize: 12,
+                        ),
                       ),
                     ),
                     child: LoggyStreamWidget(logLevel: _level),

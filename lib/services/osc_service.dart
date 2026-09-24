@@ -421,6 +421,13 @@ class OscService {
     );
   }
 
+  // Heartbeat traffic resolves the target several times per second; cache
+  // DNS results briefly instead of hitting the resolver on every send.
+  static const Duration _targetCacheTtl = Duration(minutes: 5);
+  OscTarget? _cachedTarget;
+  String? _cachedTargetKey;
+  DateTime _cachedTargetAt = DateTime.fromMillisecondsSinceEpoch(0);
+
   Future<OscTarget?> _resolveTarget() async {
     final raw = oscAddress.trim();
     if (raw.isEmpty) return null;
@@ -431,6 +438,14 @@ class OscService {
     final port = int.tryParse(parts.last);
     final hostStr = parts.sublist(0, parts.length - 1).join(':');
     final host = hostStr.isEmpty ? '127.0.0.1' : hostStr;
+
+    final cacheKey = '$host:$port';
+    final cached = _cachedTarget;
+    if (cached != null &&
+        _cachedTargetKey == cacheKey &&
+        DateTime.now().difference(_cachedTargetAt) < _targetCacheTtl) {
+      return cached;
+    }
 
     InternetAddress? ip = InternetAddress.tryParse(host);
     if (ip == null) {
@@ -443,7 +458,11 @@ class OscService {
     }
 
     if (ip == null || port == null) return null;
-    return OscTarget(ip, port);
+    final target = OscTarget(ip, port);
+    _cachedTarget = target;
+    _cachedTargetKey = cacheKey;
+    _cachedTargetAt = DateTime.now();
+    return target;
   }
 
   Future<RawDatagramSocket?> _ensureSocket() async {
