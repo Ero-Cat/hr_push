@@ -12,6 +12,7 @@ import 'ble/ble_connection_service.dart';
 import 'ble/ble_scanner.dart';
 import 'ble/universal_ble_adapter.dart';
 import 'models/models.dart';
+import 'services/live_activity_service.dart';
 import 'services/services.dart';
 import 'utils/utils.dart';
 
@@ -66,6 +67,7 @@ class HeartRateManager extends ChangeNotifier {
   bool _connecting = false;
 
   final HrNotificationService _notificationService = HrNotificationService();
+  final LiveActivityService _liveActivity = LiveActivityService();
 
   bool _autoReconnect = true;
   bool _userInitiatedDisconnect = false;
@@ -297,6 +299,9 @@ class HeartRateManager extends ChangeNotifier {
         );
       }
     }
+
+    // iOS Live Activity (lock screen / Dynamic Island) when supported.
+    unawaited(_liveActivity.initialize());
 
     _adapterStateSub = _bleAdapter.adapterStateStream.listen((state) {
       _adapterState = state;
@@ -799,16 +804,11 @@ class HeartRateManager extends ChangeNotifier {
         return;
       }
 
-      final deviceIdForReconnect = nearby.id;
-      if (deviceIdForReconnect != _connectedDeviceId) {
-        // Update target if shifted? Usually same ID.
-      }
-
       _pendingConnectName = nearby.name;
       _setStatus('autoReconnecting');
       notifyListeners();
       _log('auto reconnect: ${nearby.name} (${nearby.id})');
-      await _connectTo(deviceIdForReconnect);
+      await _connectTo(nearby.id);
     });
   }
 
@@ -918,7 +918,6 @@ class HeartRateManager extends ChangeNotifier {
 
     unawaited(_sendPushPayload(payload));
     unawaited(_sendOscConnectedIfNeeded(_hrOnline));
-    unawaited(_sendOscHeartRate(bpm, percent));
     unawaited(_sendOscChatboxIfNeeded(bpm, percent));
 
     unawaited(
@@ -926,6 +925,12 @@ class HeartRateManager extends ChangeNotifier {
         deviceName: _connectedDeviceName ?? '',
         bpm: bpm,
         lastUpdated: _lastUpdated,
+        status: _connectedNotifText(_connectedDeviceName ?? ''),
+      ),
+    );
+    unawaited(
+      _liveActivity.update(
+        bpm: bpm,
         status: _connectedNotifText(_connectedDeviceName ?? ''),
       ),
     );
@@ -954,6 +959,7 @@ class HeartRateManager extends ChangeNotifier {
       );
     } else {
       unawaited(_notificationService.showDisconnected(status: statusText));
+      unawaited(_liveActivity.end());
     }
   }
 
@@ -984,10 +990,6 @@ class HeartRateManager extends ChangeNotifier {
     bool force = false,
   }) async {
     await _pushCoordinator.sendConnectionStatus(connected, force: force);
-  }
-
-  Future<void> _sendOscHeartRate(int bpm, double? percent) async {
-    // Now handled by _sendPushPayload via PushCoordinator
   }
 
   Future<void> _sendOscChatboxIfNeeded(int bpm, double? percent) async {
@@ -1059,6 +1061,7 @@ class HeartRateManager extends ChangeNotifier {
     _uiNotifyTimer?.cancel();
     _pushCoordinator.dispose();
     _bleAdapter.dispose();
+    _liveActivity.dispose();
     unawaited(_notificationService.stop());
     super.dispose();
   }

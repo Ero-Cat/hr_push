@@ -9,6 +9,7 @@ import 'package:provider/provider.dart';
 import 'package:window_manager/window_manager.dart';
 
 import 'app_log.dart';
+import 'window_tray_controller.dart';
 import 'heart_rate_manager.dart';
 import 'l10n/l10n_keys.dart';
 import 'theme/design_system.dart';
@@ -94,9 +95,11 @@ class HrOscApp extends StatelessWidget {
           }
           return child!;
         },
-        home: ScrollConfiguration(
-          behavior: const ScrollBehavior().copyWith(scrollbars: false),
-          child: const HeartDashboard(),
+        home: WindowTrayController(
+          child: ScrollConfiguration(
+            behavior: const ScrollBehavior().copyWith(scrollbars: false),
+            child: const HeartDashboard(),
+          ),
         ),
       ),
     );

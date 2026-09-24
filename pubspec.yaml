@@ -50,6 +50,7 @@ dependencies:
   flutter_localizations:
     sdk: flutter
   intl: ^0.20.2
+  live_activities: ^2.4.7
 
 dev_dependencies:
   flutter_test:
