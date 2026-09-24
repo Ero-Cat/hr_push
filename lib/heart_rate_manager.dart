@@ -93,6 +93,8 @@ class HeartRateManager extends ChangeNotifier {
   DateTime? _connectedAt;
 
   DateTime? _lastStatusChange;
+  DateTime? _lastOscConnectedRefreshAt;
+  DateTime? _lastNearbyReorgAt;
 
   // 扫描周期 1000ms
   static const Duration _scanInterval = Duration(milliseconds: 1000);
@@ -209,6 +211,18 @@ class HeartRateManager extends ChangeNotifier {
     }
   }
 
+  /// While online, re-assert the OSC connected parameter periodically so
+  /// avatar reloads in VRChat recover without waiting for a transition.
+  void _maybeRefreshOscConnected(DateTime now) {
+    if (!_hrOnline) return;
+    final last = _lastOscConnectedRefreshAt;
+    if (last != null && now.difference(last) < const Duration(seconds: 60)) {
+      return;
+    }
+    _lastOscConnectedRefreshAt = now;
+    unawaited(_sendOscConnectedIfNeeded(true, force: true));
+  }
+
   void _setStatus(String value, {bool force = false, String? param}) {
     if (!force && _status == value && _statusParam == param) return;
     final now = DateTime.now();
@@ -321,6 +335,7 @@ class HeartRateManager extends ChangeNotifier {
       _pruneNearby(now);
       _checkStaleConnection(now);
       _syncHrOnline(now: now);
+      _maybeRefreshOscConnected(now);
       _tryStartScan();
     });
   }
@@ -447,8 +462,16 @@ class HeartRateManager extends ChangeNotifier {
       _connectTo(r.id);
     }
 
-    _scanner.pruneNearby();
-    _scanner.sortByRssi();
+    // Prune+sort at most every 500ms instead of per scan result; scanning
+    // floods results and O(n log n) per packet wastes battery.
+    final now = DateTime.now();
+    if (_lastNearbyReorgAt == null ||
+        now.difference(_lastNearbyReorgAt!) >=
+            const Duration(milliseconds: 500)) {
+      _lastNearbyReorgAt = now;
+      _scanner.pruneNearby();
+      _scanner.sortByRssi();
+    }
     _notifyUi();
   }
 
@@ -894,7 +917,7 @@ class HeartRateManager extends ChangeNotifier {
     );
 
     unawaited(_sendPushPayload(payload));
-    unawaited(_sendOscConnectedIfNeeded(_hrOnline, force: true));
+    unawaited(_sendOscConnectedIfNeeded(_hrOnline));
     unawaited(_sendOscHeartRate(bpm, percent));
     unawaited(_sendOscChatboxIfNeeded(bpm, percent));
 
@@ -938,12 +961,21 @@ class HeartRateManager extends ChangeNotifier {
     final bpm = payload['heartRate'] as int?;
     final timestamp = DateTime.tryParse(payload['timestamp'] as String? ?? '');
     final percent = payload['percent'] as double?;
-    if (bpm == null || timestamp == null) return;
+    if (timestamp == null) return;
+
+    if (bpm == null) {
+      // Lifecycle events (connection/disconnect) reach HTTP/WS/MQTT too.
+      await _pushCoordinator.sendEvent(payload: payload, timestamp: timestamp);
+      return;
+    }
 
     await _pushCoordinator.sendHeartRate(
       bpm: bpm,
       percent: percent,
       timestamp: timestamp,
+      event: payload['event'] as String? ?? 'heartRate',
+      connected: payload['connected'] as bool?,
+      device: payload['device'] as String?,
     );
   }
 
@@ -987,7 +1019,9 @@ class HeartRateManager extends ChangeNotifier {
   }
 
   void _handleOscStatusChanged(OscStatus status) {
-    notifyListeners();
+    // Throttled: sent->acknowledged transitions fire ~2x/s otherwise and
+    // would rebuild listeners on every beat on top of the HR updates.
+    _notifyUi();
   }
 
   /// Called by the connection service when service discovery finished but no
