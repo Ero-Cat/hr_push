@@ -85,7 +85,7 @@ void main() {
         final scanner = BleScanner(
           onLog: (_, {error}) {},
           onDeviceFound: (device, isNew) => found.add(device),
-          onBroadcastHeartRate: (_, __, ___) {},
+          onBroadcastHeartRate: (bpm, rssi, name) {},
         );
 
         scanner.handleScanResult(
@@ -105,7 +105,7 @@ void main() {
       final scanner = BleScanner(
         onLog: (_, {error}) {},
         onDeviceFound: (_, __) {},
-        onBroadcastHeartRate: (_, __, ___) {},
+        onBroadcastHeartRate: (bpm, rssi, name) {},
       );
       scanner.handleScanResult(
         _device(id: 'd1', name: 'Redmi Watch', rssi: -50),
