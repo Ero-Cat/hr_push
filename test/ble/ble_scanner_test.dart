@@ -104,7 +104,7 @@ void main() {
     test('prunes devices after the TTL', () async {
       final scanner = BleScanner(
         onLog: (_, {error}) {},
-        onDeviceFound: (_, __) {},
+        onDeviceFound: (device, isNew) {},
         onBroadcastHeartRate: (bpm, rssi, name) {},
       );
       scanner.handleScanResult(
