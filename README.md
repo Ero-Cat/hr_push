@@ -1,68 +1,190 @@
-# HR PUSH / 心率推送
+<div align="center">
 
-![Release](https://img.shields.io/github/v/release/Ero-Cat/hr_push?display_name=tag)
-![License](https://img.shields.io/github/license/Ero-Cat/hr_push)
-![Flutter](https://img.shields.io/badge/Flutter-3.10%2B-02569B?logo=flutter&logoColor=white)
-![Platform](https://img.shields.io/badge/Platform-Android%20%7C%20iOS%20%7C%20macOS%20%7C%20Windows%20%7C%20Linux-0ea5e9)
-![Protocols](https://img.shields.io/badge/Protocols-HTTP%2FWS%20%7C%20OSC%20%7C%20MQTT-10b981)
-![BLE](https://img.shields.io/badge/BLE-Heart%20Rate-ef4444)
+<img src="images/logo.png" alt="HR PUSH logo" width="160" />
+
+# HR PUSH · 心率推送
+
+**开源 · 跨平台 · 本地优先的 BLE 心率监控与多协议实时推送**
+
+[![Release](https://img.shields.io/github/v/release/Ero-Cat/hr_push?display_name=tag)](https://github.com/Ero-Cat/hr_push/releases)
+[![CI](https://github.com/Ero-Cat/hr_push/actions/workflows/ci.yml/badge.svg)](https://github.com/Ero-Cat/hr_push/actions/workflows/ci.yml)
+[![License](https://img.shields.io/github/license/Ero-Cat/hr_push)](LICENSE)
+[![Changelog](https://img.shields.io/badge/docs-changelog-10b981)](CHANGELOG.md)
+[![Flutter](https://img.shields.io/badge/Flutter-3.11%2B-02569B?logo=flutter&logoColor=white)](https://flutter.dev)
+[![Platforms](https://img.shields.io/badge/platform-Android%20%7C%20iOS%20%7C%20macOS%20%7C%20Windows%20%7C%20Linux-0ea5e9)](#-安装)
+[![Protocols](https://img.shields.io/badge/protocols-HTTP%2FWS%20%7C%20OSC%20%7C%20MQTT-8b5cf6)](#-协议与数据格式)
+[![Tests](https://img.shields.io/badge/tests-51%20passing-brightgreen)](test)
 
 **中文** | [English](README_EN.md) | [日本語](README_JA.md)
 
-一个用 Flutter 开发的跨平台 BLE 心率监控与推送工具。连接心率设备后，可将实时 BPM、在线状态与心率百分比同步到 **HTTP/WS、OSC、MQTT** 等链路，方便在桌面端或周边应用中联动使用。
-
-<div align="center">
-  <img src="images/logo.png" alt="HR PUSH logo" width="140" />
 </div>
 
-## ⚠️ 已知问题
-- Windows 平台下中文路径可能会存在运行失败的问题，建议在英文路径目录下执行本程序。
+HR PUSH 连接标准 BLE 心率设备（手表 / 手环 / 心率带），把实时 BPM、在线状态与心率百分比推送到 **HTTP/WS、OSC、MQTT** 任意组合的端点 —— 用于 [VRChat](#-vrchat-osc-联动) 联动、直播画面、Home Assistant 仪表盘，或你自己的任何程序。
 
+一句话概括：**一台装上即忘的后台心率网关** —— 回到蓝牙范围自动连接，掉线自动重连，推送永不间断。
 
-## ✨ 亮点功能
-- **BLE 扫描与连接**：自动过滤无关广播，优先匹配心率服务/常见穿戴品牌（新增小米手环 10 等设备支持）。
-- **智能自动重连**：记忆最近成功设备，断连或心率长时间无更新时按退避策略自动重连（连续失败自动停止，避免连接风暴）。
-- **实时展示**：全新“Lub-Dub”仿生心跳动画，BPM、上次更新时间、RSSI 信号强度一目了然。
-- **多协议推送**：HTTP/WS、OSC、MQTT 任意组合启用，统一 JSON payload。
-- **调试视图**：查看附近广播、Service UUID、RSSI、厂商数据长度。
-- **桌面端体验**：Windows/macOS/Linux 固定竖屏窗口；Windows 关闭最小化到托盘，后台继续推送。
-- **配置体验**：首次使用向导、输入校验与行内错误提示、HTTP/WS/OSC/MQTT 一键测试连接。
-- **iOS 实时活动**：锁屏/灵动岛显示实时心率（iOS 16.1+）。
-- **Android 常驻通知**：全新设计的原生“实时活动”风格通知卡片，支持 Android 12+ (ColorOS 14 等) 系统。
+## 📖 目录
 
-## 🗺️ 适用场景
-- **常驻心率推送**：家里/工作室有一台不关机的 Mac mini 或 Windows 主机，手表常开心率广播，回到范围内即可自动连接并持续推送。
-- **VRChat/自定义程序联动**：通过 OSC 或 HTTP/WS/MQTT 订阅心率，用于状态显示、动画驱动或自定义交互。
+- [为什么再造一个](#-为什么再造一个)
+- [功能特性](#-功能特性)
+- [效果预览](#-效果预览)
+- [快速开始](#-快速开始)
+- [安装](#-安装)
+- [使用手册](#-使用手册)
+  - [连接心率设备](#-连接心率设备)
+  - [配置推送](#-配置推送)
+  - [VRChat（OSC）联动](#-vrchat-osc-联动)
+  - [Android 常驻通知](#-android-常驻通知)
+  - [iOS 实时活动](#-ios-实时活动)
+  - [桌面后台运行](#-桌面后台运行)
+- [协议与数据格式](#-协议与数据格式)
+- [配置项参考](#-配置项参考)
+- [设备兼容性](#-设备兼容性)
+- [常见问题](#-常见问题-faq)
+- [开发指南](#-开发指南)
+- [更新日志](#-更新日志)
 
+## 💡 为什么再造一个
+
+心率推送工具并不少，但它们各有取舍：云端 SaaS 方案要注册账号、心率数据绕服务器一圈，部分功能还收订阅费；单平台小工具往往只支持 Windows 或只支持一种协议；直播软件插件则绑定特定 OBS 版本。
+
+HR PUSH 想做的事很简单 —— **把心率稳定地送到你想送的任何地方**：
+
+1. **本地优先**：数据从手表直达你的局域网端点，不经任何云端、不需要账号，断网也能推。
+2. **一套代码五个平台**：Android / iOS / macOS / Windows / Linux 统一体验，手机和桌面主机都能当网关。
+3. **多协议同发**：HTTP/WS + OSC + MQTT 任意组合同时启用，共享同一份 JSON payload，慢端点不阻塞快端点。
+4. **装上即忘**：自动扫描、指数退避重连、无数据僵尸连接自愈、Android 常驻通知 / Windows 托盘后台运行。
+5. **免费开源**：MIT 协议，无广告、无内购、无遥测。
+
+> 🗺️ **典型场景**：家里有一台不关机的 Mac mini 或 Windows 主机，手表常开心率广播 —— 回到范围内即自动连接并持续推送；或把手机揣兜里，通过 OSC 驱动 VRChat 头像的实时心率动画。
+
+## ✨ 功能特性
+
+### 🔵 BLE 连接
+- **智能扫描**：自动过滤无关广播，优先匹配心率服务（0x180D）与常见穿戴品牌（含小米手环 10、Redmi Watch 系列）。
+- **自动重连**：记忆最近成功设备；断连或心率长时间无更新时按指数退避重连，连续失败自动停止，避免连接风暴；小米轮换 MAC 可按名称重连。
+- **调试视图**：查看附近广播、Service UUID、RSSI 信号强度与厂商数据，排查设备问题不求人。
+
+### 📤 多协议推送
+- **HTTP**：POST JSON，3 秒超时，持久连接复用。
+- **WebSocket**：断开后按指数退避自动重连（1~30 秒）。
+- **OSC**：UDP 发送 bool / int / float 参数，支持 VRChat ChatBox 文本模板（UTF-8，中文 / emoji 无乱码）。
+- **MQTT**：端口 / Topic / 用户名密码 / Client ID / TLS (mqtts) / 遗嘱消息 (LWT) 全可配，QoS 1 发布。
+- **一键测试连接**：配置页内直接验证每个端点是否可达，不用反复保存试错。
+
+### 🪟 各平台体验
+- **Android**：原生「实时活动」风格常驻通知卡片，锁屏可见实时心率。
+- **iOS**：实时活动（Live Activities）—— 锁屏与灵动岛显示实时心率（iOS 16.1+）。
+- **Windows**：关闭最小化到系统托盘，后台继续推送，悬停查看心率摘要。
+- **桌面端**：Windows / macOS / Linux 固定竖屏窗口，适配手机风格布局。
+
+### 🧩 配置体验
+- 首次使用向导、按协议分组折叠、全字段行内校验与错误提示、未保存离开确认。
+- 中 / 英 / 日三语界面，状态文案全面本地化。
 
 ## 📷 效果预览
 
-| 首页 | 配置页 |
-| --- | --- |
+| 主界面 | 配置页 |
+| :---: | :---: |
 | ![主界面](images/main.png) | ![配置界面](images/settings.png) |
 
-## 🚀 快速开始（用户）
-1. 启动应用后点击“重新扫描”。
-2. 选择心率设备并连接（现已支持更多广播心率的手环/手表）。
-3. 在配置页填写推送目标（HTTP/WS、OSC 或 MQTT），保存后即可推送。
+| VRChat OSC 联动 | Android 常驻通知 |
+| :---: | :---: |
+| ![VRChat 测试](images/vrchat.png) | ![安卓状态栏](images/android.jpeg) |
 
-> 若设备仅广播心率但不支持连接，仍可在“广播调试”视图中查看数据与信号，但推送仅在连接并订阅特征后触发。
+## 🚀 快速开始
 
-## 🔗 协议与数据
-### 推送协议
-- **HTTP**：对 `http(s)://` 目标发送 JSON（POST，超时 3 秒）。
-- **WebSocket**：对 `ws(s)://` 目标发送 JSON 文本，断开后按指数退避自动重连（1~30 秒）。
-- **OSC**：填写 `host:port` 后通过 UDP 发送；支持 bool/int/float 与 ChatBox 文本。
-- **MQTT**：填写 Broker 后启用，支持端口/Topic/用户名/密码/Client ID，QoS 1 发布。
+1. 从 [Releases](https://github.com/Ero-Cat/hr_push/releases/latest) 下载并安装对应平台的安装包（见下方[安装](#-安装)）。
+2. 启动应用，点击 **重新扫描**，选择心率设备并连接。
+3. 进入配置页填写推送目标（HTTP/WS、OSC 或 MQTT），保存后即开始推送。
 
-### 数据格式
-所有协议发送相同的 JSON payload。
+> 💡 若设备仅广播心率但不支持连接，仍可在「广播调试」视图中查看数据与信号，但推送仅在连接并订阅心率特征后触发。
+
+## 📥 安装
+
+### 从 Release 下载（推荐）
+
+前往 [GitHub Releases](https://github.com/Ero-Cat/hr_push/releases/latest) 下载最新版本（`vX.Y.Z` 为版本号）：
+
+| 平台 | 下载文件 | 说明 |
+| --- | --- | --- |
+| Android | `app-release-vX.Y.Z.apk` | 直接安装；首次使用需授予蓝牙与通知权限 |
+| Windows | `hr-push-windows-vX.Y.Z.zip` | 解压后运行；需支持 BLE 的蓝牙适配器；⚠️ 暂不支持中文路径 |
+| macOS | `hr-push-macos-vX.Y.Z.zip` | 解压得到 `.app`；首次打开若提示未知开发者，请右键 → 打开 |
+| iOS / Linux | 需自行构建 | iOS 需 Apple 开发者账号签名；Linux 需系统安装 `bluez` |
+
+### 从源码构建
+
+前置要求：[Flutter SDK](https://docs.flutter.dev/get-started/install) ≥ 3.11（Windows 另需 Visual Studio C++ 工作负载，macOS/iOS 需 Xcode）。
+
+```bash
+git clone https://github.com/Ero-Cat/hr_push.git
+cd hr_push
+flutter pub get
+flutter run -d <device>          # 运行
+flutter build apk                # Android APK
+flutter build windows            # Windows（也可 build macos / linux / ios）
+```
+
+## 📖 使用手册
+
+### 🔵 连接心率设备
+
+1. 启动应用后点击 **重新扫描**（已自动过滤无关广播，优先显示心率设备）。
+2. 点击设备连接，首页即可看到实时 BPM、上次更新时间与 RSSI 信号强度。
+3. 掉线后无需干预：应用会自动重连最近成功的设备；手表远离后再回来，推送自动恢复。
+
+小米 / Redmi 手表手环需要先在手表端开启「心率广播」，详见[设备兼容性](#-设备兼容性)。
+
+### 📤 配置推送
+
+1. 进入 **配置页**，按需填写任意组合的推送端点：
+   - **HTTP/WS**：填 `http(s)://` 或 `ws(s)://` 地址，为空即关闭该协议；
+   - **OSC**：填 `host:port`（VRChat 默认 `127.0.0.1:9000`）；
+   - **MQTT**：填 Broker 地址，可选端口 / Topic / 用户名密码 / TLS / 遗嘱主题。
+2. 点击各协议的 **测试连接** 按钮验证端点可达。
+3. 保存后立即生效，无需重启应用。所有协议发送相同的 [JSON payload](#-协议与数据格式)。
+
+完整字段说明见[配置项参考](#-配置项参考)。
+
+### 🎮 VRChat OSC 联动
+
+在 VRChat 中通过 OSC 参数驱动头像动画：
+
+1. 配置页填入 OSC 目标 `127.0.0.1:9000`（VRChat 默认 OSC 端口，需在 VRChat 设置中开启 OSC）。
+2. Avatar 参数中监听以下地址（也可直接使用推荐插件 [booth.pm/zh-cn/items/5531594](https://booth.pm/zh-cn/items/5531594)）：
+   - `/avatar/parameters/hr_connected` — bool，设备是否在线
+   - `/avatar/parameters/hr_val` — int，当前 BPM
+   - `/avatar/parameters/hr_percent` — float 0~1，心率百分比
+3. 可选：开启 **ChatBox 推送**，用模板（如 `💓{hr}`）把心率文本发到 `/chatbox/input`，支持 `{hr}` / `{percent}` 占位符，自带节流与去重防刷屏。
+
+### 📱 Android 常驻通知
+
+连接成功后自动显示「实时活动」风格常驻通知卡片，按推送间隔实时刷新心率，锁屏可见。若不显示：
+
+- 授予应用 **通知权限**；
+- ColorOS / MIUI / HyperOS 等定制系统需在设置中允许 **后台运行** 与 **自启动**。
+
+### 📲 iOS 实时活动
+
+iOS 16.1+ 连接成功后自动开启实时活动，锁屏与灵动岛实时显示心率，无需任何配置。
+
+### 💻 桌面后台运行
+
+- **Windows**：点击关闭按钮即最小化到系统托盘，后台继续扫描重连与推送；点击托盘图标恢复窗口，悬停查看在线状态与心率摘要。
+- **macOS / Linux / Windows**：均为固定竖屏窗口，与手机端布局一致。
+
+## 🔗 协议与数据格式
+
+所有协议发送相同的 JSON payload：
 
 - 心率事件
+
 ```json
 {
   "event": "heartRate",
   "heartRate": 85,
+  "heart_rate": 85,
   "percent": 0.42,
   "connected": true,
   "device": "Polar H10",
@@ -71,6 +193,7 @@
 ```
 
 - 连接事件
+
 ```json
 {
   "event": "connection",
@@ -80,11 +203,14 @@
 }
 ```
 
-`percent = heartRate / 最大心率`，范围 0~1。
+说明：
 
-心率事件同时包含 `heartRate` 与 `heart_rate` 两个键（值相同）：前者与本文档一致，后者为历史版本兼容键，便于既有 webhook 无缝迁移。
+- `percent = heartRate / 最大心率`，范围 0~1（最大心率默认 200，可在配置页修改）。
+- 心率事件同时包含 `heartRate` 与 `heart_rate` 两个键（值相同）：前者与本文档一致，后者为历史版本兼容键，便于既有 webhook 无缝迁移。
+- HTTP 为 POST（超时 3 秒）；WebSocket 发送 JSON 文本；MQTT 以 QoS 1 发布到配置的 Topic；OSC 发送单独的参数地址（见上方 VRChat 一节）。
 
-## ⚙️ 配置项说明
+## 🔧 配置项参考
+
 | 配置项 | 说明 | 默认 |
 | --- | --- | --- |
 | HTTP/WS 推送地址 | 为空关闭；支持 `http(s)`/`ws(s)` | 空 |
@@ -104,31 +230,23 @@
 | 最大心率 | 用于计算百分比 | `200` |
 | 推送/刷新间隔 (ms) | 控制 UI 刷新、推送节流、RSSI 轮询 | `1000` |
 
-## 🎮 VRChat（OSC）
-- 推荐搭配默认 OSC 参数插件：[booth.pm/zh-cn/items/5531594](https://booth.pm/zh-cn/items/5531594)
-- 也可在 Avatar 参数中自行监听上述 OSC 路径。
-
-### 测试截图
-<img src="images/vrchat.png" alt="VRChat OSC 测试" width="900" />
-
-#### 安卓设备状态栏
-<img src="images/android.jpeg" alt="安卓测试" />
-
 ## 🧩 设备兼容性
-### 已验证设备
-**蓝牙广播发送端**
+
+只要实现标准 BLE 心率服务（0x180D）的设备即可连接。以下为已验证型号：
+
+**蓝牙广播发送端（手表 / 手环 / 心率带）**
 1. Garmin Enduro 2（佳明手表，蓝牙广播推送）
 2. Xiaomi Smart Band 10 / 9、Redmi Watch 系列（需在手表端开启「心率广播」，见下方说明）
 3. HuaWei Watch GT 4
 4. Apple Watch（需配合第三方 App，见下方说明）
 
-**蓝牙广播接收端**
+**蓝牙广播接收端（运行 HR PUSH 的设备）**
 1. iPhone 15 Pro（无证书可自行签名）
-2. OnePlus Ace / ColorOS 14 (Android 14)
+2. OnePlus Ace / ColorOS 14（Android 14）
 3. MacBook Pro M5（macOS Tahoe 26.1）
 4. Windows（蓝牙适配器需支持 BLE）
 
-### 🔴 小米 / Redmi 手表/手环（重要）
+### 🔴 小米 / Redmi 手表手环（重要）
 
 小米与 Redmi 手表默认使用小米私有 BLE 协议（需服务器配对），**不会**对外提供标准心率服务。要在 HR PUSH 中使用，请在手表端开启「心率广播」：
 
@@ -142,145 +260,116 @@
 
 > ⚠️ **重要提示：** Apple Watch **不原生支持**标准 BLE 心率广播协议。你需要安装第三方 App 将心率数据转发为标准 BLE 信号后，HR PUSH 才能接收。
 
-#### 为什么需要第三方 App？
-HR PUSH 通过标准 BLE 心率服务（UUID: `0x180D`）接收心率数据。Apple Watch 默认不广播此服务，而是将心率数据保留在 Apple HealthKit 生态内。因此需要借助第三方 App 将心率转发为标准 BLE 信号。
+**为什么需要第三方 App？** HR PUSH 通过标准 BLE 心率服务（UUID: `0x180D`）接收心率数据。Apple Watch 默认不广播此服务，而是将心率数据保留在 Apple HealthKit 生态内，因此需要借助第三方 App 转发。
 
-#### 推荐方案：HeartCast（免费）
-[HeartCast](https://apps.apple.com/app/heartcast-heart-rate-monitor/id1499771124) 是一款免费 App，可将 Apple Watch 心率通过 iPhone 以标准 BLE 心率服务广播出去。
+**推荐方案：HeartCast（免费）** —— 可将 Apple Watch 心率通过 iPhone 以标准 BLE 心率服务广播出去：
 
-**设置步骤：**
-1. 在 iPhone 和 Apple Watch 上安装 [HeartCast](https://apps.apple.com/app/heartcast-heart-rate-monitor/id1499771124)
-2. 确保 iPhone 和 Apple Watch 已配对并正常连接
-3. 在 Apple Watch 上打开 HeartCast，点击 **Start** 开始广播
-4. 在运行 HR PUSH 的设备上点击"重新扫描"
-5. 在设备列表中找到类似 `HeartCast` 或 `iPhone (xxx)` 的设备并连接
+1. 在 iPhone 和 Apple Watch 上安装 [HeartCast](https://apps.apple.com/app/heartcast-heart-rate-monitor/id1499771124)。
+2. 确保 iPhone 和 Apple Watch 已配对并正常连接。
+3. 在 Apple Watch 上打开 HeartCast，点击 **Start** 开始广播。
+4. 在运行 HR PUSH 的设备上点击「重新扫描」。
+5. 在设备列表中找到类似 `HeartCast` 或 `iPhone (xxx)` 的设备并连接。
 
-**注意事项：**
-- HeartCast 通过 iPhone 中转广播，因此 HR PUSH 实际连接的是 iPhone 而非 Apple Watch
-- 需保持 HeartCast 在 Apple Watch 前台运行，或开启后台模式
-- iPhone 需开启蓝牙且与 HR PUSH 接收端在同一范围内
+注意事项：HeartCast 通过 iPhone 中转广播，HR PUSH 实际连接的是 iPhone；需保持 HeartCast 在 Apple Watch 前台运行或开启后台模式；iPhone 需开启蓝牙并与接收端在同一范围内。
 
-#### 其他可选方案
+其他可选方案：
+
 | 应用 | 类型 | 说明 |
 | --- | --- | --- |
-| [WATCH LINK](https://apps.apple.com/app/watch-link/id1565977702) | 付费（需硬件） | 需配合 WATCH LINK Pod/USB 硬件，支持 ANT+ 和 BLE |
 | [ECHO BLE](https://apps.apple.com/app/echo-ble/id1572440703) | 免费 | 功能与 HeartCast 类似 |
+| [WATCH LINK](https://apps.apple.com/app/watch-link/id1565977702) | 付费（需硬件） | 需配合 WATCH LINK Pod/USB 硬件，支持 ANT+ 和 BLE |
 
-## 🛡️ 平台支持与权限
-- **Android**：需要 BLE 扫描/连接权限（Android 12+ 无需定位，11 及以下需定位权限）。若想显示状态栏卡片，请允许通知权限。
-  - ColorOS/MIUI/HyperOS 等：需在系统设置中打开应用通知，并允许后台运行/自启动，否则可能看不到常驻卡片或后台停止更新。
-- **iOS/macOS**：首次启动会请求蓝牙权限。
+### 🔐 平台权限
 
-## 🔧 开发与构建
-- 主要代码：`lib/main.dart`（UI 与交互）、`lib/heart_rate_manager.dart`（扫描、连接、心率订阅与推送）。
-- 依赖安装：`flutter pub get`。
-- 运行：`flutter run -d <device>`。
-- 测试：`flutter test`。
-- 打包：`flutter build apk|ios|windows|macos|linux`。
-- 代码风格：2 空格缩进；`dart format .`；启用 `flutter_lints`。
+- **Android**：需 BLE 扫描/连接权限（Android 12+ 无需定位，11 及以下需定位权限）；显示状态栏卡片需通知权限。
+- **iOS / macOS**：首次启动会请求蓝牙权限。
+- **Linux**：需系统安装 `bluez`。
 
+## ❓ 常见问题 FAQ
 
+<details>
+<summary><b>扫描不到我的手表/手环？</b></summary>
+
+- 小米 / Redmi 设备默认使用私有协议，需先在手表端开启「心率广播」，见[设备兼容性](#-设备兼容性)。
+- 确认手表没有被厂商 App（如「小米运动健康」）占用连接 —— BLE 为单连接。
+- iOS / macOS 首次使用需在系统弹窗中允许蓝牙权限；Android 11 及以下需授予定位权限。
+</details>
+
+<details>
+<summary><b>Apple Watch 能直接连接吗？</b></summary>
+
+不能。Apple Watch 不广播标准 BLE 心率服务，需配合 HeartCast 等第三方 App 转发，详见[Apple Watch 准备工作](#-apple-watch-准备工作)。
+</details>
+
+<details>
+<summary><b>推送目标收不到数据？</b></summary>
+
+- 确认设备已**连接并订阅**心率特征 —— 推送仅在连接成功后触发，仅广播不连接不会推送。
+- 在配置页使用「测试连接」按钮逐一验证端点可达。
+- 检查防火墙 / 端口：OSC 走 UDP，MQTT / HTTP 走 TCP，确认端口未被拦截。
+- 推送按「推送/刷新间隔」节流（默认 1000ms），数据不变时会去重。
+</details>
+
+<details>
+<summary><b>Android 常驻通知不显示 / 后台停止更新？</b></summary>
+
+授予通知权限后重新连接；ColorOS / MIUI / HyperOS 等定制系统还需在设置中允许本应用「后台运行」与「自启动」。
+</details>
+
+<details>
+<summary><b>VRChat ChatBox 中文 / emoji 乱码？</b></summary>
+
+已在 v1.7.2 修复（OSC 文本改为 UTF-8 编码），请升级到最新版本。
+</details>
+
+<details>
+<summary><b>VRChat 里 OSC 参数有延迟或不刷新？</b></summary>
+
+确认 VRChat 设置中已开启 OSC；推送节奏与「推送/刷新间隔」一致；若本机显示与 VRChat 不同步，升级到 v1.7.2+（UI 显示已与推送快照同步）。
+</details>
+
+<details>
+<summary><b>Windows 下程序无法启动或闪退？</b></summary>
+
+已知问题：Windows 平台下中文路径可能导致运行失败，请将程序放在英文路径目录中运行。另请确认蓝牙适配器支持 BLE。
+</details>
+
+<details>
+<summary><b><code>percent</code> 是怎么计算的？</b></summary>
+
+`percent = heartRate / 最大心率`，范围 0~1。最大心率默认 200，可在配置页按自身情况调整。
+</details>
+
+## 🧰 开发指南
+
+```bash
+flutter pub get       # 安装依赖
+flutter run           # 运行
+flutter test          # 运行测试（51 项）
+flutter analyze       # 静态分析
+dart format .         # 格式化
+flutter gen-l10n      # 生成中/英/日本地化文件
+```
+
+- 架构说明见 [ARCHITECTURE.md](ARCHITECTURE.md)，贡献指南见 [CONTRIBUTING.md](CONTRIBUTING.md)。
+- 主要模块：`lib/heart_rate_manager.dart`（BLE / 重连 / 推送调度核心）、`lib/ble/`（平台无关 BLE 抽象层）、`lib/services/`（OSC / MQTT / HTTP-WS 推送服务）。
+- 代码风格：2 空格缩进，启用 `flutter_lints`。
 
 ## 🧾 更新日志
-### v1.8.0
-- **Redmi/小米手表兼容性**：扫描过滤支持 Redmi 与未命名的心率广播设备；连接超时修复、重连风暴治理（指数退避 + 连续失败上限）、无数据僵尸连接检测、小米轮换 MAC 按名称重连；未找到心率服务时自动弹出「心率广播」开启引导（三语）。
-- **设置页全面重构**：按协议分组折叠、全字段行内校验与错误提示、HTTP/WS/OSC/MQTT 一键测试连接、未保存离开确认与保存反馈、OSC 实时推送状态显示、首次使用向导。
-- **MQTT 增强**：TLS (mqtts/8883)、密码可见切换、遗嘱主题 (LWT)、稳定默认 Client ID。
-- **推送性能**：HTTP 持久连接复用（不再每次推送重建 TCP/TLS）、协议并行扇出（慢端点不再阻塞 VRChat OSC）、WebSocket 指数退避重连、OSC DNS 缓存、`hr_connected` 按状态变化发送。
-- **数据格式**：payload 补齐 `event/connected/device` 字段并新增 `heart_rate` 兼容键；连接/断开事件同步推送至 HTTP/WS/MQTT。
-- **新增平台特性**：iOS 实时活动（锁屏/灵动岛实时心率，iOS 16.1+）、Windows 托盘最小化后台运行。
-- **体验与无障碍**：状态文案全面三语本地化（含 Android 通知）、解除系统字号缩放锁定、语义标签、心率动画渲染优化（RepaintBoundary/固定阴影）。
-- **稳定性**：Android 扫描节流自愈、附近设备列表扩容至 15 个并防闪烁、资源释放链修复；移除 5 个死代码模块；测试覆盖 25 → 51 项。
 
-### v1.7.3
-- **设置即时生效**：修复 OSC 路径、ChatBox 开关和模板等配置保存后仍沿用旧推送实例的问题，无需重启应用即可生效。
-- **回归测试**：新增 PushCoordinator 单元测试，确保 OSC 配置更新后下一次推送立即使用新配置。
+**v1.8.0** — Redmi/小米手表兼容性（重连风暴治理、心率广播引导）、设置页全面重构（分组折叠 / 行内校验 / 一键测试连接）、MQTT TLS 与遗嘱消息、HTTP 持久连接与协议并行扇出、iOS 实时活动、Windows 托盘后台运行。
 
-### v1.7.2
-- **OSC 编码修复**：OSC ChatBox 文本改为 UTF-8 编码，修复 Windows/VRChat 下中文、emoji 或模板文本乱码问题。
-- **显示与推送同步**：心率 UI 显示改为跟随最后一次发布快照，确保本机显示值与 VRChat OSC 参数刷新节奏一致。
-- **BLE 稳定性增强**：修复部分断连场景下自动重连被阻断的问题；新增 notification 失败后 fallback 到 indication 的订阅策略，提升小米手环等设备兼容性。
-- **测试覆盖**：新增 OSC 编码、心率发布快照同步、BLE indication fallback 单元测试。
-
-### v1.7.0
-- **CI/CD 优化**：新增 CI 工作流（代码分析 + 测试）；优化 Release 构建时间，合并步骤并移除冗余操作。
-- **版本自动同步**：新增 `sync-version.sh` 脚本，发布时自动同步版本号到代码中。
-- **文档补充**：新增 `CONTRIBUTING.md` 贡献指南和 `ARCHITECTURE.md` 架构文档。
-- **国际化完善**：中/英/日三语种新增 15+ 翻译键值，支持更多 UI 状态本地化。
-- **代码架构优化**：新增 `lib/services/` 模块，提取 OSC、MQTT、HTTP/WS 推送服务为独立类。
-
-### v1.6.1
-- **Android 优化**：更新 Proguard 规则，优化构建混淆。
-- **BLE 适配器微调**：优化 `universal_ble` 适配层，提升连接稳定性。
-- **Windows 构建增强**：升级 C++ 标准至 20，并修复编译告警；CI 现在会自动上传 Windows 构建产物。
-
-### v1.6.0
-- **BLE 架构升级**：引入 `universal_ble` 库，使用原生 WinRT API 替代不稳定的 `win_ble`，大幅提升 Windows 平台蓝牙连接稳定性。
-- **跨平台统一**：新增 BLE 抽象层 (`lib/ble/`)，同一套代码支持 Windows/macOS/iOS/Android/Linux。
-- **设备兼容性增强**：支持所有标准 BLE 心率服务 (0x180D) 设备，包括 Polar、Garmin、Wahoo、小米手环等。
-- **代码优化**：移除 Windows 专用的连接重试逻辑和设备名编码修复，由统一的 BLE 层处理。
-
-### v1.5.0
-- **UI 重构**：首页心率动画重构，采用更自然的仿生“Lub-Dub”跳动节奏与波纹扩散效果。
-- **功能增强**：Android 端状态栏通知全新改版为 Native 布局（类似 iOS 实时活动风格），适配 Android 12+ (ColorOS 14) 系统，修复了部分机型不显示通知的问题。
-- **兼容性**：修复了小米手环 10 (Xiaomi Smart Band 10) 及部分以 `Mi` / `Xiaomi` 命名的设备无法被扫描到的问题；增加了详细的 BLE 服务发现日志以便排查连接问题。
-- **优化**：移除未使用的资源文件，精简代码逻辑。
-
-### v1.4.0
-- Android：状态栏/导航栏颜色同步与沉浸式刷新优化（含部分定制 ROM 适配）。
-- Android：常驻通知通道与样式升级，权限请求与颜色配置更稳定。
-- Android：Play Core 适配 targetSdk 34（迁移至 feature-delivery），Release 构建签名更完整。
-- 性能：心率 UI 刷新节流，降低无效重建提升流畅度。
-- 工程：全平台包名统一为 `moe.iacg.hrpush`。
-
-### v1.3.4
-- OSC：新增 ChatBox 心率推送，支持 `{hr}/{percent}` 模板与节流/去重，避免刷屏。
-- UI：设置页新增 ChatBox 开关与模板输入；移除旧的 ChatBox 建议提示文案。
-- 文档与仓库：README 结构重构；新增 MIT License；.gitignore 增加本地发布脚本忽略。
-
-### v1.3.3
-- UI：应用标题统一为“心率推送”（桌面窗口、应用标题、iOS 显示名、测试文案）。
-- UI：主页/配置页布局调整，设置按钮与保存按钮样式统一。
-- OSC：推送心率时强制同步在线状态，避免状态滞后。
-- Android：常驻通知通道更新，避免旧通道冲突。
-- CI：Release 流程移除未签名 iOS 打包步骤。
-- Release：发布包命名统一为 `hr-push` 前缀（macOS/Windows）。
-- 文档：新增/更新 VRChat 与安卓截图、补充已测试设备清单与 Windows 中文路径已知问题说明。
-- 资源：替换主界面/配置页/VRChat 截图。
-- 开发：忽略 `.vscode/settings.json`，测试用例标题同步新名称。
-
-### v1.3.1
-- Windows：最小化到托盘后支持点击托盘图标恢复窗口。
-- Windows：掉线后自动重连更稳定（扫描卡死自愈、广播心率候选识别增强、陈旧连接句柄清理）。
-- UI：减少无关重建，整体交互更流畅。
-- OSC：`/avatar/parameters/hr_connected` 更贴合实际在线状态（抗抖动与掉线恢复）。
-
-### v1.3.0
-- 新增 MQTT 推送（Broker 填写即启用，端口/Topic/鉴权可配）。
-- Android 新增通知栏常驻心率卡片，并自动按刷新间隔更新。
-- RSSI 轮询刷新间隔与配置一致，连接后持续刷新信号。
-- 自动重连逻辑与按钮状态修复，避免重连死锁和重复连接。
-- Windows：BLEServer 在中文用户名/路径下运行更稳定（Public ASCII 临时目录 + 正确工作目录）。
-
-### v1.2.2
-- Windows：最小化自动隐藏到系统托盘，悬停显示在线状态与心率摘要。
-- Android：发布构建启用 R8 混淆、资源压缩与 ABI 分包；Windows/macOS/iOS 开启链接优化以减小体积。
-
-### v1.2.1
-- Windows：BLE 连接在数据长时间未更新时会主动重连，提升掉线恢复成功率。
-
-### v1.2.0
-- Windows/macOS/Android/iOS 统一使用 `images/logo.png` 生成应用图标。
-- Windows：最小化/失焦时暂停心跳动画，降低 GPU 占用；检测心率数据长时间未更新时主动重连。
-- README 补充中文路径构建提示。
-- 依赖配置同步：`flutter_launcher_icons` 扩展桌面平台支持。
-
-## 📜 开源协议
-本项目采用 MIT License，详见 `LICENSE`。
-
-## 🌐 多语言 README
-- English: [README_EN.md](README_EN.md)
-- 日本語: [README_JA.md](README_JA.md)
+完整历史版本见 [CHANGELOG.md](CHANGELOG.md)。
 
 ## 🤝 贡献与反馈
+
 欢迎提交 Issue / PR，一起完善 BLE 兼容性与推送链路。若在特定设备或平台遇到问题，请附上日志与环境信息，便于复现。
+
+## 📜 开源协议
+
+本项目采用 [MIT License](LICENSE)。
+
+## 🌐 多语言 README
+
+- English: [README_EN.md](README_EN.md)
+- 日本語: [README_JA.md](README_JA.md)
