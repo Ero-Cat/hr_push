@@ -603,6 +603,222 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Got it'**
   String get xiaomiGuideGotIt;
+
+  /// No description provided for @sectionGeneral.
+  ///
+  /// In en, this message translates to:
+  /// **'General'**
+  String get sectionGeneral;
+
+  /// No description provided for @showAdvanced.
+  ///
+  /// In en, this message translates to:
+  /// **'Show advanced'**
+  String get showAdvanced;
+
+  /// No description provided for @hideAdvanced.
+  ///
+  /// In en, this message translates to:
+  /// **'Hide advanced'**
+  String get hideAdvanced;
+
+  /// No description provided for @hintOscEmpty.
+  ///
+  /// In en, this message translates to:
+  /// **'Leave empty to disable OSC push'**
+  String get hintOscEmpty;
+
+  /// No description provided for @btnFillDefault.
+  ///
+  /// In en, this message translates to:
+  /// **'Use default'**
+  String get btnFillDefault;
+
+  /// No description provided for @btnTest.
+  ///
+  /// In en, this message translates to:
+  /// **'Test'**
+  String get btnTest;
+
+  /// No description provided for @testSuccess.
+  ///
+  /// In en, this message translates to:
+  /// **'Test passed'**
+  String get testSuccess;
+
+  /// No description provided for @testFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Failed'**
+  String get testFailed;
+
+  /// No description provided for @hintOscNote.
+  ///
+  /// In en, this message translates to:
+  /// **'OSC is connectionless; the test only verifies the datagram can be sent'**
+  String get hintOscNote;
+
+  /// No description provided for @errInvalidUrl.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter a valid http/https/ws/wss URL'**
+  String get errInvalidUrl;
+
+  /// No description provided for @errInvalidOscAddress.
+  ///
+  /// In en, this message translates to:
+  /// **'Expected host:port (port 1-65535)'**
+  String get errInvalidOscAddress;
+
+  /// No description provided for @errInvalidOscPath.
+  ///
+  /// In en, this message translates to:
+  /// **'OSC path must start with /'**
+  String get errInvalidOscPath;
+
+  /// No description provided for @errInvalidPort.
+  ///
+  /// In en, this message translates to:
+  /// **'Port must be between 1 and 65535'**
+  String get errInvalidPort;
+
+  /// No description provided for @errInvalidInterval.
+  ///
+  /// In en, this message translates to:
+  /// **'Interval must be between 250 and 60000 ms'**
+  String get errInvalidInterval;
+
+  /// No description provided for @errInvalidMaxHr.
+  ///
+  /// In en, this message translates to:
+  /// **'Max heart rate must be between 100 and 250'**
+  String get errInvalidMaxHr;
+
+  /// No description provided for @errInvalidPulseDuration.
+  ///
+  /// In en, this message translates to:
+  /// **'Pulse duration must be between 20 and 1000 ms'**
+  String get errInvalidPulseDuration;
+
+  /// No description provided for @unsavedTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Unsaved changes'**
+  String get unsavedTitle;
+
+  /// No description provided for @unsavedBody.
+  ///
+  /// In en, this message translates to:
+  /// **'Leaving will discard your changes. Continue?'**
+  String get unsavedBody;
+
+  /// No description provided for @unsavedDiscard.
+  ///
+  /// In en, this message translates to:
+  /// **'Discard'**
+  String get unsavedDiscard;
+
+  /// No description provided for @unsavedKeepEditing.
+  ///
+  /// In en, this message translates to:
+  /// **'Keep editing'**
+  String get unsavedKeepEditing;
+
+  /// No description provided for @savedToast.
+  ///
+  /// In en, this message translates to:
+  /// **'Settings saved'**
+  String get savedToast;
+
+  /// No description provided for @fixErrorsBeforeSave.
+  ///
+  /// In en, this message translates to:
+  /// **'Fix the highlighted fields first'**
+  String get fixErrorsBeforeSave;
+
+  /// No description provided for @fieldMqttTls.
+  ///
+  /// In en, this message translates to:
+  /// **'Use TLS (mqtts)'**
+  String get fieldMqttTls;
+
+  /// No description provided for @fieldMqttLwtTopic.
+  ///
+  /// In en, this message translates to:
+  /// **'Last-will topic (optional)'**
+  String get fieldMqttLwtTopic;
+
+  /// No description provided for @hintMqttLwt.
+  ///
+  /// In en, this message translates to:
+  /// **'Publishes an offline message to this topic on abnormal disconnect'**
+  String get hintMqttLwt;
+
+  /// No description provided for @hintClientId.
+  ///
+  /// In en, this message translates to:
+  /// **'Uses a default client ID when empty'**
+  String get hintClientId;
+
+  /// No description provided for @showPassword.
+  ///
+  /// In en, this message translates to:
+  /// **'Show password'**
+  String get showPassword;
+
+  /// No description provided for @onbSkip.
+  ///
+  /// In en, this message translates to:
+  /// **'Skip'**
+  String get onbSkip;
+
+  /// No description provided for @onbNext.
+  ///
+  /// In en, this message translates to:
+  /// **'Next'**
+  String get onbNext;
+
+  /// No description provided for @onbDone.
+  ///
+  /// In en, this message translates to:
+  /// **'Get started'**
+  String get onbDone;
+
+  /// No description provided for @onbTitle1.
+  ///
+  /// In en, this message translates to:
+  /// **'Welcome to HR PUSH'**
+  String get onbTitle1;
+
+  /// No description provided for @onbBody1.
+  ///
+  /// In en, this message translates to:
+  /// **'Read live heart rate from your strap or watch and push it to HTTP/WebSocket, VRChat OSC and MQTT.'**
+  String get onbBody1;
+
+  /// No description provided for @onbTitle2.
+  ///
+  /// In en, this message translates to:
+  /// **'Connect a device'**
+  String get onbTitle2;
+
+  /// No description provided for @onbBody2.
+  ///
+  /// In en, this message translates to:
+  /// **'Wear your heart rate device and tap it under \"Nearby devices\" to connect.\n\nXiaomi/Redmi watches: enable \"Heart Rate Broadcast\" on the watch first (Settings → Heart Rate).'**
+  String get onbBody2;
+
+  /// No description provided for @onbTitle3.
+  ///
+  /// In en, this message translates to:
+  /// **'Set up push'**
+  String get onbTitle3;
+
+  /// No description provided for @onbBody3.
+  ///
+  /// In en, this message translates to:
+  /// **'Open Settings to enter your webhook, OSC or MQTT address. Use the Test button to verify connectivity; data pushes in real time after saving.'**
+  String get onbBody3;
 }
 
 class _AppLocalizationsDelegate

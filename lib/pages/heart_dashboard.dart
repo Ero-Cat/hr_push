@@ -166,7 +166,9 @@ class _HeartDashboardState extends State<HeartDashboard> {
   Future<void> _openSettings(BuildContext context) async {
     final mgr = context.read<HeartRateManager>();
     final updated = await Navigator.of(context).push<HeartRateSettings>(
-      CupertinoPageRoute(builder: (_) => SettingsPage(initial: mgr.settings)),
+      CupertinoPageRoute(
+        builder: (_) => SettingsPage(initial: mgr.settings, manager: mgr),
+      ),
     );
     if (updated != null) {
       await mgr.updateSettings(updated);

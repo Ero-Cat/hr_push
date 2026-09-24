@@ -262,4 +262,115 @@ class AppLocalizationsJa extends AppLocalizations {
 
   @override
   String get xiaomiGuideGotIt => '了解しました';
+
+  @override
+  String get sectionGeneral => '全般';
+
+  @override
+  String get showAdvanced => '詳細設定を表示';
+
+  @override
+  String get hideAdvanced => '詳細設定を閉じる';
+
+  @override
+  String get hintOscEmpty => '空欄で OSC プッシュは無効になります';
+
+  @override
+  String get btnFillDefault => 'デフォルトを使用';
+
+  @override
+  String get btnTest => 'テスト';
+
+  @override
+  String get testSuccess => 'テスト成功';
+
+  @override
+  String get testFailed => '失敗';
+
+  @override
+  String get hintOscNote => 'OSC はコネクションレスのため、テストはデータグラムの送信可否のみ検証します';
+
+  @override
+  String get errInvalidUrl => '有効な http/https/ws/wss URL を入力してください';
+
+  @override
+  String get errInvalidOscAddress => '形式は host:port（ポート 1-65535）です';
+
+  @override
+  String get errInvalidOscPath => 'OSC パスは / で始まる必要があります';
+
+  @override
+  String get errInvalidPort => 'ポートは 1-65535 の範囲で入力してください';
+
+  @override
+  String get errInvalidInterval => '間隔は 250-60000 ms の範囲で入力してください';
+
+  @override
+  String get errInvalidMaxHr => '最大心拍数は 100-250 の範囲で入力してください';
+
+  @override
+  String get errInvalidPulseDuration => '点滅時間は 20-1000 ms の範囲で入力してください';
+
+  @override
+  String get unsavedTitle => '未保存の変更';
+
+  @override
+  String get unsavedBody => '画面を離れると変更が破棄されます。続行しますか？';
+
+  @override
+  String get unsavedDiscard => '破棄';
+
+  @override
+  String get unsavedKeepEditing => '編集を続ける';
+
+  @override
+  String get savedToast => '設定を保存しました';
+
+  @override
+  String get fixErrorsBeforeSave => '赤く表示された項目を先に修正してください';
+
+  @override
+  String get fieldMqttTls => 'TLS を使用 (mqtts)';
+
+  @override
+  String get fieldMqttLwtTopic => 'LWT トピック（任意）';
+
+  @override
+  String get hintMqttLwt => '異常切断時にこのトピックへオフラインメッセージを発行します';
+
+  @override
+  String get hintClientId => '空欄の場合デフォルトのクライアント ID を使用します';
+
+  @override
+  String get showPassword => 'パスワードを表示';
+
+  @override
+  String get onbSkip => 'スキップ';
+
+  @override
+  String get onbNext => '次へ';
+
+  @override
+  String get onbDone => '始める';
+
+  @override
+  String get onbTitle1 => 'HR PUSH へようこそ';
+
+  @override
+  String get onbBody1 =>
+      '心拍ストラップやウォッチの心拍数をリアルタイムで読み取り、HTTP/WebSocket・VRChat OSC・MQTT へプッシュします。';
+
+  @override
+  String get onbTitle2 => 'デバイスを接続';
+
+  @override
+  String get onbBody2 =>
+      '心拍デバイスを装着し、「近くのデバイス」一覧からタップして接続します。\n\nXiaomi/Redmi ウォッチは、先に本体で「心拍数ブロードキャスト」を有効にしてください（設定 → 心拍数）。';
+
+  @override
+  String get onbTitle3 => 'プッシュを設定';
+
+  @override
+  String get onbBody3 =>
+      '設定から Webhook・OSC・MQTT のアドレスを入力し、「テスト」ボタンで接続を確認します。保存後はリアルタイムでプッシュされます。';
 }

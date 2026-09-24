@@ -13,6 +13,8 @@ class MqttService {
     required this.username,
     required this.password,
     required this.clientId,
+    this.useTls = false,
+    this.lwtTopic = '',
     this.onLog,
   });
 
@@ -22,6 +24,8 @@ class MqttService {
   final String username;
   final String password;
   final String clientId;
+  final bool useTls;
+  final String lwtTopic;
   final void Function(String message, {Object? error})? onLog;
 
   MqttServerClient? _client;
@@ -34,6 +38,36 @@ class MqttService {
   void _log(String message, {Object? error}) {
     onLog?.call(message, error: error);
     AppLog.info(message);
+  }
+
+  /// Resolve broker host/port from a bare host or a mqtt://host:port URI.
+  static ({String host, int effectivePort, bool tlsFromScheme}) resolveBroker(
+    String broker,
+    int port,
+  ) {
+    var host = broker.trim();
+    var effectivePort = port > 0 ? port : 1883;
+    var tlsFromScheme = false;
+
+    if (broker.contains('://')) {
+      final uri = Uri.tryParse(broker.trim());
+      if (uri != null && uri.host.isNotEmpty) {
+        host = uri.host;
+        tlsFromScheme =
+            uri.scheme == 'mqtts' || uri.scheme == 'tls' || uri.scheme == 'ssl';
+        if (port <= 0 && uri.port > 0) {
+          effectivePort = uri.port;
+        }
+        if (tlsFromScheme && port <= 0) {
+          effectivePort = uri.port > 0 ? uri.port : 8883;
+        }
+      }
+    }
+    return (
+      host: host,
+      effectivePort: effectivePort,
+      tlsFromScheme: tlsFromScheme,
+    );
   }
 
   /// Send payload to MQTT broker
@@ -59,48 +93,60 @@ class MqttService {
 
   Future<void> _ensureConnected() async {
     if (_connected && _client != null) return;
-    if (_connecting) return;
+    if (_connecting) {
+      _log('mqtt busy connecting, payload dropped');
+      return;
+    }
 
     _connecting = true;
     try {
       final brokerStr = broker.trim();
       if (brokerStr.isEmpty) return;
 
-      var host = brokerStr;
-      var actualPort = port > 0 ? port : 1883;
-
-      if (brokerStr.contains('://')) {
-        final uri = Uri.tryParse(brokerStr);
-        if (uri != null && uri.host.isNotEmpty) {
-          host = uri.host;
-          if (port <= 0 && uri.port > 0) {
-            actualPort = uri.port;
-          }
-        }
-      }
+      final resolved = resolveBroker(broker, port);
+      final tls = useTls || resolved.tlsFromScheme;
 
       final usernameStr = username.trim();
       final rawClientId = clientId.trim();
-      final actualClientId = rawClientId.isNotEmpty
-          ? rawClientId
-          : 'hr_push_${DateTime.now().millisecondsSinceEpoch}';
+      final actualClientId = rawClientId.isNotEmpty ? rawClientId : 'hr_push';
 
-      _log('mqtt connecting: $host:$actualPort clientId=$actualClientId');
+      _log(
+        'mqtt connecting: ${resolved.host}:${resolved.effectivePort}'
+        ' tls=$tls clientId=$actualClientId',
+      );
 
-      final client = MqttServerClient(host, actualClientId)
-        ..port = actualPort
+      final client = MqttServerClient(resolved.host, actualClientId)
+        ..port = resolved.effectivePort
         ..keepAlivePeriod = 20
         ..logging(on: false)
         ..onDisconnected = () {
-          _log('mqtt disconnected: $host:$actualPort');
+          _log('mqtt disconnected: ${resolved.host}:${resolved.effectivePort}');
           _connected = false;
           _client = null;
         };
+      if (tls) {
+        client.secure = true;
+      }
 
-      final connMess = MqttConnectMessage()
-          .withClientIdentifier(actualClientId)
-          .withWillQos(MqttQos.atLeastOnce)
-          .startClean();
+      final connMess = MqttConnectMessage().withClientIdentifier(
+        actualClientId,
+      );
+      final lwt = lwtTopic.trim();
+      if (lwt.isNotEmpty) {
+        connMess
+          ..withWillTopic(lwt)
+          ..withWillMessage(
+            jsonEncode({
+              'event': 'connection',
+              'connected': false,
+              'timestamp': DateTime.now().toIso8601String(),
+            }),
+          )
+          ..withWillQos(MqttQos.atLeastOnce);
+      } else {
+        connMess.withWillQos(MqttQos.atLeastOnce);
+      }
+      connMess.startClean();
 
       client.connectionMessage = connMess;
 
@@ -110,7 +156,10 @@ class MqttService {
           usernameStr.isEmpty ? null : password,
         );
       } catch (e) {
-        _log('mqtt connect failed: $host:$actualPort', error: e);
+        _log(
+          'mqtt connect failed: ${resolved.host}:${resolved.effectivePort}',
+          error: e,
+        );
         client.disconnect();
         return;
       }
@@ -118,7 +167,7 @@ class MqttService {
       if (client.connectionStatus?.state == MqttConnectionState.connected) {
         _client = client;
         _connected = true;
-        _log('mqtt connected: $host:$actualPort');
+        _log('mqtt connected: ${resolved.host}:${resolved.effectivePort}');
       } else {
         client.disconnect();
       }

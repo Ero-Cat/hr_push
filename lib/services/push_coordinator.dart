@@ -142,7 +142,9 @@ class PushCoordinator {
         old.mqttTopic != value.mqttTopic ||
         old.mqttUsername != value.mqttUsername ||
         old.mqttPassword != value.mqttPassword ||
-        old.mqttClientId != value.mqttClientId;
+        old.mqttClientId != value.mqttClientId ||
+        old.mqttUseTls != value.mqttUseTls ||
+        old.mqttLwtTopic != value.mqttLwtTopic;
     if (mqttChanged) {
       _mqttService?.dispose();
       _mqttService = null;
@@ -223,6 +225,8 @@ class PushCoordinator {
       username: _settings.mqttUsername,
       password: _settings.mqttPassword,
       clientId: _settings.mqttClientId,
+      useTls: _settings.mqttUseTls,
+      lwtTopic: _settings.mqttLwtTopic,
       onLog: onLog,
     );
     await _mqttService!.send(payload);
