@@ -40,7 +40,7 @@ class _WindowTrayControllerState extends State<WindowTrayController>
       await trayManager.setContextMenu(
         Menu(
           items: [
-            MenuItem(key: _menuShow, label: 'HR PUSH'),
+            MenuItem(key: _menuShow, label: 'Show HR PUSH'),
             MenuItem.separator(),
             MenuItem(key: _menuQuit, label: 'Exit'),
           ],
@@ -63,6 +63,20 @@ class _WindowTrayControllerState extends State<WindowTrayController>
   void onTrayIconMouseDown() {
     windowManager.show();
     windowManager.focus();
+  }
+
+  @override
+  void onTrayIconRightMouseDown() {
+    // Windows fires this callback on right-click and does NOT pop the menu
+    // natively (tray_manager windows/tray_manager_plugin.cpp WM_RBUTTONUP);
+    // without this call there is no way to reach the Exit item.
+    trayManager.popUpContextMenu();
+  }
+
+  @override
+  void onTrayIconRightMouseUp() {
+    // macOS/other platforms deliver right-click on mouse-up.
+    trayManager.popUpContextMenu();
   }
 
   @override
