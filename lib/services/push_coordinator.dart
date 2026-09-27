@@ -101,7 +101,7 @@ class PushCoordinator {
     _settings = value;
 
     // Reset HTTP/WS service if endpoint changed
-    if (old.pushEndpoint != value.pushEndpoint) {
+    if (old.pushEndpointDiffersFrom(value)) {
       _httpWsService?.dispose();
       _httpWsService = null;
     }
@@ -109,21 +109,7 @@ class PushCoordinator {
     // Reset OSC service if any OSC setting changed. OscService stores paths
     // and ChatBox options in final fields, so keeping the instance would keep
     // sending with stale settings until app restart.
-    final oscChanged =
-        old.oscAddress != value.oscAddress ||
-        old.oscHrConnectedPath != value.oscHrConnectedPath ||
-        old.oscHrValuePath != value.oscHrValuePath ||
-        old.oscHrPercentPath != value.oscHrPercentPath ||
-        old.oscHeartbeatIntPath != value.oscHeartbeatIntPath ||
-        old.oscHeartbeatPulsePath != value.oscHeartbeatPulsePath ||
-        old.oscHeartbeatTogglePath != value.oscHeartbeatTogglePath ||
-        old.oscHeartbeatIntEnabled != value.oscHeartbeatIntEnabled ||
-        old.oscHeartbeatPulseEnabled != value.oscHeartbeatPulseEnabled ||
-        old.oscHeartbeatToggleEnabled != value.oscHeartbeatToggleEnabled ||
-        old.oscHeartbeatPulseDurationMs != value.oscHeartbeatPulseDurationMs ||
-        old.oscChatboxEnabled != value.oscChatboxEnabled ||
-        old.oscChatboxTemplate != value.oscChatboxTemplate;
-    if (oscChanged) {
+    if (old.oscConfigDiffersFrom(value)) {
       final previousOscService = _oscService;
       _oscService = null;
       if (previousOscService != null) {
@@ -136,16 +122,7 @@ class PushCoordinator {
     _setOscConfiguredStatus(value);
 
     // Reset MQTT service if any MQTT settings changed
-    final mqttChanged =
-        old.mqttBroker != value.mqttBroker ||
-        old.mqttPort != value.mqttPort ||
-        old.mqttTopic != value.mqttTopic ||
-        old.mqttUsername != value.mqttUsername ||
-        old.mqttPassword != value.mqttPassword ||
-        old.mqttClientId != value.mqttClientId ||
-        old.mqttUseTls != value.mqttUseTls ||
-        old.mqttLwtTopic != value.mqttLwtTopic;
-    if (mqttChanged) {
+    if (old.mqttConfigDiffersFrom(value)) {
       _mqttService?.dispose();
       _mqttService = null;
     }

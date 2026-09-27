@@ -34,7 +34,8 @@
   "fieldHeartbeatToggle": "Beat toggle",
   "fieldHeartbeatTogglePath": "Beat toggle address",
   "fieldHeartbeatDuration": "Flash duration (ms)",
-  "fieldMaxHr": "Max HR",
+  "fieldMinHr": "Min HR (0%)",
+  "fieldMaxHr": "Max HR (100%)",
   "oscStatusTitle": "OSC Push",
   "oscStatusDisabled": "Disabled",
   "oscStatusReady": "Ready",
@@ -105,7 +106,9 @@
   "errInvalidOscPath": "OSC path must start with /",
   "errInvalidPort": "Port must be between 1 and 65535",
   "errInvalidInterval": "Interval must be between 250 and 60000 ms",
+  "errInvalidMinHr": "Min heart rate must be between 0 and 180",
   "errInvalidMaxHr": "Max heart rate must be between 100 and 250",
+  "errInvalidHrRange": "Min heart rate must be less than max heart rate",
   "errInvalidPulseDuration": "Pulse duration must be between 20 and 1000 ms",
   "unsavedTitle": "Unsaved changes",
   "unsavedBody": "Leaving will discard your changes. Continue?",
@@ -144,5 +147,37 @@
   "stSubscribeFailed": "Subscription failed",
   "stConnectTimeout": "Connection timed out",
   "stConnectCancelled": "Connection cancelled",
-  "stDeviceDisconnected": "Device disconnected"
+  "stDeviceDisconnected": "Device disconnected",
+  "btnHrPercentHelp": "Percent conversion guide",
+  "percentHelpTitle": "Heart rate percent",
+  "percentHelpFormulaTitle": "Formula",
+  "percentHelpFormulaBody": "percent = (BPM − min HR) ÷ (max HR − min HR)\n\nThe result is a float between 0.0 and 1.0: 0.0 at the min HR, 1.0 at the max HR, and clamped outside the range. The defaults (min 0, max 200) are equivalent to BPM ÷ 200.",
+  "percentHelpExampleTitle": "Live examples",
+  "percentHelpExampleIntro": "Converted with the current settings (min {min}, max {max}):",
+  "@percentHelpExampleIntro": {
+    "placeholders": {
+      "min": {
+        "type": "int"
+      },
+      "max": {
+        "type": "int"
+      }
+    }
+  },
+  "percentHelpTagMin": "Min",
+  "percentHelpTagMid": "Midpoint",
+  "percentHelpTagMax": "Max",
+  "percentHelpTagClampedLow": "Below min → clamped to 0",
+  "percentHelpTagClampedHigh": "Above max → clamped to 1",
+  "percentHelpFieldsTitle": "Push fields",
+  "percentHelpFieldJson": "HTTP/WS/MQTT: the percent field in the JSON payload, float 0~1",
+  "percentHelpFieldOsc": "OSC: /avatar/parameters/hr_percent, float 0~1",
+  "percentHelpFieldChatbox": "ChatBox template percent placeholder: rendered as an integer 0~100",
+  "percentHelpUnityTitle": "Unity / VRChat mapping",
+  "percentHelpUnityIntro": "Unity tools often remap the percent to 0~255 (8-bit). Two input conventions are common:",
+  "percentHelpUnity01": "Tool expects 0~1 input: value × 255 (e.g. 0.5 → 128)",
+  "percentHelpUnityNeg": "Tool expects -1~1 input: remap (value × 2 − 1) onto 0~255 (e.g. 0.5 → 191)",
+  "percentHelpUnityDirect": "Float animator parameters: feed 0~1 directly, no conversion needed",
+  "percentHelpWhyTitle": "Why set a min HR",
+  "percentHelpWhyBody": "With a min of 0, a resting rate of 60 BPM already reads 0.3, so daily variation only spans 0.3~1.0. Setting the min to your everyday resting rate (e.g. 60) lets 0.0~1.0 cover your actual range, making animations more expressive."
 }

@@ -34,7 +34,8 @@
   "fieldHeartbeatToggle": "逐拍翻转",
   "fieldHeartbeatTogglePath": "逐拍翻转地址",
   "fieldHeartbeatDuration": "闪烁时长 (ms)",
-  "fieldMaxHr": "最大心率",
+  "fieldMinHr": "下限心率 (0%)",
+  "fieldMaxHr": "上限心率 (100%)",
   "oscStatusTitle": "OSC 推送",
   "oscStatusDisabled": "未启用",
   "oscStatusReady": "待发送",
@@ -105,7 +106,9 @@
   "errInvalidOscPath": "OSC 路径需以 / 开头",
   "errInvalidPort": "端口需在 1-65535 之间",
   "errInvalidInterval": "间隔需在 250-60000 ms 之间",
-  "errInvalidMaxHr": "最大心率需在 100-250 之间",
+  "errInvalidMinHr": "下限心率需在 0-180 之间",
+  "errInvalidMaxHr": "上限心率需在 100-250 之间",
+  "errInvalidHrRange": "下限心率必须小于上限心率",
   "errInvalidPulseDuration": "闪烁时长需在 20-1000 ms 之间",
   "unsavedTitle": "未保存的修改",
   "unsavedBody": "离开将丢弃未保存的修改，确定继续吗？",
@@ -144,5 +147,37 @@
   "stSubscribeFailed": "订阅心率失败",
   "stConnectTimeout": "连接超时",
   "stConnectCancelled": "连接取消",
-  "stDeviceDisconnected": "设备断开"
+  "stDeviceDisconnected": "设备断开",
+  "btnHrPercentHelp": "百分比换算说明",
+  "percentHelpTitle": "心率百分比说明",
+  "percentHelpFormulaTitle": "换算公式",
+  "percentHelpFormulaBody": "percent = (BPM − 下限心率) ÷ (上限心率 − 下限心率)\n\n结果为 0.0~1.0 的浮点数：BPM 等于下限时为 0.0，等于上限时为 1.0，超出区间会被截断。默认下限 0、上限 200，等价于 BPM ÷ 200。",
+  "percentHelpExampleTitle": "实时示例",
+  "percentHelpExampleIntro": "按当前设置换算（下限 {min}，上限 {max}）：",
+  "@percentHelpExampleIntro": {
+    "placeholders": {
+      "min": {
+        "type": "int"
+      },
+      "max": {
+        "type": "int"
+      }
+    }
+  },
+  "percentHelpTagMin": "下限",
+  "percentHelpTagMid": "中点",
+  "percentHelpTagMax": "上限",
+  "percentHelpTagClampedLow": "低于下限 → 截断为 0",
+  "percentHelpTagClampedHigh": "高于上限 → 截断为 1",
+  "percentHelpFieldsTitle": "推送字段对照",
+  "percentHelpFieldJson": "HTTP/WS/MQTT：JSON 中的 percent 字段，0~1 浮点数",
+  "percentHelpFieldOsc": "OSC：/avatar/parameters/hr_percent，float 类型 0~1",
+  "percentHelpFieldChatbox": "ChatBox 模板的 percent 占位符：换算为 0~100 的整数文本",
+  "percentHelpUnityTitle": "Unity / VRChat 映射",
+  "percentHelpUnityIntro": "Unity 工具常把心率百分比再映射为 0~255（8 位），常见两种输入约定：",
+  "percentHelpUnity01": "工具期望 0~1 输入：value × 255（例：0.5 → 128）",
+  "percentHelpUnityNeg": "工具期望 -1~1 输入：先 value × 2 − 1 再映射 0~255（例：0.5 → 191）",
+  "percentHelpUnityDirect": "Float 动画参数：0~1 可直接驱动，无需换算",
+  "percentHelpWhyTitle": "为什么要设置下限",
+  "percentHelpWhyBody": "下限为 0 时，静息心率 60 BPM 的百分比已达 0.3，日常波动只占用 0.3~1.0 的区间。把下限设为日常静息心率（如 60），可让 0.0~1.0 完整覆盖你的实际心率变化，动画层次更分明。"
 }

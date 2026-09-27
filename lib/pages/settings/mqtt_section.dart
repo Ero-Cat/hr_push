@@ -8,19 +8,22 @@ import '../../utils/settings_validator.dart';
 import '../../widgets/settings/validated_field.dart';
 import 'settings_section.dart';
 import 'settings_section_contract.dart';
+import 'settings_section_state.dart';
 
 /// MQTT section: broker, port, TLS, credentials, last-will topic, test.
-class MqttSettingsSection extends StatefulWidget {
-  const MqttSettingsSection({super.key, required this.initial, this.onChanged});
-
-  final HeartRateSettings initial;
-  final VoidCallback? onChanged;
+class MqttSettingsSection extends SettingsSectionWidget {
+  const MqttSettingsSection({
+    super.key,
+    required super.initial,
+    super.onChanged,
+  });
 
   @override
   State<MqttSettingsSection> createState() => MqttSettingsSectionState();
 }
 
 class MqttSettingsSectionState extends State<MqttSettingsSection>
+    with SettingsSectionState<MqttSettingsSection>
     implements SettingsSectionContract {
   late final TextEditingController _brokerCtrl;
   late final TextEditingController _portCtrl;
@@ -37,43 +40,16 @@ class MqttSettingsSectionState extends State<MqttSettingsSection>
   void initState() {
     super.initState();
     final s = widget.initial;
-    _brokerCtrl = TextEditingController(text: s.mqttBroker);
-    _portCtrl = TextEditingController(text: s.mqttPort.toString());
-    _topicCtrl = TextEditingController(text: s.mqttTopic);
-    _usernameCtrl = TextEditingController(text: s.mqttUsername);
-    _passwordCtrl = TextEditingController(text: s.mqttPassword);
-    _clientIdCtrl = TextEditingController(text: s.mqttClientId);
-    _lwtTopicCtrl = TextEditingController(text: s.mqttLwtTopic);
+    _brokerCtrl = fieldController(s.mqttBroker);
+    _portCtrl = fieldController(s.mqttPort.toString());
+    _topicCtrl = fieldController(s.mqttTopic);
+    _usernameCtrl = fieldController(s.mqttUsername);
+    _passwordCtrl = fieldController(s.mqttPassword);
+    _clientIdCtrl = fieldController(s.mqttClientId);
+    _lwtTopicCtrl = fieldController(s.mqttLwtTopic);
     _useTls = s.mqttUseTls;
 
-    for (final c in _controllers) {
-      c.addListener(_notifyChanged);
-    }
-  }
-
-  List<TextEditingController> get _controllers => [
-    _brokerCtrl,
-    _portCtrl,
-    _topicCtrl,
-    _usernameCtrl,
-    _passwordCtrl,
-    _clientIdCtrl,
-    _lwtTopicCtrl,
-  ];
-
-  @override
-  void dispose() {
-    for (final c in _controllers) {
-      c.dispose();
-    }
-    super.dispose();
-  }
-
-  void _notifyChanged() {
-    // Rebuild this section so inline validation errors update live; the
-    // page shell separately tracks the dirty flag.
-    if (mounted) setState(() {});
-    widget.onChanged?.call();
+    listenToFields();
   }
 
   String? get _portError => SettingsValidator.port(_portCtrl.text);
@@ -81,19 +57,16 @@ class MqttSettingsSectionState extends State<MqttSettingsSection>
   @override
   List<String> validate() => [_portError].whereType<String>().toList();
 
-  bool _textDirty(TextEditingController c, String initial) =>
-      c.text.trim() != initial;
-
   @override
   bool isDirty() {
     final s = widget.initial;
-    return _textDirty(_brokerCtrl, s.mqttBroker) ||
-        _textDirty(_portCtrl, s.mqttPort.toString()) ||
-        _textDirty(_topicCtrl, s.mqttTopic) ||
-        _textDirty(_usernameCtrl, s.mqttUsername) ||
-        _textDirty(_passwordCtrl, s.mqttPassword) ||
-        _textDirty(_clientIdCtrl, s.mqttClientId) ||
-        _textDirty(_lwtTopicCtrl, s.mqttLwtTopic) ||
+    return textDirty(_brokerCtrl, s.mqttBroker) ||
+        textDirty(_portCtrl, s.mqttPort.toString()) ||
+        textDirty(_topicCtrl, s.mqttTopic) ||
+        textDirty(_usernameCtrl, s.mqttUsername) ||
+        textDirty(_passwordCtrl, s.mqttPassword) ||
+        textDirty(_clientIdCtrl, s.mqttClientId) ||
+        textDirty(_lwtTopicCtrl, s.mqttLwtTopic) ||
         _useTls != s.mqttUseTls;
   }
 
@@ -154,7 +127,7 @@ class MqttSettingsSectionState extends State<MqttSettingsSection>
             activeTrackColor: AppColors.accent,
             onChanged: (v) => setState(() {
               _useTls = v;
-              widget.onChanged?.call();
+              notifyFieldChanged();
             }),
           ),
         ),

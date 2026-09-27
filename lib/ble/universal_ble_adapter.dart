@@ -157,6 +157,9 @@ class UniversalBleAdapter implements BleAdapter {
   }
 
   @override
+  bool get isScanning => _isScanning;
+
+  @override
   Future<void> connect(String deviceId, {Duration? timeout}) async {
     _getConnectionController(deviceId).add(AdapterConnectionState.connecting);
 
@@ -228,56 +231,6 @@ class UniversalBleAdapter implements BleAdapter {
       mode == BleSubscriptionMode.indication
           ? BleInputProperty.indication
           : BleInputProperty.notification,
-    );
-  }
-
-  @override
-  Future<void> unsubscribeFromCharacteristic(
-    String deviceId,
-    String serviceUuid,
-    String characteristicUuid,
-  ) async {
-    // ignore: deprecated_member_use
-    await UniversalBle.setNotifiable(
-      deviceId,
-      serviceUuid,
-      characteristicUuid,
-      BleInputProperty.disabled,
-    );
-  }
-
-  @override
-  Future<Uint8List> readCharacteristic(
-    String deviceId,
-    String serviceUuid,
-    String characteristicUuid,
-  ) async {
-    // ignore: deprecated_member_use
-    final value = await UniversalBle.readValue(
-      deviceId,
-      serviceUuid,
-      characteristicUuid,
-    );
-    return Uint8List.fromList(value);
-  }
-
-  @override
-  Future<void> writeCharacteristic(
-    String deviceId,
-    String serviceUuid,
-    String characteristicUuid,
-    Uint8List data, {
-    bool withResponse = true,
-  }) async {
-    // ignore: deprecated_member_use
-    await UniversalBle.writeValue(
-      deviceId,
-      serviceUuid,
-      characteristicUuid,
-      data,
-      withResponse
-          ? BleOutputProperty.withResponse
-          : BleOutputProperty.withoutResponse,
     );
   }
 

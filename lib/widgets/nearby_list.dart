@@ -5,6 +5,9 @@ import '../heart_rate_manager.dart';
 import '../models/models.dart';
 import '../theme/design_system.dart';
 
+/// Nearby BLE device list: signal strength, connection state per device and
+/// manual scan trigger. Reads its state live from [mgr]; the dashboard gates
+/// rebuilds with a Selector.
 class NearbyList extends StatelessWidget {
   const NearbyList({super.key, required this.mgr});
 

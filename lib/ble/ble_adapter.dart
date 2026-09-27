@@ -102,6 +102,9 @@ abstract class BleAdapter {
   /// Stop scanning
   Future<void> stopScan();
 
+  /// Whether a scan started through this adapter is still running
+  bool get isScanning;
+
   /// Connect to a device
   Future<void> connect(String deviceId, {Duration? timeout});
 
@@ -119,32 +122,9 @@ abstract class BleAdapter {
     BleSubscriptionMode mode = BleSubscriptionMode.notification,
   });
 
-  /// Unsubscribe from characteristic notifications
-  Future<void> unsubscribeFromCharacteristic(
-    String deviceId,
-    String serviceUuid,
-    String characteristicUuid,
-  );
-
-  /// Read characteristic value
-  Future<Uint8List> readCharacteristic(
-    String deviceId,
-    String serviceUuid,
-    String characteristicUuid,
-  );
-
-  /// Write characteristic value
-  Future<void> writeCharacteristic(
-    String deviceId,
-    String serviceUuid,
-    String characteristicUuid,
-    Uint8List data, {
-    bool withResponse = true,
-  });
-
   /// Release per-device resources after disconnect so long sessions do not
   /// accumulate state for every address seen (relevant for rotating MACs).
-  void cleanupDevice(String deviceId) {}
+  void cleanupDevice(String deviceId);
 
   /// Dispose resources
   void dispose();

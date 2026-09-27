@@ -111,7 +111,10 @@ class AppLocalizationsJa extends AppLocalizations {
   String get fieldHeartbeatDuration => 'フラッシュ時間 (ms)';
 
   @override
-  String get fieldMaxHr => '最大心拍数';
+  String get fieldMinHr => '下限心拍 (0%)';
+
+  @override
+  String get fieldMaxHr => '上限心拍 (100%)';
 
   @override
   String get oscStatusTitle => 'OSC送信';
@@ -306,7 +309,13 @@ class AppLocalizationsJa extends AppLocalizations {
   String get errInvalidInterval => '間隔は 250-60000 ms の範囲で入力してください';
 
   @override
-  String get errInvalidMaxHr => '最大心拍数は 100-250 の範囲で入力してください';
+  String get errInvalidMinHr => '下限心拍数は 0-180 の範囲で入力してください';
+
+  @override
+  String get errInvalidMaxHr => '上限心拍数は 100-250 の範囲で入力してください';
+
+  @override
+  String get errInvalidHrRange => '下限心拍数は上限心拍数より小さくしてください';
 
   @override
   String get errInvalidPulseDuration => '点滅時間は 20-1000 ms の範囲で入力してください';
@@ -428,4 +437,79 @@ class AppLocalizationsJa extends AppLocalizations {
 
   @override
   String get stDeviceDisconnected => 'デバイスが切断されました';
+
+  @override
+  String get btnHrPercentHelp => 'パーセント換算の説明';
+
+  @override
+  String get percentHelpTitle => '心拍パーセントについて';
+
+  @override
+  String get percentHelpFormulaTitle => '換算式';
+
+  @override
+  String get percentHelpFormulaBody =>
+      'percent = (BPM − 下限心拍数) ÷ (上限心拍数 − 下限心拍数)\n\n結果は 0.0~1.0 の浮動小数点数です。BPM が下限で 0.0、上限で 1.0 になり、範囲外は切り詰められます。デフォルト（下限 0・上限 200）は BPM ÷ 200 と同じです。';
+
+  @override
+  String get percentHelpExampleTitle => 'リアルタイム例';
+
+  @override
+  String percentHelpExampleIntro(int min, int max) {
+    return '現在の設定（下限 $min・上限 $max）での換算：';
+  }
+
+  @override
+  String get percentHelpTagMin => '下限';
+
+  @override
+  String get percentHelpTagMid => '中間';
+
+  @override
+  String get percentHelpTagMax => '上限';
+
+  @override
+  String get percentHelpTagClampedLow => '下限未満 → 0 に切り詰め';
+
+  @override
+  String get percentHelpTagClampedHigh => '上限超過 → 1 に切り詰め';
+
+  @override
+  String get percentHelpFieldsTitle => '送信フィールド';
+
+  @override
+  String get percentHelpFieldJson =>
+      'HTTP/WS/MQTT：JSON ペイロードの percent フィールド（0~1 の浮動小数点数）';
+
+  @override
+  String get percentHelpFieldOsc =>
+      'OSC：/avatar/parameters/hr_percent（float、0~1）';
+
+  @override
+  String get percentHelpFieldChatbox =>
+      'ChatBox テンプレートの percent プレースホルダー：0~100 の整数テキスト';
+
+  @override
+  String get percentHelpUnityTitle => 'Unity / VRChat マッピング';
+
+  @override
+  String get percentHelpUnityIntro =>
+      'Unity ツールはパーセントを 0~255（8 ビット）へ再マッピングすることが多く、入力の規約は 2 種類あります：';
+
+  @override
+  String get percentHelpUnity01 => '0~1 入力のツール：value × 255（例：0.5 → 128）';
+
+  @override
+  String get percentHelpUnityNeg =>
+      '-1~1 入力のツール：(value × 2 − 1) を 0~255 へ再マッピング（例：0.5 → 191）';
+
+  @override
+  String get percentHelpUnityDirect => 'Float アニメーターパラメーター：0~1 をそのまま使用可能';
+
+  @override
+  String get percentHelpWhyTitle => '下限を設定する理由';
+
+  @override
+  String get percentHelpWhyBody =>
+      '下限が 0 の場合、安静時 60 BPM でもすでに 0.3 となり、日常の変動は 0.3~1.0 の範囲しか使えません。下限を日常の安静時心拍数（例：60）に設定すると、0.0~1.0 が実際の心拍変動をフルにカバーし、アニメーションの表情が豊かになります。';
 }

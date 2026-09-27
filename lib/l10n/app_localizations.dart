@@ -304,10 +304,16 @@ abstract class AppLocalizations {
   /// **'Flash duration (ms)'**
   String get fieldHeartbeatDuration;
 
+  /// No description provided for @fieldMinHr.
+  ///
+  /// In en, this message translates to:
+  /// **'Min HR (0%)'**
+  String get fieldMinHr;
+
   /// No description provided for @fieldMaxHr.
   ///
   /// In en, this message translates to:
-  /// **'Max HR'**
+  /// **'Max HR (100%)'**
   String get fieldMaxHr;
 
   /// No description provided for @oscStatusTitle.
@@ -688,11 +694,23 @@ abstract class AppLocalizations {
   /// **'Interval must be between 250 and 60000 ms'**
   String get errInvalidInterval;
 
+  /// No description provided for @errInvalidMinHr.
+  ///
+  /// In en, this message translates to:
+  /// **'Min heart rate must be between 0 and 180'**
+  String get errInvalidMinHr;
+
   /// No description provided for @errInvalidMaxHr.
   ///
   /// In en, this message translates to:
   /// **'Max heart rate must be between 100 and 250'**
   String get errInvalidMaxHr;
+
+  /// No description provided for @errInvalidHrRange.
+  ///
+  /// In en, this message translates to:
+  /// **'Min heart rate must be less than max heart rate'**
+  String get errInvalidHrRange;
 
   /// No description provided for @errInvalidPulseDuration.
   ///
@@ -927,6 +945,138 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Device disconnected'**
   String get stDeviceDisconnected;
+
+  /// No description provided for @btnHrPercentHelp.
+  ///
+  /// In en, this message translates to:
+  /// **'Percent conversion guide'**
+  String get btnHrPercentHelp;
+
+  /// No description provided for @percentHelpTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Heart rate percent'**
+  String get percentHelpTitle;
+
+  /// No description provided for @percentHelpFormulaTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Formula'**
+  String get percentHelpFormulaTitle;
+
+  /// No description provided for @percentHelpFormulaBody.
+  ///
+  /// In en, this message translates to:
+  /// **'percent = (BPM − min HR) ÷ (max HR − min HR)\n\nThe result is a float between 0.0 and 1.0: 0.0 at the min HR, 1.0 at the max HR, and clamped outside the range. The defaults (min 0, max 200) are equivalent to BPM ÷ 200.'**
+  String get percentHelpFormulaBody;
+
+  /// No description provided for @percentHelpExampleTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Live examples'**
+  String get percentHelpExampleTitle;
+
+  /// No description provided for @percentHelpExampleIntro.
+  ///
+  /// In en, this message translates to:
+  /// **'Converted with the current settings (min {min}, max {max}):'**
+  String percentHelpExampleIntro(int min, int max);
+
+  /// No description provided for @percentHelpTagMin.
+  ///
+  /// In en, this message translates to:
+  /// **'Min'**
+  String get percentHelpTagMin;
+
+  /// No description provided for @percentHelpTagMid.
+  ///
+  /// In en, this message translates to:
+  /// **'Midpoint'**
+  String get percentHelpTagMid;
+
+  /// No description provided for @percentHelpTagMax.
+  ///
+  /// In en, this message translates to:
+  /// **'Max'**
+  String get percentHelpTagMax;
+
+  /// No description provided for @percentHelpTagClampedLow.
+  ///
+  /// In en, this message translates to:
+  /// **'Below min → clamped to 0'**
+  String get percentHelpTagClampedLow;
+
+  /// No description provided for @percentHelpTagClampedHigh.
+  ///
+  /// In en, this message translates to:
+  /// **'Above max → clamped to 1'**
+  String get percentHelpTagClampedHigh;
+
+  /// No description provided for @percentHelpFieldsTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Push fields'**
+  String get percentHelpFieldsTitle;
+
+  /// No description provided for @percentHelpFieldJson.
+  ///
+  /// In en, this message translates to:
+  /// **'HTTP/WS/MQTT: the percent field in the JSON payload, float 0~1'**
+  String get percentHelpFieldJson;
+
+  /// No description provided for @percentHelpFieldOsc.
+  ///
+  /// In en, this message translates to:
+  /// **'OSC: /avatar/parameters/hr_percent, float 0~1'**
+  String get percentHelpFieldOsc;
+
+  /// No description provided for @percentHelpFieldChatbox.
+  ///
+  /// In en, this message translates to:
+  /// **'ChatBox template percent placeholder: rendered as an integer 0~100'**
+  String get percentHelpFieldChatbox;
+
+  /// No description provided for @percentHelpUnityTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Unity / VRChat mapping'**
+  String get percentHelpUnityTitle;
+
+  /// No description provided for @percentHelpUnityIntro.
+  ///
+  /// In en, this message translates to:
+  /// **'Unity tools often remap the percent to 0~255 (8-bit). Two input conventions are common:'**
+  String get percentHelpUnityIntro;
+
+  /// No description provided for @percentHelpUnity01.
+  ///
+  /// In en, this message translates to:
+  /// **'Tool expects 0~1 input: value × 255 (e.g. 0.5 → 128)'**
+  String get percentHelpUnity01;
+
+  /// No description provided for @percentHelpUnityNeg.
+  ///
+  /// In en, this message translates to:
+  /// **'Tool expects -1~1 input: remap (value × 2 − 1) onto 0~255 (e.g. 0.5 → 191)'**
+  String get percentHelpUnityNeg;
+
+  /// No description provided for @percentHelpUnityDirect.
+  ///
+  /// In en, this message translates to:
+  /// **'Float animator parameters: feed 0~1 directly, no conversion needed'**
+  String get percentHelpUnityDirect;
+
+  /// No description provided for @percentHelpWhyTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Why set a min HR'**
+  String get percentHelpWhyTitle;
+
+  /// No description provided for @percentHelpWhyBody.
+  ///
+  /// In en, this message translates to:
+  /// **'With a min of 0, a resting rate of 60 BPM already reads 0.3, so daily variation only spans 0.3~1.0. Setting the min to your everyday resting rate (e.g. 60) lets 0.0~1.0 cover your actual range, making animations more expressive.'**
+  String get percentHelpWhyBody;
 }
 
 class _AppLocalizationsDelegate

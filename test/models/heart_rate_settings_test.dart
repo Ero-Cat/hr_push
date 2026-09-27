@@ -58,4 +58,54 @@ void main() {
     expect(restored.oscHeartbeatToggleEnabled, isFalse);
     expect(restored.oscHeartbeatPulseDurationMs, 360);
   });
+
+  test('min/max heart rate persist through preferences', () async {
+    SharedPreferences.setMockInitialValues({});
+    final prefs = await SharedPreferences.getInstance();
+
+    final settings = HeartRateSettings.defaults().copyWith(
+      minHeartRate: 60,
+      maxHeartRate: 190,
+    );
+
+    await settings.save(prefs);
+    final restored = HeartRateSettings.fromPrefs(prefs);
+
+    expect(restored.minHeartRate, 60);
+    expect(restored.maxHeartRate, 190);
+  });
+
+  test('percentFor matches bpm / maxHeartRate with default min of 0', () {
+    final settings = HeartRateSettings.defaults();
+
+    expect(settings.minHeartRate, 0);
+    expect(settings.percentFor(100), 0.5);
+    expect(settings.percentFor(200), 1.0);
+    expect(settings.percentFor(300), 1.0); // clamped above
+    expect(settings.percentFor(0), 0.0);
+    expect(settings.percentFor(null), isNull);
+  });
+
+  test('percentFor maps the min-max span onto 0..1', () {
+    final settings = HeartRateSettings.defaults().copyWith(
+      minHeartRate: 60,
+      maxHeartRate: 200,
+    );
+
+    expect(settings.percentFor(60), 0.0);
+    expect(settings.percentFor(130), closeTo(0.5, 1e-9));
+    expect(settings.percentFor(200), 1.0);
+    expect(settings.percentFor(50), 0.0); // clamped below
+    expect(settings.percentFor(220), 1.0); // clamped above
+    expect(settings.percentFor(null), isNull);
+  });
+
+  test('percentFor returns null for a non-positive span', () {
+    final settings = HeartRateSettings.defaults().copyWith(
+      minHeartRate: 200,
+      maxHeartRate: 200,
+    );
+
+    expect(settings.percentFor(150), isNull);
+  });
 }

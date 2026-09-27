@@ -7,19 +7,22 @@ import '../../utils/settings_validator.dart';
 import '../../widgets/settings/validated_field.dart';
 import 'settings_section.dart';
 import 'settings_section_contract.dart';
+import 'settings_section_state.dart';
 
 /// HTTP/WebSocket push section: endpoint, publish interval, test button.
-class PushSettingsSection extends StatefulWidget {
-  const PushSettingsSection({super.key, required this.initial, this.onChanged});
-
-  final HeartRateSettings initial;
-  final VoidCallback? onChanged;
+class PushSettingsSection extends SettingsSectionWidget {
+  const PushSettingsSection({
+    super.key,
+    required super.initial,
+    super.onChanged,
+  });
 
   @override
   State<PushSettingsSection> createState() => PushSettingsSectionState();
 }
 
 class PushSettingsSectionState extends State<PushSettingsSection>
+    with SettingsSectionState<PushSettingsSection>
     implements SettingsSectionContract {
   late final TextEditingController _endpointCtrl;
   late final TextEditingController _intervalCtrl;
@@ -27,26 +30,9 @@ class PushSettingsSectionState extends State<PushSettingsSection>
   @override
   void initState() {
     super.initState();
-    _endpointCtrl = TextEditingController(text: widget.initial.pushEndpoint);
-    _intervalCtrl = TextEditingController(
-      text: widget.initial.updateIntervalMs.toString(),
-    );
-    _endpointCtrl.addListener(_notifyChanged);
-    _intervalCtrl.addListener(_notifyChanged);
-  }
-
-  @override
-  void dispose() {
-    _endpointCtrl.dispose();
-    _intervalCtrl.dispose();
-    super.dispose();
-  }
-
-  void _notifyChanged() {
-    // Rebuild this section so inline validation errors update live; the
-    // page shell separately tracks the dirty flag.
-    if (mounted) setState(() {});
-    widget.onChanged?.call();
+    _endpointCtrl = fieldController(widget.initial.pushEndpoint);
+    _intervalCtrl = fieldController(widget.initial.updateIntervalMs.toString());
+    listenToFields();
   }
 
   String? get _endpointError =>
@@ -61,7 +47,7 @@ class PushSettingsSectionState extends State<PushSettingsSection>
 
   @override
   bool isDirty() =>
-      _endpointCtrl.text.trim() != widget.initial.pushEndpoint ||
+      textDirty(_endpointCtrl, widget.initial.pushEndpoint) ||
       (int.tryParse(_intervalCtrl.text.trim()) ?? -1) !=
           widget.initial.updateIntervalMs;
 

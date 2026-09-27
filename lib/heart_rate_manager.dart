@@ -16,6 +16,12 @@ import 'services/live_activity_service.dart';
 import 'services/services.dart';
 import 'utils/utils.dart';
 
+/// Central app state: BLE scanning/connection, heart-rate ingestion, push
+/// fan-out (HTTP/WS, OSC, MQTT) and persistence.
+///
+/// UI visibility ([setUiVisible]) is reported by the app shell (window
+/// minimize/hide/tray and mobile lifecycle); while hidden, throttled UI
+/// notifications are suppressed — monitoring and pushing continue.
 class HeartRateManager extends ChangeNotifier {
   HeartRateManager() {
     _pushCoordinator = PushCoordinator(
@@ -25,7 +31,6 @@ class HeartRateManager extends ChangeNotifier {
     // Initialize BleScanner with callbacks
     _scanner = BleScanner(
       onLog: _log,
-      onDeviceFound: _onDeviceFound,
       onBroadcastHeartRate: _onBroadcastHeartRate,
     );
     // Initialize BleConnectionService
@@ -71,7 +76,6 @@ class HeartRateManager extends ChangeNotifier {
 
   bool _autoReconnect = true;
   bool _userInitiatedDisconnect = false;
-  final bool _isScanning = false;
   bool _uiScanning = false;
   bool _isTestEnv = false;
   bool _autoConnectEnabled = false; // 首次启动不自动连接，等待用户操作
@@ -93,6 +97,15 @@ class HeartRateManager extends ChangeNotifier {
   String? _statusParam;
   BleAdapterState _adapterState = BleAdapterState.unknown;
   DateTime? _connectedAt;
+
+  // Set by the app shell when the window is minimized/hidden to tray or the
+  // mobile app goes to background; gates UI work (rebuilds, animations).
+  bool _uiVisible = true;
+
+  // Last values pushed to the Android notification / iOS Live Activity, so
+  // the platform channels are only hit when displayed content changed.
+  int? _lastNotifiedBpm;
+  String? _lastNotifiedDevice;
 
   DateTime? _lastStatusChange;
   DateTime? _lastOscConnectedRefreshAt;
@@ -120,7 +133,12 @@ class HeartRateManager extends ChangeNotifier {
 
   List<NearbyDevice> get nearbyDevices => _scanner.nearbyDevices;
 
-  bool get isScanning => _isScanning;
+  /// Whether the adapter is currently running a scan.
+  bool get isScanning => _bleAdapter.isScanning;
+
+  /// Whether the app window is visible (not minimized/hidden to tray or
+  /// backgrounded). Animations and UI rebuilds are paused while false.
+  bool get uiVisible => _uiVisible;
   bool get uiScanning => _uiScanning;
   bool get isHeartRateFresh =>
       _lastUpdated != null &&
@@ -209,7 +227,9 @@ class HeartRateManager extends ChangeNotifier {
     final changed = next != _hrOnline;
     _hrOnline = next;
     if (changed || forceOsc) {
-      unawaited(_sendOscConnectedIfNeeded(_hrOnline, force: forceOsc));
+      unawaited(
+        _pushCoordinator.sendConnectionStatus(_hrOnline, force: forceOsc),
+      );
     }
   }
 
@@ -222,7 +242,7 @@ class HeartRateManager extends ChangeNotifier {
       return;
     }
     _lastOscConnectedRefreshAt = now;
-    unawaited(_sendOscConnectedIfNeeded(true, force: true));
+    unawaited(_pushCoordinator.sendConnectionStatus(true, force: true));
   }
 
   void _setStatus(String value, {bool force = false, String? param}) {
@@ -314,7 +334,6 @@ class HeartRateManager extends ChangeNotifier {
     });
 
     _scanResultsSub = _bleAdapter.scanStream.listen(_handleScanResult);
-    // UniversalBle doesn't expose isScanning stream directly, we manage it manually.
 
     _startScanLoopTimer();
 
@@ -337,7 +356,7 @@ class HeartRateManager extends ChangeNotifier {
     _scanLoopTimer?.cancel();
     _scanLoopTimer = Timer.periodic(_scanInterval, (_) {
       final now = DateTime.now();
-      _pruneNearby(now);
+      _scanner.pruneNearby();
       _checkStaleConnection(now);
       _syncHrOnline(now: now);
       _maybeRefreshOscConnected(now);
@@ -396,13 +415,18 @@ class HeartRateManager extends ChangeNotifier {
     return now.difference(last) > limit;
   }
 
+  /// Scanning feeds auto-connect/reconnect and the nearby list. With the
+  /// window hidden and no reconnect to serve it's pure radio drain.
+  bool get _scanUseful => _autoConnectEnabled || isAutoReconnecting;
+
   Future<void> _tryStartScan() async {
     if (_isTestEnv || _scanLoopStarting) return;
     if (!_isBleSupportedPlatform) return;
-    if (_isScanning) return;
     if (_connectionState == AdapterConnectionState.connected || _connecting) {
       return;
     }
+    if (!_uiVisible && !_scanUseful) return;
+    if (_bleAdapter.isScanning) return;
 
     _scanLoopStarting = true;
     try {
@@ -480,20 +504,14 @@ class HeartRateManager extends ChangeNotifier {
     _notifyUi();
   }
 
-  void _pruneNearby(DateTime now) {
-    _scanner.pruneNearby();
-  }
-
-  // BleScanner callbacks
-  void _onDeviceFound(NearbyDevice device, bool isNew) {
-    // Device tracking handled by BleScanner
-  }
-
-  void _onBroadcastHeartRate(int bpm, int rssi, String deviceName) {
+  /// Shared ingestion pipeline for both heart-rate sources (notifications
+  /// and Xiaomi broadcast): update state, then publish at most once per
+  /// configured interval.
+  void _ingestHeartRate(int bpm, {int? rssi}) {
     final now = DateTime.now();
     _prevHeartRateAt = _lastUpdated;
     _heartRate = bpm;
-    _rssi = rssi;
+    if (rssi != null) _rssi = rssi;
     _lastUpdated = now;
     _lastHrSeenAt = now;
     _syncHrOnline(now: now);
@@ -501,6 +519,11 @@ class HeartRateManager extends ChangeNotifier {
     if (!_shouldPublishNow(now)) return;
     _lastPublished = now;
     _notifyHeartRateUpdate();
+    _notifyUi();
+  }
+
+  void _onBroadcastHeartRate(int bpm, int rssi, String deviceName) {
+    _ingestHeartRate(bpm, rssi: rssi);
   }
 
   Future<void> _connectTo(String deviceId) async {
@@ -572,13 +595,7 @@ class HeartRateManager extends ChangeNotifier {
     }
 
     if (state == AdapterConnectionState.disconnected) {
-      _connectedAt = null;
-      _hrSubscribed = false;
-      _heartRate = null;
-      _publishedHeartRate = null;
-      _rssi = null;
-      _lastUpdated = null;
-      _prevHeartRateAt = null;
+      _resetSessionState();
       _autoConnectEnabled = !_userInitiatedDisconnect;
 
       if (_userInitiatedDisconnect) {
@@ -595,6 +612,20 @@ class HeartRateManager extends ChangeNotifier {
 
     _notifyConnectionState();
     notifyListeners();
+  }
+
+  /// Clear per-session heart-rate state after a disconnect (shared by the
+  /// unexpected-disconnect and user-initiated paths).
+  void _resetSessionState() {
+    _connectedAt = null;
+    _hrSubscribed = false;
+    _heartRate = null;
+    _publishedHeartRate = null;
+    _rssi = null;
+    _lastUpdated = null;
+    _prevHeartRateAt = null;
+    _lastNotifiedBpm = null;
+    _lastNotifiedDevice = null;
   }
 
   Future<void> manualConnect(NearbyDevice target) async {
@@ -628,7 +659,9 @@ class HeartRateManager extends ChangeNotifier {
     _autoConnectEnabled = true;
     _userInitiatedDisconnect = false;
 
-    final target = _selectPreferredDevice();
+    final target = _scanner.selectPreferredDevice(
+      savedDeviceId: _savedDeviceId,
+    );
     if (target != null) {
       _pendingConnectName = target.name;
       await _connectTo(target.id);
@@ -640,27 +673,12 @@ class HeartRateManager extends ChangeNotifier {
     await restartScan();
   }
 
-  NearbyDevice? _selectPreferredDevice() {
-    return _scanner.selectPreferredDevice(savedDeviceId: _savedDeviceId);
-  }
-
   void _handleHeartRateData(Uint8List data) {
     if (data.isEmpty) return;
     final bpm = BleScanner.parseHeartRateValue(data);
     if (bpm == null) return;
-    final now = DateTime.now();
     _log('hr rx notify: bpm=$bpm');
-    _prevHeartRateAt = _lastUpdated;
-    _heartRate = bpm;
-    _lastUpdated = now;
-    _lastHrSeenAt = now;
-    _syncHrOnline(now: now);
-    final shouldPublish = _shouldPublishNow(now);
-    if (!shouldPublish) return;
-
-    _lastPublished = now;
-    _notifyHeartRateUpdate();
-    _notifyUi();
+    _ingestHeartRate(bpm);
   }
 
   Future<void> disconnect() async {
@@ -683,21 +701,15 @@ class HeartRateManager extends ChangeNotifier {
     await _connectionService.disconnect();
 
     // Clean up local state
-    _hrSubscribed = false;
+    _resetSessionState();
     _connectedDeviceId = null;
     _connectedDeviceName = null;
-    _rssi = null;
-    _heartRate = null;
-    _publishedHeartRate = null;
-    _lastUpdated = null;
     _lastHrSeenAt = null;
-    _prevHeartRateAt = null;
     _savedDeviceId = null;
     await _prefs?.remove('last_device_id');
     _savedDeviceName = null;
     await _prefs?.remove('last_device_name');
     _connectionState = AdapterConnectionState.disconnected;
-    _connectedAt = null;
 
     _syncHrOnline(now: DateTime.now(), forceOsc: true);
     _notifyConnectionState();
@@ -719,12 +731,8 @@ class HeartRateManager extends ChangeNotifier {
       return;
     }
 
-    // We don't have isScanning check from adapter, rely on internal state or just restart
-    // If not connecting/connected and adapter on, ensure we are scanning if supposed to
-    // But restartScan already handles checks.
-
-    // For universal_ble, maybe we don't need aggressive restart?
-    // Just stop and start to be safe.
+    // Deliberate restart (not gated by adapter.isScanning): a reconnect
+    // attempt must see fresh advertisements even if a stale scan is stuck.
     await _bleAdapter.stopScan();
     await _startScan();
   }
@@ -831,12 +839,8 @@ class HeartRateManager extends ChangeNotifier {
       }
       _scanUiHoldTimer?.cancel();
       _scanUiHoldTimer = Timer(_scanUiMinVisible, () {
-        // _isScanning is not tracked directly from stream anymore,
-        // rely on manual setting in _startScan/stopScan?
-        // Actually we set _uiScanning=true in _startScan.
-        // We need to unset it when scan stops.
-
-        // For now, let UI scanning indicator turn off if we are connected.
+        // Turn the scanning indicator off once connected; while disconnected
+        // the scan keeps running and the indicator stays on.
         if (isConnected && _uiScanning) {
           _uiScanning = false;
           notifyListeners();
@@ -853,7 +857,29 @@ class HeartRateManager extends ChangeNotifier {
     }
   }
 
+  /// Report window/app visibility from the app shell. While hidden the
+  /// heart animation and throttled UI notifications stop (state keeps
+  /// updating; everything refreshes on the next [notifyListeners] once
+  /// visible again). Scanning also pauses when nothing can use it — see
+  /// [_scanUseful].
+  void setUiVisible(bool visible) {
+    if (_uiVisible == visible) return;
+    _uiVisible = visible;
+    if (visible) {
+      notifyListeners();
+      unawaited(_tryStartScan());
+    } else {
+      // Drop any throttled notify scheduled before hiding.
+      _uiNotifyTimer?.cancel();
+      _uiNotifyScheduled = false;
+      if (!_scanUseful) {
+        unawaited(_bleAdapter.stopScan());
+      }
+    }
+  }
+
   void _notifyUi({bool force = false}) {
+    if (!_uiVisible) return;
     if (force) {
       _uiNotifyTimer?.cancel();
       _uiNotifyScheduled = false;
@@ -902,53 +928,61 @@ class HeartRateManager extends ChangeNotifier {
     if (bpm == null) return;
     final percent = _percentFor(bpm);
     final connected = isConnected;
+    final device = _connectedDeviceName;
     _publishedHeartRate = bpm;
 
-    final payload = <String, dynamic>{
-      'event': 'heartRate',
-      'heartRate': bpm,
-      'percent': percent,
-      'connected': connected,
-      'device': _connectedDeviceName,
-      'timestamp': DateTime.now().toIso8601String(),
-    };
     _log(
       'push event=heartRate bpm=$bpm percent=${percent == null ? '-' : (percent * 100).round()} connected=$connected',
     );
 
-    unawaited(_sendPushPayload(payload));
-    unawaited(_sendOscConnectedIfNeeded(_hrOnline));
-    unawaited(_sendOscChatboxIfNeeded(bpm, percent));
+    unawaited(
+      _pushCoordinator.sendHeartRate(
+        bpm: bpm,
+        percent: percent,
+        timestamp: DateTime.now(),
+        connected: connected,
+        device: device,
+      ),
+    );
+    unawaited(_pushCoordinator.sendConnectionStatus(_hrOnline));
+    unawaited(_pushCoordinator.sendChatbox(bpm, percent));
 
+    // Hit the Android notification / Live Activity platform channels only
+    // when the displayed values changed; a call on every publish (default
+    // 1/s) is pure overhead while the content is identical.
+    if (bpm == _lastNotifiedBpm && device == _lastNotifiedDevice) return;
+    _lastNotifiedBpm = bpm;
+    _lastNotifiedDevice = device;
+    final status = _connectedNotifText(device ?? '');
     unawaited(
       _notificationService.showConnected(
-        deviceName: _connectedDeviceName ?? '',
+        deviceName: device ?? '',
         bpm: bpm,
         lastUpdated: _lastUpdated,
-        status: _connectedNotifText(_connectedDeviceName ?? ''),
+        status: status,
       ),
     );
-    unawaited(
-      _liveActivity.update(
-        bpm: bpm,
-        status: _connectedNotifText(_connectedDeviceName ?? ''),
-      ),
-    );
+    unawaited(_liveActivity.update(bpm: bpm, status: status));
   }
 
   void _notifyConnectionState() {
     _syncHrOnline(now: DateTime.now());
     final connected = isConnected;
-    final payload = <String, dynamic>{
-      'event': 'connection',
-      'connected': connected,
-      'device': _connectedDeviceName,
-      'timestamp': DateTime.now().toIso8601String(),
-    };
     _log('push event=connection connected=$connected');
 
-    unawaited(_sendPushPayload(payload));
+    unawaited(
+      _pushCoordinator.sendEvent(
+        payload: <String, dynamic>{
+          'event': 'connection',
+          'connected': connected,
+          'device': _connectedDeviceName,
+        },
+        timestamp: DateTime.now(),
+      ),
+    );
     if (connected) {
+      _lastNotifiedBpm = heartRate;
+      _lastNotifiedDevice = _connectedDeviceName;
       unawaited(
         _notificationService.showConnected(
           deviceName: _connectedDeviceName ?? '',
@@ -963,39 +997,6 @@ class HeartRateManager extends ChangeNotifier {
     }
   }
 
-  Future<void> _sendPushPayload(Map<String, dynamic> payload) async {
-    final bpm = payload['heartRate'] as int?;
-    final timestamp = DateTime.tryParse(payload['timestamp'] as String? ?? '');
-    final percent = payload['percent'] as double?;
-    if (timestamp == null) return;
-
-    if (bpm == null) {
-      // Lifecycle events (connection/disconnect) reach HTTP/WS/MQTT too.
-      await _pushCoordinator.sendEvent(payload: payload, timestamp: timestamp);
-      return;
-    }
-
-    await _pushCoordinator.sendHeartRate(
-      bpm: bpm,
-      percent: percent,
-      timestamp: timestamp,
-      event: payload['event'] as String? ?? 'heartRate',
-      connected: payload['connected'] as bool?,
-      device: payload['device'] as String?,
-    );
-  }
-
-  Future<void> _sendOscConnectedIfNeeded(
-    bool connected, {
-    bool force = false,
-  }) async {
-    await _pushCoordinator.sendConnectionStatus(connected, force: force);
-  }
-
-  Future<void> _sendOscChatboxIfNeeded(int bpm, double? percent) async {
-    await _pushCoordinator.sendChatbox(bpm, percent);
-  }
-
   Future<void> updateSettings(HeartRateSettings value) async {
     final old = _settings;
     _settings = value;
@@ -1006,12 +1007,7 @@ class HeartRateManager extends ChangeNotifier {
     _pushCoordinator.updateSettings(value);
 
     // Refresh OSC connected status if relevant settings changed
-    final oscConnectedChanged =
-        old.oscAddress != value.oscAddress ||
-        old.oscHrConnectedPath != value.oscHrConnectedPath ||
-        old.oscChatboxEnabled != value.oscChatboxEnabled ||
-        old.oscChatboxTemplate != value.oscChatboxTemplate;
-    if (oscConnectedChanged) {
+    if (old.oscPresenceDiffersFrom(value)) {
       _syncHrOnline(now: DateTime.now(), forceOsc: true);
     }
 
@@ -1090,9 +1086,5 @@ class HeartRateManager extends ChangeNotifier {
     return '$fallback: $error';
   }
 
-  double? _percentFor(int? bpm) {
-    if (bpm == null || _settings.maxHeartRate <= 0) return null;
-    final percent = bpm / _settings.maxHeartRate;
-    return percent.clamp(0, 1).toDouble();
-  }
+  double? _percentFor(int? bpm) => _settings.percentFor(bpm);
 }

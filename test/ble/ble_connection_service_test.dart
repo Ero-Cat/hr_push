@@ -160,6 +160,9 @@ class _FakeBleAdapter implements BleAdapter {
   Future<void> stopScan() async {}
 
   @override
+  bool get isScanning => false;
+
+  @override
   Future<void> connect(String deviceId, {Duration? timeout}) async {
     lastConnectTimeout = timeout;
     _connectionController.add(AdapterConnectionState.connected);
@@ -188,31 +191,6 @@ class _FakeBleAdapter implements BleAdapter {
       throw StateError('notification rejected');
     }
   }
-
-  @override
-  Future<void> unsubscribeFromCharacteristic(
-    String deviceId,
-    String serviceUuid,
-    String characteristicUuid,
-  ) async {}
-
-  @override
-  Future<Uint8List> readCharacteristic(
-    String deviceId,
-    String serviceUuid,
-    String characteristicUuid,
-  ) async {
-    return Uint8List(0);
-  }
-
-  @override
-  Future<void> writeCharacteristic(
-    String deviceId,
-    String serviceUuid,
-    String characteristicUuid,
-    Uint8List data, {
-    bool withResponse = true,
-  }) async {}
 
   @override
   void dispose() {

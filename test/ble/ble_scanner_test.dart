@@ -3,7 +3,6 @@ import 'dart:typed_data';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:hr_push/ble/ble_adapter.dart';
 import 'package:hr_push/ble/ble_scanner.dart';
-import 'package:hr_push/models/nearby_device.dart';
 
 BleDeviceInfo _device({
   String id = 'aa:bb:cc:dd:ee:ff',
@@ -81,10 +80,8 @@ void main() {
     test(
       'keeps unnamed HR devices with an empty localized-later name',
       () async {
-        final found = <NearbyDevice>[];
         final scanner = BleScanner(
           onLog: (_, {error}) {},
-          onDeviceFound: (device, isNew) => found.add(device),
           onBroadcastHeartRate: (bpm, rssi, name) {},
         );
 
@@ -97,14 +94,12 @@ void main() {
 
         expect(scanner.nearbyDevices, hasLength(1));
         expect(scanner.nearbyDevices.first.name, isEmpty);
-        expect(found, hasLength(1));
       },
     );
 
     test('prunes devices after the TTL', () async {
       final scanner = BleScanner(
         onLog: (_, {error}) {},
-        onDeviceFound: (device, isNew) {},
         onBroadcastHeartRate: (bpm, rssi, name) {},
       );
       scanner.handleScanResult(

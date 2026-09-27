@@ -9,60 +9,62 @@ import '../../models/models.dart';
 import '../../theme/design_system.dart';
 import '../../utils/settings_validator.dart';
 import '../../widgets/settings/validated_field.dart';
+import '../hr_percent_help_page.dart';
 import '../log_detail_page.dart';
 import 'settings_section.dart';
 import 'settings_section_contract.dart';
+import 'settings_section_state.dart';
 
-/// General section: max heart rate, logging, background runtime, version.
-class GeneralSettingsSection extends StatefulWidget {
+/// General section: heart-rate percent conversion range, logging, background
+/// runtime, version.
+class GeneralSettingsSection extends SettingsSectionWidget {
   const GeneralSettingsSection({
     super.key,
-    required this.initial,
-    this.onChanged,
+    required super.initial,
+    super.onChanged,
   });
-
-  final HeartRateSettings initial;
-  final VoidCallback? onChanged;
 
   @override
   State<GeneralSettingsSection> createState() => GeneralSettingsSectionState();
 }
 
 class GeneralSettingsSectionState extends State<GeneralSettingsSection>
+    with SettingsSectionState<GeneralSettingsSection>
     implements SettingsSectionContract {
+  late final TextEditingController _minHrCtrl;
   late final TextEditingController _maxHrCtrl;
   bool _logEnabled = false;
 
   @override
   void initState() {
     super.initState();
-    _maxHrCtrl = TextEditingController(
-      text: widget.initial.maxHeartRate.toString(),
-    );
+    _minHrCtrl = fieldController(widget.initial.minHeartRate.toString());
+    _maxHrCtrl = fieldController(widget.initial.maxHeartRate.toString());
     _logEnabled = widget.initial.logEnabled;
-    _maxHrCtrl.addListener(_notifyChanged);
+    listenToFields();
   }
 
-  @override
-  void dispose() {
-    _maxHrCtrl.dispose();
-    super.dispose();
-  }
-
-  void _notifyChanged() {
-    // Rebuild this section so inline validation errors update live; the
-    // page shell separately tracks the dirty flag.
-    if (mounted) setState(() {});
-    widget.onChanged?.call();
-  }
-
+  String? get _minHrError => SettingsValidator.minHeartRate(_minHrCtrl.text);
   String? get _maxHrError => SettingsValidator.maxHeartRate(_maxHrCtrl.text);
 
+  /// Cross-field check that the conversion span is positive; only meaningful
+  /// once both fields individually validate.
+  String? get _hrRangeError {
+    if (_minHrError != null || _maxHrError != null) return null;
+    final min = int.tryParse(_minHrCtrl.text.trim());
+    final max = int.tryParse(_maxHrCtrl.text.trim());
+    if (min == null || max == null) return null;
+    return SettingsValidator.hrRange(min, max);
+  }
+
   @override
-  List<String> validate() => [_maxHrError].whereType<String>().toList();
+  List<String> validate() =>
+      [_minHrError, _maxHrError, _hrRangeError].whereType<String>().toList();
 
   @override
   bool isDirty() =>
+      (int.tryParse(_minHrCtrl.text.trim()) ?? -1) !=
+          widget.initial.minHeartRate ||
       (int.tryParse(_maxHrCtrl.text.trim()) ?? -1) !=
           widget.initial.maxHeartRate ||
       _logEnabled != widget.initial.logEnabled;
@@ -70,6 +72,8 @@ class GeneralSettingsSectionState extends State<GeneralSettingsSection>
   @override
   HeartRateSettings merge(HeartRateSettings settings) {
     return settings.copyWith(
+      minHeartRate:
+          int.tryParse(_minHrCtrl.text.trim()) ?? widget.initial.minHeartRate,
       maxHeartRate:
           int.tryParse(_maxHrCtrl.text.trim()) ?? widget.initial.maxHeartRate,
       logEnabled: _logEnabled,
@@ -84,10 +88,44 @@ class GeneralSettingsSectionState extends State<GeneralSettingsSection>
       header: l10n.sectionGeneral,
       children: [
         ValidatedField(
+          controller: _minHrCtrl,
+          label: l10n.fieldMinHr,
+          keyboardType: TextInputType.number,
+          errorKey: _minHrError,
+        ),
+        ValidatedField(
           controller: _maxHrCtrl,
           label: l10n.fieldMaxHr,
           keyboardType: TextInputType.number,
-          errorKey: _maxHrError,
+          errorKey: _maxHrError ?? _hrRangeError,
+        ),
+        CupertinoButton(
+          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 6),
+          minimumSize: Size.zero,
+          onPressed: () {
+            Navigator.of(context).push(
+              CupertinoPageRoute(
+                builder: (_) => HrPercentHelpPage(
+                  minHeartRate:
+                      int.tryParse(_minHrCtrl.text.trim()) ??
+                      widget.initial.minHeartRate,
+                  maxHeartRate:
+                      int.tryParse(_maxHrCtrl.text.trim()) ??
+                      widget.initial.maxHeartRate,
+                ),
+              ),
+            );
+          },
+          child: Align(
+            alignment: AlignmentDirectional.centerStart,
+            child: Text(
+              l10n.btnHrPercentHelp,
+              style: AppTypography.subheadline.copyWith(
+                color: AppColors.accent.resolveFrom(context),
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
         ),
         CupertinoFormRow(
           prefix: Text(l10n.fieldEnableLogs),
@@ -96,7 +134,7 @@ class GeneralSettingsSectionState extends State<GeneralSettingsSection>
             activeTrackColor: AppColors.accent,
             onChanged: (v) => setState(() {
               _logEnabled = v;
-              widget.onChanged?.call();
+              notifyFieldChanged();
             }),
           ),
         ),

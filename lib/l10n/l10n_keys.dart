@@ -18,6 +18,10 @@ String resolveL10nKey(AppLocalizations l10n, String key, [String? param]) {
       return l10n.errInvalidInterval;
     case 'errInvalidMaxHr':
       return l10n.errInvalidMaxHr;
+    case 'errInvalidMinHr':
+      return l10n.errInvalidMinHr;
+    case 'errInvalidHrRange':
+      return l10n.errInvalidHrRange;
     case 'errInvalidPulseDuration':
       return l10n.errInvalidPulseDuration;
     case 'hintOscEmpty':

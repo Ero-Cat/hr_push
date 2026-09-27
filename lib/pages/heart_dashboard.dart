@@ -14,6 +14,7 @@ import '../widgets/nearby_list.dart';
 import 'onboarding_page.dart';
 import 'settings_page.dart';
 
+/// Main dashboard: heart-rate card, nearby device list and window controls.
 class HeartDashboard extends StatefulWidget {
   const HeartDashboard({super.key});
 
@@ -183,8 +184,35 @@ class _HeartDashboardState extends State<HeartDashboard> {
                   const SizedBox(height: AppSpacing.s8),
                   const HeroCard(),
                   const SizedBox(height: AppSpacing.s32),
-                  Consumer<HeartRateManager>(
-                    builder: (context, mgr, _) => NearbyList(mgr: mgr),
+                  // Rebuild the nearby list only when something it renders
+                  // changed. The nearby list itself is a stable cached view
+                  // (see BleScanner.nearbyDevices), so per-heartbeat manager
+                  // notifications no longer rebuild all tiles.
+                  Selector<
+                    HeartRateManager,
+                    ({
+                      bool bluetoothOn,
+                      bool uiScanning,
+                      bool canToggle,
+                      bool isConnecting,
+                      bool isAutoReconnecting,
+                      bool isConnected,
+                      String? activeDeviceId,
+                      List<NearbyDevice> devices,
+                    })
+                  >(
+                    selector: (_, mgr) => (
+                      bluetoothOn: mgr.isBluetoothOn,
+                      uiScanning: mgr.uiScanning,
+                      canToggle: mgr.canToggleConnection,
+                      isConnecting: mgr.isConnecting,
+                      isAutoReconnecting: mgr.isAutoReconnecting,
+                      isConnected: mgr.isConnected,
+                      activeDeviceId: mgr.activeDeviceId,
+                      devices: mgr.nearbyDevices,
+                    ),
+                    builder: (context, _, _) =>
+                        NearbyList(mgr: context.read<HeartRateManager>()),
                   ),
                   const SizedBox(height: 100), // Bottom padding
                 ]),

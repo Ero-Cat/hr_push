@@ -111,7 +111,10 @@ class AppLocalizationsZh extends AppLocalizations {
   String get fieldHeartbeatDuration => '闪烁时长 (ms)';
 
   @override
-  String get fieldMaxHr => '最大心率';
+  String get fieldMinHr => '下限心率 (0%)';
+
+  @override
+  String get fieldMaxHr => '上限心率 (100%)';
 
   @override
   String get oscStatusTitle => 'OSC 推送';
@@ -306,7 +309,13 @@ class AppLocalizationsZh extends AppLocalizations {
   String get errInvalidInterval => '间隔需在 250-60000 ms 之间';
 
   @override
-  String get errInvalidMaxHr => '最大心率需在 100-250 之间';
+  String get errInvalidMinHr => '下限心率需在 0-180 之间';
+
+  @override
+  String get errInvalidMaxHr => '上限心率需在 100-250 之间';
+
+  @override
+  String get errInvalidHrRange => '下限心率必须小于上限心率';
 
   @override
   String get errInvalidPulseDuration => '闪烁时长需在 20-1000 ms 之间';
@@ -425,4 +434,78 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get stDeviceDisconnected => '设备断开';
+
+  @override
+  String get btnHrPercentHelp => '百分比换算说明';
+
+  @override
+  String get percentHelpTitle => '心率百分比说明';
+
+  @override
+  String get percentHelpFormulaTitle => '换算公式';
+
+  @override
+  String get percentHelpFormulaBody =>
+      'percent = (BPM − 下限心率) ÷ (上限心率 − 下限心率)\n\n结果为 0.0~1.0 的浮点数：BPM 等于下限时为 0.0，等于上限时为 1.0，超出区间会被截断。默认下限 0、上限 200，等价于 BPM ÷ 200。';
+
+  @override
+  String get percentHelpExampleTitle => '实时示例';
+
+  @override
+  String percentHelpExampleIntro(int min, int max) {
+    return '按当前设置换算（下限 $min，上限 $max）：';
+  }
+
+  @override
+  String get percentHelpTagMin => '下限';
+
+  @override
+  String get percentHelpTagMid => '中点';
+
+  @override
+  String get percentHelpTagMax => '上限';
+
+  @override
+  String get percentHelpTagClampedLow => '低于下限 → 截断为 0';
+
+  @override
+  String get percentHelpTagClampedHigh => '高于上限 → 截断为 1';
+
+  @override
+  String get percentHelpFieldsTitle => '推送字段对照';
+
+  @override
+  String get percentHelpFieldJson => 'HTTP/WS/MQTT：JSON 中的 percent 字段，0~1 浮点数';
+
+  @override
+  String get percentHelpFieldOsc =>
+      'OSC：/avatar/parameters/hr_percent，float 类型 0~1';
+
+  @override
+  String get percentHelpFieldChatbox =>
+      'ChatBox 模板的 percent 占位符：换算为 0~100 的整数文本';
+
+  @override
+  String get percentHelpUnityTitle => 'Unity / VRChat 映射';
+
+  @override
+  String get percentHelpUnityIntro =>
+      'Unity 工具常把心率百分比再映射为 0~255（8 位），常见两种输入约定：';
+
+  @override
+  String get percentHelpUnity01 => '工具期望 0~1 输入：value × 255（例：0.5 → 128）';
+
+  @override
+  String get percentHelpUnityNeg =>
+      '工具期望 -1~1 输入：先 value × 2 − 1 再映射 0~255（例：0.5 → 191）';
+
+  @override
+  String get percentHelpUnityDirect => 'Float 动画参数：0~1 可直接驱动，无需换算';
+
+  @override
+  String get percentHelpWhyTitle => '为什么要设置下限';
+
+  @override
+  String get percentHelpWhyBody =>
+      '下限为 0 时，静息心率 60 BPM 的百分比已达 0.3，日常波动只占用 0.3~1.0 的区间。把下限设为日常静息心率（如 60），可让 0.0~1.0 完整覆盖你的实际心率变化，动画层次更分明。';
 }

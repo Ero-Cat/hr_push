@@ -57,6 +57,8 @@ Future<void> main() async {
   runApp(const HrOscApp());
 }
 
+/// App shell: providers, localization, theme and the root dashboard
+/// (wrapped in [WindowTrayController] for tray + window-visibility wiring).
 class HrOscApp extends StatelessWidget {
   const HrOscApp({super.key});
 

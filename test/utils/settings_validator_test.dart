@@ -61,10 +61,26 @@ void main() {
       expect(SettingsValidator.updateIntervalMs('abc'), 'errInvalidInterval');
     });
 
+    test('minHeartRate', () {
+      expect(SettingsValidator.minHeartRate('0'), isNull);
+      expect(SettingsValidator.minHeartRate('60'), isNull);
+      expect(SettingsValidator.minHeartRate('180'), isNull);
+      expect(SettingsValidator.minHeartRate('-1'), 'errInvalidMinHr');
+      expect(SettingsValidator.minHeartRate('181'), 'errInvalidMinHr');
+      expect(SettingsValidator.minHeartRate('abc'), 'errInvalidMinHr');
+    });
+
     test('maxHeartRate', () {
       expect(SettingsValidator.maxHeartRate('200'), isNull);
       expect(SettingsValidator.maxHeartRate('99'), 'errInvalidMaxHr');
       expect(SettingsValidator.maxHeartRate('251'), 'errInvalidMaxHr');
+    });
+
+    test('hrRange requires a positive span', () {
+      expect(SettingsValidator.hrRange(0, 200), isNull);
+      expect(SettingsValidator.hrRange(60, 200), isNull);
+      expect(SettingsValidator.hrRange(200, 200), 'errInvalidHrRange');
+      expect(SettingsValidator.hrRange(210, 200), 'errInvalidHrRange');
     });
 
     test('heartbeatPulseDurationMs', () {

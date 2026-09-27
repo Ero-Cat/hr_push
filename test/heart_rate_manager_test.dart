@@ -2,6 +2,10 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:hr_push/heart_rate_manager.dart';
 
 void main() {
+  // Constructing HeartRateManager wires UniversalBle's callback channels,
+  // which need an initialized test binding even in plain unit tests.
+  TestWidgetsFlutterBinding.ensureInitialized();
+
   group('reconnectDelayFor', () {
     test('immediate attempts skip the backoff', () {
       expect(
@@ -96,6 +100,34 @@ void main() {
         ),
         isFalse,
       );
+    });
+  });
+
+  group('setUiVisible', () {
+    test('hiding is silent, showing refreshes the UI', () {
+      final manager = HeartRateManager();
+      addTearDown(manager.dispose);
+
+      var notifications = 0;
+      manager.addListener(() => notifications++);
+
+      manager.setUiVisible(false);
+      expect(manager.uiVisible, isFalse);
+      expect(notifications, 0, reason: 'hiding must not wake listeners');
+
+      // Repeated values are idempotent.
+      manager.setUiVisible(false);
+      expect(notifications, 0);
+
+      manager.setUiVisible(true);
+      expect(manager.uiVisible, isTrue);
+      // At least the refresh notification fires (resuming a useful scan
+      // may notify again, which is legitimate UI state).
+      expect(notifications, greaterThanOrEqualTo(1));
+
+      final afterShow = notifications;
+      manager.setUiVisible(true);
+      expect(notifications, afterShow, reason: 'repeated shows are silent');
     });
   });
 }

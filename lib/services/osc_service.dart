@@ -139,7 +139,7 @@ class OscService {
     final key = '${oscAddress.trim()}|$hrConnectedPath|$connected';
     if (!force && _lastHrConnectedKey == key) return true;
 
-    final ok = await _sendMessage(hrConnectedPath, connected);
+    final ok = await _sendMessage(hrConnectedPath, [connected]);
     if (ok) {
       _lastHrConnectedKey = key;
     }
@@ -148,10 +148,10 @@ class OscService {
 
   /// Send heart rate value and percent
   Future<bool> sendHeartRate(int bpm, double? percent) async {
-    final valueOk = await _sendMessage(hrValuePath, bpm);
+    final valueOk = await _sendMessage(hrValuePath, [bpm]);
     var percentOk = true;
     if (percent != null) {
-      percentOk = await _sendMessage(hrPercentPath, percent);
+      percentOk = await _sendMessage(hrPercentPath, [percent]);
     }
     if (valueOk && percentOk) {
       _startHeartbeatLoop(bpm);
@@ -196,7 +196,7 @@ class OscService {
       return true;
     }
 
-    final ok = await _sendMessageWithArgs('/chatbox/input', [
+    final ok = await _sendMessage('/chatbox/input', [
       text,
       true, // send immediately
       false, // disable notification SFX
@@ -231,7 +231,7 @@ class OscService {
 
   Future<bool> _sendMessage(
     String address,
-    Object value, {
+    List<Object> args, {
     bool Function()? canSend,
   }) async {
     if (_isDisposed || (canSend != null && !canSend())) return false;
@@ -246,32 +246,9 @@ class OscService {
       return false;
     }
 
-    final msg = _encodeMessage(address, [_argFromValue(value)]);
+    final msg = _encodeMessage(address, args.map(_argFromValue).toList());
     try {
       if (_isDisposed || (canSend != null && !canSend())) return false;
-      socket.send(msg, target.address, target.port);
-      _log('osc sent: $address -> ${target.address.address}:${target.port}');
-      return true;
-    } catch (_) {}
-    _log('osc failed: $address -> ${target.address.address}:${target.port}');
-    return false;
-  }
-
-  Future<bool> _sendMessageWithArgs(String address, List<Object> args) async {
-    final target = await _resolveTarget();
-    if (target == null) {
-      _log('osc target invalid: $address');
-      return false;
-    }
-    final socket = await _ensureSocket();
-    if (socket == null) {
-      _log('osc socket unavailable: $address');
-      return false;
-    }
-
-    final oscArgs = args.map(_argFromValue).toList();
-    final msg = _encodeMessage(address, oscArgs);
-    try {
       socket.send(msg, target.address, target.port);
       _log('osc sent: $address -> ${target.address.address}:${target.port}');
       return true;
@@ -392,7 +369,7 @@ class OscService {
   }) async {
     final path = address.trim();
     if (path.isEmpty) return true;
-    return _sendMessage(path, value, canSend: canSend);
+    return _sendMessage(path, [value], canSend: canSend);
   }
 
   static Duration _rrIntervalFor(int bpm) {

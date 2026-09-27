@@ -6,8 +6,12 @@ class SettingsValidator {
   SettingsValidator._();
 
   static const int minUpdateIntervalMs = 250;
+  static const int minMinHeartRate = 0;
+  static const int maxMinHeartRate = 180;
   static const int minMaxHeartRate = 100;
   static const int maxMaxHeartRate = 250;
+  static const int minHeartbeatPulseDurationMs = 20;
+  static const int maxHeartbeatPulseDurationMs = 1000;
 
   /// HTTP/HTTPS/WS/WSS endpoint. Empty is allowed (push disabled).
   static String? pushEndpoint(String value) {
@@ -64,6 +68,16 @@ class SettingsValidator {
     return null;
   }
 
+  static String? minHeartRate(String value) {
+    final trimmed = value.trim();
+    final parsed = int.tryParse(trimmed);
+    if (parsed == null) return 'errInvalidMinHr';
+    if (parsed < minMinHeartRate || parsed > maxMinHeartRate) {
+      return 'errInvalidMinHr';
+    }
+    return null;
+  }
+
   static String? maxHeartRate(String value) {
     final trimmed = value.trim();
     final parsed = int.tryParse(trimmed);
@@ -74,11 +88,21 @@ class SettingsValidator {
     return null;
   }
 
+  /// Cross-field check: the percent-conversion span must be positive.
+  /// Call only after both fields individually validate.
+  static String? hrRange(int minHr, int maxHr) {
+    if (minHr >= maxHr) return 'errInvalidHrRange';
+    return null;
+  }
+
   static String? heartbeatPulseDurationMs(String value) {
     final trimmed = value.trim();
     final parsed = int.tryParse(trimmed);
     if (parsed == null) return 'errInvalidPulseDuration';
-    if (parsed < 20 || parsed > 1000) return 'errInvalidPulseDuration';
+    if (parsed < minHeartbeatPulseDurationMs ||
+        parsed > maxHeartbeatPulseDurationMs) {
+      return 'errInvalidPulseDuration';
+    }
     return null;
   }
 

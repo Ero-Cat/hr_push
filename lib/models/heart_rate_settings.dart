@@ -17,6 +17,7 @@ class HeartRateSettings {
     required this.oscHeartbeatPulseDurationMs,
     required this.oscChatboxEnabled,
     required this.oscChatboxTemplate,
+    required this.minHeartRate,
     required this.maxHeartRate,
     required this.updateIntervalMs,
     required this.logEnabled,
@@ -44,6 +45,7 @@ class HeartRateSettings {
   final int oscHeartbeatPulseDurationMs;
   final bool oscChatboxEnabled;
   final String oscChatboxTemplate;
+  final int minHeartRate;
   final int maxHeartRate;
   final int updateIntervalMs;
   final bool logEnabled;
@@ -72,6 +74,7 @@ class HeartRateSettings {
   static const _defaultHeartbeatPulseDurationMs = 120;
   static const _defaultOscChatboxEnabled = false;
   static const _defaultOscChatboxTemplate = '💓{hr}';
+  static const _defaultMinHeartRate = 0;
   static const _defaultMaxHeartRate = 200;
   static const _defaultUpdateIntervalMs = 1000;
   static const _defaultLogEnabled = false;
@@ -102,6 +105,7 @@ class HeartRateSettings {
       'cfg_osc_heartbeat_pulse_duration_ms';
   static const _kOscChatboxEnabledKey = 'cfg_osc_chatbox_enabled';
   static const _kOscChatboxTemplateKey = 'cfg_osc_chatbox_template';
+  static const _kMinHeartRateKey = 'cfg_min_heart_rate';
   static const _kMaxHeartRateKey = 'cfg_max_heart_rate';
   static const _kUpdateIntervalKey = 'cfg_update_interval_ms';
   static const _kLogEnabledKey = 'cfg_log_enabled';
@@ -130,6 +134,7 @@ class HeartRateSettings {
       oscHeartbeatPulseDurationMs: _defaultHeartbeatPulseDurationMs,
       oscChatboxEnabled: _defaultOscChatboxEnabled,
       oscChatboxTemplate: _defaultOscChatboxTemplate,
+      minHeartRate: _defaultMinHeartRate,
       maxHeartRate: _defaultMaxHeartRate,
       updateIntervalMs: _defaultUpdateIntervalMs,
       logEnabled: _defaultLogEnabled,
@@ -179,6 +184,7 @@ class HeartRateSettings {
       oscChatboxTemplate:
           prefs.getString(_kOscChatboxTemplateKey) ??
           _defaultOscChatboxTemplate,
+      minHeartRate: prefs.getInt(_kMinHeartRateKey) ?? _defaultMinHeartRate,
       maxHeartRate: prefs.getInt(_kMaxHeartRateKey) ?? _defaultMaxHeartRate,
       updateIntervalMs:
           prefs.getInt(_kUpdateIntervalKey) ?? _defaultUpdateIntervalMs,
@@ -219,6 +225,7 @@ class HeartRateSettings {
     );
     await prefs.setBool(_kOscChatboxEnabledKey, oscChatboxEnabled);
     await prefs.setString(_kOscChatboxTemplateKey, oscChatboxTemplate);
+    await prefs.setInt(_kMinHeartRateKey, minHeartRate);
     await prefs.setInt(_kMaxHeartRateKey, maxHeartRate);
     await prefs.setInt(_kUpdateIntervalKey, updateIntervalMs);
     await prefs.setBool(_kLogEnabledKey, logEnabled);
@@ -247,6 +254,7 @@ class HeartRateSettings {
     int? oscHeartbeatPulseDurationMs,
     bool? oscChatboxEnabled,
     String? oscChatboxTemplate,
+    int? minHeartRate,
     int? maxHeartRate,
     int? updateIntervalMs,
     bool? logEnabled,
@@ -280,6 +288,7 @@ class HeartRateSettings {
           oscHeartbeatPulseDurationMs ?? this.oscHeartbeatPulseDurationMs,
       oscChatboxEnabled: oscChatboxEnabled ?? this.oscChatboxEnabled,
       oscChatboxTemplate: oscChatboxTemplate ?? this.oscChatboxTemplate,
+      minHeartRate: minHeartRate ?? this.minHeartRate,
       maxHeartRate: maxHeartRate ?? this.maxHeartRate,
       updateIntervalMs: updateIntervalMs ?? this.updateIntervalMs,
       logEnabled: logEnabled ?? this.logEnabled,
@@ -293,4 +302,64 @@ class HeartRateSettings {
       mqttLwtTopic: mqttLwtTopic ?? this.mqttLwtTopic,
     );
   }
+
+  /// Normalized heart-rate ratio for [bpm], or `null` when it cannot be
+  /// computed. The [minHeartRate]–[maxHeartRate] span maps linearly onto
+  /// 0.0–1.0; values outside the span are clamped. With the default
+  /// min of 0 this is equivalent to `bpm / maxHeartRate`.
+  double? percentFor(int? bpm) {
+    if (bpm == null) return null;
+    final span = maxHeartRate - minHeartRate;
+    if (span <= 0) return null;
+    return ((bpm - minHeartRate) / span).clamp(0.0, 1.0).toDouble();
+  }
+
+  // ───────────────────────────────────────────────────────────────────────
+  // Domain change detection. Callers used to compare every field by hand;
+  // adding a setting had to be mirrored in each comparison site. These
+  // methods keep the field lists next to the fields they belong to.
+  // ───────────────────────────────────────────────────────────────────────
+
+  /// Whether the HTTP/WS push endpoint differs from [other], meaning the
+  /// existing connection must be discarded.
+  bool pushEndpointDiffersFrom(HeartRateSettings other) =>
+      pushEndpoint != other.pushEndpoint;
+
+  /// Whether any OSC option (target, paths, heartbeat toggles, ChatBox)
+  /// differs from [other]. [OscService] stores these in final fields, so any
+  /// change requires recreating the service.
+  bool oscConfigDiffersFrom(HeartRateSettings other) =>
+      oscAddress != other.oscAddress ||
+      oscHrConnectedPath != other.oscHrConnectedPath ||
+      oscHrValuePath != other.oscHrValuePath ||
+      oscHrPercentPath != other.oscHrPercentPath ||
+      oscHeartbeatIntPath != other.oscHeartbeatIntPath ||
+      oscHeartbeatPulsePath != other.oscHeartbeatPulsePath ||
+      oscHeartbeatTogglePath != other.oscHeartbeatTogglePath ||
+      oscHeartbeatIntEnabled != other.oscHeartbeatIntEnabled ||
+      oscHeartbeatPulseEnabled != other.oscHeartbeatPulseEnabled ||
+      oscHeartbeatToggleEnabled != other.oscHeartbeatToggleEnabled ||
+      oscHeartbeatPulseDurationMs != other.oscHeartbeatPulseDurationMs ||
+      oscChatboxEnabled != other.oscChatboxEnabled ||
+      oscChatboxTemplate != other.oscChatboxTemplate;
+
+  /// Whether options shaping the OSC connected-status / ChatBox signal
+  /// differ from [other]; the current state must then be re-asserted.
+  bool oscPresenceDiffersFrom(HeartRateSettings other) =>
+      oscAddress != other.oscAddress ||
+      oscHrConnectedPath != other.oscHrConnectedPath ||
+      oscChatboxEnabled != other.oscChatboxEnabled ||
+      oscChatboxTemplate != other.oscChatboxTemplate;
+
+  /// Whether any MQTT option differs from [other], meaning the client must
+  /// reconnect.
+  bool mqttConfigDiffersFrom(HeartRateSettings other) =>
+      mqttBroker != other.mqttBroker ||
+      mqttPort != other.mqttPort ||
+      mqttTopic != other.mqttTopic ||
+      mqttUsername != other.mqttUsername ||
+      mqttPassword != other.mqttPassword ||
+      mqttClientId != other.mqttClientId ||
+      mqttUseTls != other.mqttUseTls ||
+      mqttLwtTopic != other.mqttLwtTopic;
 }

@@ -111,7 +111,10 @@ class AppLocalizationsEn extends AppLocalizations {
   String get fieldHeartbeatDuration => 'Flash duration (ms)';
 
   @override
-  String get fieldMaxHr => 'Max HR';
+  String get fieldMinHr => 'Min HR (0%)';
+
+  @override
+  String get fieldMaxHr => 'Max HR (100%)';
 
   @override
   String get oscStatusTitle => 'OSC Push';
@@ -307,7 +310,14 @@ class AppLocalizationsEn extends AppLocalizations {
   String get errInvalidInterval => 'Interval must be between 250 and 60000 ms';
 
   @override
+  String get errInvalidMinHr => 'Min heart rate must be between 0 and 180';
+
+  @override
   String get errInvalidMaxHr => 'Max heart rate must be between 100 and 250';
+
+  @override
+  String get errInvalidHrRange =>
+      'Min heart rate must be less than max heart rate';
 
   @override
   String get errInvalidPulseDuration =>
@@ -436,4 +446,81 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get stDeviceDisconnected => 'Device disconnected';
+
+  @override
+  String get btnHrPercentHelp => 'Percent conversion guide';
+
+  @override
+  String get percentHelpTitle => 'Heart rate percent';
+
+  @override
+  String get percentHelpFormulaTitle => 'Formula';
+
+  @override
+  String get percentHelpFormulaBody =>
+      'percent = (BPM − min HR) ÷ (max HR − min HR)\n\nThe result is a float between 0.0 and 1.0: 0.0 at the min HR, 1.0 at the max HR, and clamped outside the range. The defaults (min 0, max 200) are equivalent to BPM ÷ 200.';
+
+  @override
+  String get percentHelpExampleTitle => 'Live examples';
+
+  @override
+  String percentHelpExampleIntro(int min, int max) {
+    return 'Converted with the current settings (min $min, max $max):';
+  }
+
+  @override
+  String get percentHelpTagMin => 'Min';
+
+  @override
+  String get percentHelpTagMid => 'Midpoint';
+
+  @override
+  String get percentHelpTagMax => 'Max';
+
+  @override
+  String get percentHelpTagClampedLow => 'Below min → clamped to 0';
+
+  @override
+  String get percentHelpTagClampedHigh => 'Above max → clamped to 1';
+
+  @override
+  String get percentHelpFieldsTitle => 'Push fields';
+
+  @override
+  String get percentHelpFieldJson =>
+      'HTTP/WS/MQTT: the percent field in the JSON payload, float 0~1';
+
+  @override
+  String get percentHelpFieldOsc =>
+      'OSC: /avatar/parameters/hr_percent, float 0~1';
+
+  @override
+  String get percentHelpFieldChatbox =>
+      'ChatBox template percent placeholder: rendered as an integer 0~100';
+
+  @override
+  String get percentHelpUnityTitle => 'Unity / VRChat mapping';
+
+  @override
+  String get percentHelpUnityIntro =>
+      'Unity tools often remap the percent to 0~255 (8-bit). Two input conventions are common:';
+
+  @override
+  String get percentHelpUnity01 =>
+      'Tool expects 0~1 input: value × 255 (e.g. 0.5 → 128)';
+
+  @override
+  String get percentHelpUnityNeg =>
+      'Tool expects -1~1 input: remap (value × 2 − 1) onto 0~255 (e.g. 0.5 → 191)';
+
+  @override
+  String get percentHelpUnityDirect =>
+      'Float animator parameters: feed 0~1 directly, no conversion needed';
+
+  @override
+  String get percentHelpWhyTitle => 'Why set a min HR';
+
+  @override
+  String get percentHelpWhyBody =>
+      'With a min of 0, a resting rate of 60 BPM already reads 0.3, so daily variation only spans 0.3~1.0. Setting the min to your everyday resting rate (e.g. 60) lets 0.0~1.0 cover your actual range, making animations more expressive.';
 }

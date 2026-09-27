@@ -8,29 +8,48 @@ import '../l10n/l10n_keys.dart';
 import '../theme/design_system.dart';
 import 'glass_surface.dart';
 
+/// Heart rate display card: animated heart, BPM readout, connection status
+/// pill and the connect/disconnect action.
+///
+/// Rebuilds are driven by a [Selector] over the exact fields rendered, so
+/// unrelated manager notifications (e.g. nearby-list churn) skip this card.
+/// The animation is wrapped in [TickerMode] so it stops while the window is
+/// minimized/hidden and resumes when visible again.
 class HeroCard extends StatelessWidget {
   const HeroCard({super.key});
 
-  // Extracted logic to keep presentation clean
-  bool _toggleEnabled(HeartRateManager mgr) {
-    return mgr.canToggleConnection && (!mgr.isConnecting || mgr.isConnected);
+  bool _toggleEnabled({
+    required bool canToggle,
+    required bool isConnecting,
+    required bool isConnected,
+  }) {
+    return canToggle && (!isConnecting || isConnected);
   }
 
-  String _toggleLabel(BuildContext context, HeartRateManager mgr) {
+  String _toggleLabel(
+    BuildContext context, {
+    required bool isConnected,
+    required bool isConnecting,
+    required bool isAutoReconnecting,
+  }) {
     final l10n = AppLocalizations.of(context)!;
-    if (mgr.isConnected) {
+    if (isConnected) {
       return l10n.disconnect;
     }
-    if (mgr.isConnecting) return l10n.connecting;
-    if (mgr.isAutoReconnecting) return l10n.autoReconnecting;
+    if (isConnecting) return l10n.connecting;
+    if (isAutoReconnecting) return l10n.autoReconnecting;
     return l10n.connectDevice;
   }
 
-  Color _statusColor(HeartRateManager mgr) {
-    if (mgr.isConnected) {
+  Color _statusColor({
+    required bool isConnected,
+    required bool isConnecting,
+    required bool isAutoReconnecting,
+  }) {
+    if (isConnected) {
       return AppColors.success;
     }
-    if (mgr.isConnecting || mgr.isAutoReconnecting) {
+    if (isConnecting || isAutoReconnecting) {
       return AppColors.warning;
     }
     return AppColors.textTertiary;
@@ -39,161 +58,209 @@ class HeroCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
-    final mgr = context.watch<HeartRateManager>();
 
-    final bpm = mgr.heartRate;
-    final deviceName = mgr.connectedName.isEmpty
-        ? l10n.noDeviceConnected
-        : mgr.connectedName;
-    final isConnected = mgr.isConnected;
+    return Selector<
+      HeartRateManager,
+      ({
+        int? bpm,
+        String deviceName,
+        bool isConnected,
+        bool isConnecting,
+        bool isAutoReconnecting,
+        bool canToggle,
+        int? rssi,
+        String status,
+        bool uiVisible,
+      })
+    >(
+      selector: (_, mgr) => (
+        bpm: mgr.heartRate,
+        deviceName: mgr.connectedName,
+        isConnected: mgr.isConnected,
+        isConnecting: mgr.isConnecting,
+        isAutoReconnecting: mgr.isAutoReconnecting,
+        canToggle: mgr.canToggleConnection,
+        rssi: mgr.rssi,
+        status: mgr.status,
+        uiVisible: mgr.uiVisible,
+      ),
+      builder: (context, s, _) {
+        final deviceName = s.deviceName.isEmpty
+            ? l10n.noDeviceConnected
+            : s.deviceName;
 
-    // Status color logic (inline for brevity or kept in helper)
-    final statusColor = CupertinoDynamicColor.resolve(
-      _statusColor(mgr),
-      context,
-    );
+        final statusColor = CupertinoDynamicColor.resolve(
+          _statusColor(
+            isConnected: s.isConnected,
+            isConnecting: s.isConnecting,
+            isAutoReconnecting: s.isAutoReconnecting,
+          ),
+          context,
+        );
 
-    return GlassSurface(
-      padding: const EdgeInsets.symmetric(vertical: 32, horizontal: 24),
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        crossAxisAlignment: CrossAxisAlignment.center,
-        children: [
-          // 1. Heart Animation (Centered)
-          Center(child: _AnimatedHeart(bpm: bpm)),
-          const SizedBox(height: 24),
-
-          // 2. BPM Display (Massive)
-          Column(
+        return GlassSurface(
+          padding: const EdgeInsets.symmetric(vertical: 32, horizontal: 24),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            crossAxisAlignment: CrossAxisAlignment.center,
             children: [
-              Text(
-                bpm != null ? '$bpm' : '--',
-                textAlign: TextAlign.center,
-                style: AppTypography.largeTitle.copyWith(
-                  fontSize: 72,
-                  fontWeight: FontWeight.w700, // New refined weight
-                  height: 1.0,
-                  color: AppColors.textPrimary.resolveFrom(context),
-                  letterSpacing: -1.5,
+              // 1. Heart Animation (Centered); TickerMode mutes the
+              // controllers while the window is hidden.
+              Center(
+                child: TickerMode(
+                  enabled: s.uiVisible,
+                  child: _AnimatedHeart(bpm: s.bpm),
                 ),
               ),
-              Text(
-                l10n.bpmUnit,
-                style: AppTypography.caption.copyWith(
-                  fontWeight: FontWeight.w600,
-                  color: AppColors.textTertiary.resolveFrom(context),
-                  letterSpacing: 1.0,
+              const SizedBox(height: 24),
+
+              // 2. BPM Display (Massive)
+              Column(
+                children: [
+                  Text(
+                    s.bpm != null ? '${s.bpm}' : '--',
+                    textAlign: TextAlign.center,
+                    style: AppTypography.largeTitle.copyWith(
+                      fontSize: 72,
+                      fontWeight: FontWeight.w700, // New refined weight
+                      height: 1.0,
+                      color: AppColors.textPrimary.resolveFrom(context),
+                      letterSpacing: -1.5,
+                    ),
+                  ),
+                  Text(
+                    l10n.bpmUnit,
+                    style: AppTypography.caption.copyWith(
+                      fontWeight: FontWeight.w600,
+                      color: AppColors.textTertiary.resolveFrom(context),
+                      letterSpacing: 1.0,
+                    ),
+                  ),
+                ],
+              ),
+
+              const SizedBox(height: 32),
+
+              // 3. Status Pill (Device + State)
+              Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 6,
+                ),
+                decoration: BoxDecoration(
+                  color: AppColors.bgSecondary
+                      .resolveFrom(context)
+                      .withValues(alpha: 0.5),
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(
+                    color: AppColors.separator
+                        .resolveFrom(context)
+                        .withValues(alpha: 0.5),
+                    width: 0.5,
+                  ),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    // Status Dot
+                    Container(
+                      width: 8,
+                      height: 8,
+                      decoration: BoxDecoration(
+                        color: statusColor,
+                        shape: BoxShape.circle,
+                        boxShadow: [
+                          BoxShadow(
+                            color: statusColor.withValues(alpha: 0.4),
+                            blurRadius: 4,
+                            spreadRadius: 1,
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Flexible(
+                      child: Text(
+                        s.isConnected
+                            ? deviceName
+                            : s.isConnecting
+                            ? l10n.connecting
+                            : s.isAutoReconnecting
+                            ? l10n.autoReconnecting
+                            // Surface the live manager status (scanning,
+                            // waiting, errors) instead of a static label.
+                            : localizedStatus(l10n, s.status),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: AppTypography.caption.copyWith(
+                          color: AppColors.textSecondary.resolveFrom(context),
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ),
+                    if (s.isConnected && s.rssi != null) ...[
+                      const SizedBox(width: 8),
+                      Container(
+                        width: 1,
+                        height: 10,
+                        color: AppColors.separator.resolveFrom(context),
+                      ),
+                      const SizedBox(width: 8),
+                      Icon(
+                        CupertinoIcons.wifi,
+                        size: 12,
+                        color: AppColors.textTertiary.resolveFrom(context),
+                      ),
+                      const SizedBox(width: 4),
+                      Text(
+                        '${s.rssi}',
+                        style: AppTypography.caption.copyWith(
+                          color: AppColors.textSecondary.resolveFrom(context),
+                          fontSize: 10,
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+
+              const SizedBox(height: 32),
+
+              // 4. Action Button (Wide / Centered)
+              SizedBox(
+                width: double.infinity,
+                child: CupertinoButton(
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                  color: AppColors.accent.resolveFrom(context),
+                  borderRadius: BorderRadius.circular(24),
+                  pressedOpacity: 0.8,
+                  onPressed:
+                      _toggleEnabled(
+                        canToggle: s.canToggle,
+                        isConnecting: s.isConnecting,
+                        isConnected: s.isConnected,
+                      )
+                      ? () =>
+                            context.read<HeartRateManager>().toggleConnection()
+                      : null,
+                  child: Text(
+                    _toggleLabel(
+                      context,
+                      isConnected: s.isConnected,
+                      isConnecting: s.isConnecting,
+                      isAutoReconnecting: s.isAutoReconnecting,
+                    ),
+                    style: AppTypography.body.copyWith(
+                      color: CupertinoColors.white,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
                 ),
               ),
             ],
           ),
-
-          const SizedBox(height: 32),
-
-          // 3. Status Pill (Device + State)
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-            decoration: BoxDecoration(
-              color: AppColors.bgSecondary
-                  .resolveFrom(context)
-                  .withValues(alpha: 0.5),
-              borderRadius: BorderRadius.circular(16),
-              border: Border.all(
-                color: AppColors.separator
-                    .resolveFrom(context)
-                    .withValues(alpha: 0.5),
-                width: 0.5,
-              ),
-            ),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                // Status Dot
-                Container(
-                  width: 8,
-                  height: 8,
-                  decoration: BoxDecoration(
-                    color: statusColor,
-                    shape: BoxShape.circle,
-                    boxShadow: [
-                      BoxShadow(
-                        color: statusColor.withValues(alpha: 0.4),
-                        blurRadius: 4,
-                        spreadRadius: 1,
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(width: 8),
-                Flexible(
-                  child: Text(
-                    isConnected
-                        ? deviceName
-                        : mgr.isConnecting
-                        ? l10n.connecting
-                        : mgr.isAutoReconnecting
-                        ? l10n.autoReconnecting
-                        // Surface the live manager status (scanning,
-                        // waiting, errors) instead of a static label.
-                        : localizedStatus(l10n, mgr.status),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: AppTypography.caption.copyWith(
-                      color: AppColors.textSecondary.resolveFrom(context),
-                      fontWeight: FontWeight.w500,
-                    ),
-                  ),
-                ),
-                if (isConnected && mgr.rssi != null) ...[
-                  const SizedBox(width: 8),
-                  Container(
-                    width: 1,
-                    height: 10,
-                    color: AppColors.separator.resolveFrom(context),
-                  ),
-                  const SizedBox(width: 8),
-                  Icon(
-                    CupertinoIcons.wifi,
-                    size: 12,
-                    color: AppColors.textTertiary.resolveFrom(context),
-                  ),
-                  const SizedBox(width: 4),
-                  Text(
-                    '${mgr.rssi}',
-                    style: AppTypography.caption.copyWith(
-                      color: AppColors.textSecondary.resolveFrom(context),
-                      fontSize: 10,
-                    ),
-                  ),
-                ],
-              ],
-            ),
-          ),
-
-          const SizedBox(height: 32),
-
-          // 4. Action Button (Wide / Centered)
-          SizedBox(
-            width: double.infinity,
-            child: CupertinoButton(
-              padding: const EdgeInsets.symmetric(vertical: 14),
-              color: AppColors.accent.resolveFrom(context),
-              borderRadius: BorderRadius.circular(24),
-              pressedOpacity: 0.8,
-              onPressed: _toggleEnabled(mgr)
-                  ? () => mgr.toggleConnection()
-                  : null,
-              child: Text(
-                _toggleLabel(context, mgr),
-                style: AppTypography.body.copyWith(
-                  color: CupertinoColors.white,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-            ),
-          ),
-        ],
-      ),
+        );
+      },
     );
   }
 }

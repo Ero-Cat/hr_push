@@ -5,24 +5,41 @@ import 'ble_adapter.dart';
 
 /// BLE device scanning and identification service
 class BleScanner {
-  BleScanner({
-    required this.onLog,
-    required this.onDeviceFound,
-    required this.onBroadcastHeartRate,
-  });
+  BleScanner({required this.onLog, required this.onBroadcastHeartRate});
 
   final void Function(String message, {Object? error}) onLog;
-  final void Function(NearbyDevice device, bool isNew) onDeviceFound;
   final void Function(int bpm, int rssi, String deviceName)
   onBroadcastHeartRate;
 
   final List<NearbyDevice> _nearby = [];
 
+  /// Cached unmodifiable view of [_nearby]. Rebuilding it on every mutation
+  /// (instead of on every getter call) keeps the instance stable between
+  /// changes so UI selectors can compare by identity.
+  List<NearbyDevice> _nearbyView = List.unmodifiable(const <NearbyDevice>[]);
+
   static const Duration nearbyTtl = Duration(seconds: 15);
   static const String _heartRateServiceUuid =
       '0000180d-0000-1000-8000-00805f9b34fb';
 
-  List<NearbyDevice> get nearbyDevices => List.unmodifiable(_nearby);
+  /// Xiaomi/Redmi wearables: rotate their MAC address and require the
+  /// on-device "Heart Rate Broadcast" toggle before exposing the standard
+  /// heart rate service.
+  static const List<String> _xiaomiKeywords = [
+    'xiaomi',
+    'redmi',
+    '小米',
+    'mi band',
+    'mi smart band',
+    'miband',
+    '手环',
+  ];
+
+  List<NearbyDevice> get nearbyDevices => _nearbyView;
+
+  void _refreshNearbyView() {
+    _nearbyView = List.unmodifiable(_nearby);
+  }
 
   /// Handle a scan result from BLE adapter
   void handleScanResult(BleDeviceInfo r) {
@@ -36,7 +53,6 @@ class BleScanner {
     final id = r.id;
 
     final existingIndex = _nearby.indexWhere((d) => d.id == id);
-    final isNew = existingIndex < 0;
 
     if (existingIndex >= 0) {
       _nearby[existingIndex]
@@ -60,9 +76,7 @@ class BleScanner {
 
     // Check for broadcast heart rate data
     _checkBroadcastHeartRate(r);
-
-    // Notify about device
-    onDeviceFound(_nearby.firstWhere((d) => d.id == id), isNew);
+    _refreshNearbyView();
   }
 
   void _checkBroadcastHeartRate(BleDeviceInfo r) {
@@ -103,32 +117,24 @@ class BleScanner {
     return hr16 ? data[1] | (data[2] << 8) : data[1];
   }
 
-  /// Extract broadcast heart rate from BLE device service data
-  /// Returns the heart rate value if found in service data, null otherwise
-  static int? extractBroadcastHeartRate(BleDeviceInfo r) {
-    final data =
-        r.serviceData[_heartRateServiceUuid] ??
-        r.serviceData[_heartRateServiceUuid.toLowerCase()] ??
-        r.serviceData[_heartRateServiceUuid.toUpperCase()];
-
-    if (data == null || data.length < 2) return null;
-    return parseHeartRateValue(data);
-  }
-
   /// Prune devices not seen recently
   void pruneNearby() {
     final now = DateTime.now();
+    final before = _nearby.length;
     _nearby.removeWhere((d) => now.difference(d.lastSeen) > nearbyTtl);
+    if (_nearby.length != before) _refreshNearbyView();
   }
 
   /// Sort devices by signal strength
   void sortByRssi() {
     _nearby.sort((a, b) => b.rssi.compareTo(a.rssi));
+    _refreshNearbyView();
   }
 
   /// Clear all nearby devices
   void clearNearby() {
     _nearby.clear();
+    _refreshNearbyView();
   }
 
   /// Check if device should be preferred for auto-connect
@@ -155,18 +161,11 @@ class BleScanner {
     return connectable.first;
   }
 
-  /// Detects if the device is a Xiaomi/Redmi wearable. These devices rotate
-  /// their MAC address and require the on-device "Heart Rate Broadcast"
-  /// toggle before they expose the standard heart rate service.
+  /// Detects if the device is a Xiaomi/Redmi wearable (see
+  /// [_xiaomiKeywords] for why these get special treatment).
   static bool isXiaomiDevice(String name) {
     final lowerName = name.toLowerCase();
-    return lowerName.contains('xiaomi') ||
-        lowerName.contains('redmi') ||
-        lowerName.contains('小米') ||
-        lowerName.contains('mi band') ||
-        lowerName.contains('mi smart band') ||
-        lowerName.contains('miband') ||
-        lowerName.contains('手环');
+    return _xiaomiKeywords.any(lowerName.contains);
   }
 
   /// Check if device is likely a wearable heart rate device
@@ -180,23 +179,19 @@ class BleScanner {
         r.serviceData.containsKey(_heartRateServiceUuid.toLowerCase());
 
     final name = r.name.toLowerCase();
+    const brandKeywords = [
+      'garmin',
+      'enduro',
+      'hrm',
+      'polar',
+      'wahoo',
+      'coros',
+      'suunto',
+      'fitbit',
+      'watch',
+    ];
     final likelyHrWearable =
-        name.contains('garmin') ||
-        name.contains('enduro') ||
-        name.contains('hrm') ||
-        name.contains('polar') ||
-        name.contains('wahoo') ||
-        name.contains('coros') ||
-        name.contains('suunto') ||
-        name.contains('fitbit') ||
-        name.contains('mi smart band') ||
-        name.contains('xiaomi') ||
-        name.contains('redmi') ||
-        name.contains('小米') ||
-        name.contains('miband') ||
-        name.contains('mi band') ||
-        name.contains('手环') ||
-        name.contains('watch');
+        brandKeywords.any(name.contains) || isXiaomiDevice(r.name);
 
     return hasHeartRateService || hasHeartRateServiceData || likelyHrWearable;
   }
