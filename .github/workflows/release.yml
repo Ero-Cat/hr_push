@@ -14,6 +14,7 @@ on:
         options:
           - all
           - android
+          - ios
           - macos
           - windows
 
@@ -88,6 +89,53 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
+  build_ios:
+    name: iOS Unsigned IPA
+    runs-on: macos-latest
+    if: (github.event_name == 'push' || github.event.inputs.job == 'all' || github.event.inputs.job == 'ios')
+    needs: create_release
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: ${{ env.FLUTTER_CHANNEL }}
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          cache: true
+          cache-key: 'flutter-:os:-:channel:-:version:-:arch:-:hash:'
+          pub-cache-key: 'flutter-pub-:os:-:channel:-:version:-:arch:-:hash:'
+
+      - name: Install dependencies
+        run: flutter pub get
+
+      - name: Sync version & build iOS (unsigned)
+        run: |
+          chmod +x scripts/sync-version.sh && scripts/sync-version.sh
+          flutter build ios --release --no-codesign
+
+      - name: Package unsigned IPA
+        run: |
+          VERSION="${{ github.ref_name }}"
+          APP_PATH="build/ios/iphoneos/Runner.app"
+          if [ ! -d "$APP_PATH" ]; then
+            echo "Runner.app not found at $APP_PATH"
+            find build/ios -maxdepth 3 -type d -print || true
+            exit 1
+          fi
+          rm -rf Payload && mkdir Payload
+          cp -R "$APP_PATH" Payload/
+          zip -qry "hr-push-ios-${VERSION}-unsigned.ipa" Payload
+          unzip -l "hr-push-ios-${VERSION}-unsigned.ipa" | head -5
+
+      - name: Upload IPA to release
+        if: github.event_name == 'push' || github.event.inputs.job == 'all'
+        uses: softprops/action-gh-release@v1
+        with:
+          files: hr-push-ios-${{ github.ref_name }}-unsigned.ipa
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
   build_macos:
     name: macOS App Bundle
     runs-on: macos-latest
@@ -158,11 +206,9 @@ jobs:
         
       - name: Sync version & build Windows
         run: |
-          $version = (Get-Content pubspec.yaml | Select-String '^version:').ToString().Split(' ')[1].Split('+')[0]
-          (Get-Content lib/pages/settings_page.dart) -replace "'v[0-9]+\.[0-9]+\.[0-9]+'" , "'v$version'" | Set-Content lib/pages/settings_page.dart
-          Write-Host "Synced version to v$version"
+          chmod +x scripts/sync-version.sh && scripts/sync-version.sh
           flutter build windows --release
-        shell: pwsh
+        shell: bash
         
       - name: Archive Windows build
         run: |

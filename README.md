@@ -111,7 +111,8 @@ HR PUSH 想做的事很简单 —— **把心率稳定地送到你想送的任�
 | Android | `app-release-vX.Y.Z.apk` | 直接安装；首次使用需授予蓝牙与通知权限 |
 | Windows | `hr-push-windows-vX.Y.Z.zip` | 解压后运行；需支持 BLE 的蓝牙适配器；⚠️ 暂不支持中文路径 |
 | macOS | `hr-push-macos-vX.Y.Z.zip` | 解压得到 `.app`；首次打开若提示未知开发者，请右键 → 打开 |
-| iOS / Linux | 需自行构建 | iOS 需 Apple 开发者账号签名；Linux 需系统安装 `bluez` |
+| iOS | `hr-push-ios-vX.Y.Z-unsigned.ipa` | **未签名** IPA：用 [AltStore](https://altstore.io) / [Sideloadly](https://sideloadly.io) / esign 等工具自签后安装（免费 Apple ID 即可，7 天需续签；付费账号一年） |
+| Linux | 需自行构建 | 系统需安装 `bluez` |
 
 ### 从源码构建
 
