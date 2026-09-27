@@ -22,8 +22,8 @@ echo "Extracted version: $VERSION"
 
 # Update app_metadata.dart (single source of the in-app version string)
 if [ -f "$METADATA" ]; then
-    if grep -q "const String appVersion = '[0-9]\+\.[0-9]\+\.[0-9]\+';" "$METADATA"; then
-        sed -i.bak "s/const String appVersion = '[0-9]\+\.[0-9]\+\.[0-9]\+';/const String appVersion = '$VERSION';/g" "$METADATA"
+    if grep -q "const String appVersion = '[0-9][0-9]*\.[0-9][0-9]*\.[0-9][0-9]*';" "$METADATA"; then
+        sed -i.bak "s/const String appVersion = '[0-9][0-9]*\.[0-9][0-9]*\.[0-9][0-9]*';/const String appVersion = '$VERSION';/g" "$METADATA"
         rm -f "$METADATA.bak"
         echo "Updated $METADATA to $VERSION"
     else

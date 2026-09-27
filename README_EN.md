@@ -75,7 +75,7 @@ All protocols use the same JSON payload.
 }
 ```
 
-`percent = heartRate / maxHeartRate`, range 0-1.
+`percent = (heartRate − min HR) ÷ (max HR − min HR)`, range 0-1, clamped outside the span. Defaults (min 0, max 200) equal `heartRate / 200`; set the min to your resting rate so 0-1 covers your actual range. Unity tools that map to 0-255: expect 0~1 input → `value × 255` (0.5 → 128); expect -1~1 input → remap `(value × 2 − 1)` first (0.5 → 191).
 
 Heart-rate events carry both `heartRate` and `heart_rate` keys (same value): the former matches this document, the latter is the legacy-compatible key for existing webhooks.
 
@@ -96,7 +96,8 @@ Heart-rate events carry both `heartRate` and `heart_rate` keys (same value): the
 | MQTT Client ID | Default ID when empty | Empty |
 | MQTT TLS | Enable mqtts (usually port 8883) | Off |
 | MQTT Last-will topic | Publishes offline message on abnormal disconnect (optional) | Empty |
-| Max heart rate | For percent calculation | `200` |
+| Min heart rate | Percent conversion floor (maps to 0%) | `0` |
+| Max heart rate | Percent conversion ceiling (maps to 100%) | `200` |
 | Update interval (ms) | UI refresh, push throttle, RSSI poll | `1000` |
 
 ## 🎮 VRChat (OSC)
@@ -138,6 +139,15 @@ Heart-rate events carry both `heartRate` and `heart_rate` keys (same value): the
 - On Windows, running from non-ASCII paths may fail. Prefer an ASCII-only path.
 
 ## 🧾 Changelog
+### v1.8.2
+- **Heart-rate percent conversion range**: new Min HR setting — `percent = (BPM − min) ÷ (max − min)` (0~1, clamped). The default min of 0 stays identical to `BPM ÷ 200`; setting it to your resting rate lets 0~1 cover your actual range. A new in-app percent guide covers the formula, live examples, JSON/OSC/ChatBox field reference and the two Unity 0~255 mapping conventions (0~1 and -1~1 input), in zh/en/ja.
+- **Broadcast heart rate**: HR parsed directly from Xiaomi/Redmi advertisements during scanning and fed through the unified ingestion pipeline — display and push work without a BLE connection.
+- **Desktop window visibility**: minimizing or hiding the window pauses the heart animation and UI notifications while background monitoring keeps running; Windows tray behavior fixed up.
+- **Internals**: settings sections share a `SettingsSectionWidget`/`SettingsSectionState` base; OSC messaging unified behind a multi-arg API; tests 51 → 72.
+
+### v1.8.1
+- **Windows tray fix**: right-click context menu now shows; tray exit entry restored.
+
 ### v1.8.0
 - **Redmi/Xiaomi watch compatibility**: scan filter accepts Redmi devices and unnamed heart-rate broadcasters; connect timeout honored, reconnect storms fixed (backoff + failure cap), zombie no-data connections detected, rotating-MAC name-based reconnect; a tri-lingual "enable Heart Rate Broadcast" guide appears when the HR service is missing.
 - **Settings page rebuild**: protocol-grouped sections with progressive disclosure, inline validation, one-tap HTTP/WS/OSC/MQTT connection tests, unsaved-changes guard, save feedback, live OSC status, first-run onboarding.
