@@ -13,6 +13,7 @@ import '../widgets/hero_card.dart';
 import '../widgets/nearby_list.dart';
 import 'onboarding_page.dart';
 import 'settings_page.dart';
+import 'update/update_banner.dart';
 
 /// Main dashboard: heart-rate card, nearby device list and window controls.
 class HeartDashboard extends StatefulWidget {
@@ -182,6 +183,7 @@ class _HeartDashboardState extends State<HeartDashboard> {
               sliver: SliverList(
                 delegate: SliverChildListDelegate([
                   const SizedBox(height: AppSpacing.s8),
+                  const UpdateBanner(),
                   const HeroCard(),
                   const SizedBox(height: AppSpacing.s32),
                   // Rebuild the nearby list only when something it renders

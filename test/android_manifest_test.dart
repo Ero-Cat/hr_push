@@ -41,6 +41,26 @@ void main() {
     );
   });
 
+  test('Android manifest allows the in-app APK self-update flow', () {
+    final manifest = File(
+      'android/app/src/main/AndroidManifest.xml',
+    ).readAsStringSync();
+
+    expect(
+      manifest,
+      contains('android.permission.REQUEST_INSTALL_PACKAGES'),
+      reason:
+          'The in-app updater hands the downloaded APK to the system '
+          'package installer, which needs this permission.',
+    );
+
+    final activity = File(
+      'android/app/src/main/kotlin/moe/iacg/hrpush/MainActivity.kt',
+    ).readAsStringSync();
+    expect(activity, contains('moe.iacg.hrpush/system'));
+    expect(activity, contains('getPrimaryAbi'));
+  });
+
   test(
     'Android foreground bridge starts service and opens battery settings',
     () {

@@ -1077,6 +1077,102 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'With a min of 0, a resting rate of 60 BPM already reads 0.3, so daily variation only spans 0.3~1.0. Setting the min to your everyday resting rate (e.g. 60) lets 0.0~1.0 cover your actual range, making animations more expressive.'**
   String get percentHelpWhyBody;
+
+  /// No description provided for @updateBannerTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'New version available'**
+  String get updateBannerTitle;
+
+  /// No description provided for @updateNow.
+  ///
+  /// In en, this message translates to:
+  /// **'Update Now'**
+  String get updateNow;
+
+  /// No description provided for @updateCancel.
+  ///
+  /// In en, this message translates to:
+  /// **'Cancel'**
+  String get updateCancel;
+
+  /// No description provided for @updateCheck.
+  ///
+  /// In en, this message translates to:
+  /// **'Check for Updates'**
+  String get updateCheck;
+
+  /// No description provided for @updateUpToDate.
+  ///
+  /// In en, this message translates to:
+  /// **'Up to date'**
+  String get updateUpToDate;
+
+  /// No description provided for @updateCheckFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Check failed'**
+  String get updateCheckFailed;
+
+  /// No description provided for @updateDownloadFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Download failed. Please retry.'**
+  String get updateDownloadFailed;
+
+  /// No description provided for @updateDownloading.
+  ///
+  /// In en, this message translates to:
+  /// **'Downloading'**
+  String get updateDownloading;
+
+  /// No description provided for @updateInstallNow.
+  ///
+  /// In en, this message translates to:
+  /// **'Install Now'**
+  String get updateInstallNow;
+
+  /// No description provided for @updateSkipVersion.
+  ///
+  /// In en, this message translates to:
+  /// **'Skip this version'**
+  String get updateSkipVersion;
+
+  /// No description provided for @updateOpenReleasePage.
+  ///
+  /// In en, this message translates to:
+  /// **'Open release page'**
+  String get updateOpenReleasePage;
+
+  /// No description provided for @updateNotesTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'What\'s New'**
+  String get updateNotesTitle;
+
+  /// No description provided for @updateGuideWindowsInstaller.
+  ///
+  /// In en, this message translates to:
+  /// **'The installer is starting; follow the prompts to finish updating.'**
+  String get updateGuideWindowsInstaller;
+
+  /// No description provided for @updateGuideWindowsZip.
+  ///
+  /// In en, this message translates to:
+  /// **'Package saved to Downloads. Unzip it and replace your current folder.'**
+  String get updateGuideWindowsZip;
+
+  /// No description provided for @updateGuideMacos.
+  ///
+  /// In en, this message translates to:
+  /// **'Package saved to Downloads. Unzip it and replace the old app in Applications.'**
+  String get updateGuideMacos;
+
+  /// No description provided for @updateGuideLinux.
+  ///
+  /// In en, this message translates to:
+  /// **'Package saved to Downloads. Extract it over your install directory and restart the app.'**
+  String get updateGuideLinux;
 }
 
 class _AppLocalizationsDelegate

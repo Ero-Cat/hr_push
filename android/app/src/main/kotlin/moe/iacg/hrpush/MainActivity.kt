@@ -12,6 +12,7 @@ import io.flutter.plugin.common.MethodChannel
 
 class MainActivity : FlutterActivity() {
     private val channelName = "moe.iacg.hrpush/notification"
+    private val systemChannelName = "moe.iacg.hrpush/system"
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
@@ -49,6 +50,15 @@ class MainActivity : FlutterActivity() {
                         result.success(openBackgroundRuntimeSettings())
                     }
 
+                    else -> result.notImplemented()
+                }
+            }
+        MethodChannel(flutterEngine.dartExecutor.binaryMessenger, systemChannelName)
+            .setMethodCallHandler { call, result ->
+                when (call.method) {
+                    // Primary ABI used to pick the matching split APK update.
+                    "getPrimaryAbi" ->
+                        result.success(Build.SUPPORTED_ABIS.firstOrNull())
                     else -> result.notImplemented()
                 }
             }

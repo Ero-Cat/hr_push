@@ -179,5 +179,21 @@
   "percentHelpUnityNeg": "-1~1 入力のツール：(value × 2 − 1) を 0~255 へ再マッピング（例：0.5 → 191）",
   "percentHelpUnityDirect": "Float アニメーターパラメーター：0~1 をそのまま使用可能",
   "percentHelpWhyTitle": "下限を設定する理由",
-  "percentHelpWhyBody": "下限が 0 の場合、安静時 60 BPM でもすでに 0.3 となり、日常の変動は 0.3~1.0 の範囲しか使えません。下限を日常の安静時心拍数（例：60）に設定すると、0.0~1.0 が実際の心拍変動をフルにカバーし、アニメーションの表情が豊かになります。"
+  "percentHelpWhyBody": "下限が 0 の場合、安静時 60 BPM でもすでに 0.3 となり、日常の変動は 0.3~1.0 の範囲しか使えません。下限を日常の安静時心拍数（例：60）に設定すると、0.0~1.0 が実際の心拍変動をフルにカバーし、アニメーションの表情が豊かになります。",
+  "updateBannerTitle": "新しいバージョンがあります",
+  "updateNow": "今すぐ更新",
+  "updateCancel": "キャンセル",
+  "updateCheck": "アップデートを確認",
+  "updateUpToDate": "最新です",
+  "updateCheckFailed": "確認に失敗しました",
+  "updateDownloadFailed": "ダウンロードに失敗しました。再試行してください。",
+  "updateDownloading": "ダウンロード中",
+  "updateInstallNow": "今すぐインストール",
+  "updateSkipVersion": "このバージョンをスキップ",
+  "updateOpenReleasePage": "リリースページを開く",
+  "updateNotesTitle": "更新内容",
+  "updateGuideWindowsInstaller": "インストーラーを起動します。手順に従って更新を完了してください。",
+  "updateGuideWindowsZip": "パッケージを「ダウンロード」に保存しました。解凍して既存のフォルダーを置き換えてください。",
+  "updateGuideMacos": "パッケージを「ダウンロード」に保存しました。解凍して「アプリケーション」内の旧バージョンを置き換えてください。",
+  "updateGuideLinux": "パッケージを「ダウンロード」に保存しました。既存のディレクトリに上書き展開してアプリを再起動してください。"
 }

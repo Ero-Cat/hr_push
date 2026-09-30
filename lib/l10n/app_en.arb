@@ -179,5 +179,21 @@
   "percentHelpUnityNeg": "Tool expects -1~1 input: remap (value × 2 − 1) onto 0~255 (e.g. 0.5 → 191)",
   "percentHelpUnityDirect": "Float animator parameters: feed 0~1 directly, no conversion needed",
   "percentHelpWhyTitle": "Why set a min HR",
-  "percentHelpWhyBody": "With a min of 0, a resting rate of 60 BPM already reads 0.3, so daily variation only spans 0.3~1.0. Setting the min to your everyday resting rate (e.g. 60) lets 0.0~1.0 cover your actual range, making animations more expressive."
+  "percentHelpWhyBody": "With a min of 0, a resting rate of 60 BPM already reads 0.3, so daily variation only spans 0.3~1.0. Setting the min to your everyday resting rate (e.g. 60) lets 0.0~1.0 cover your actual range, making animations more expressive.",
+  "updateBannerTitle": "New version available",
+  "updateNow": "Update Now",
+  "updateCancel": "Cancel",
+  "updateCheck": "Check for Updates",
+  "updateUpToDate": "Up to date",
+  "updateCheckFailed": "Check failed",
+  "updateDownloadFailed": "Download failed. Please retry.",
+  "updateDownloading": "Downloading",
+  "updateInstallNow": "Install Now",
+  "updateSkipVersion": "Skip this version",
+  "updateOpenReleasePage": "Open release page",
+  "updateNotesTitle": "What's New",
+  "updateGuideWindowsInstaller": "The installer is starting; follow the prompts to finish updating.",
+  "updateGuideWindowsZip": "Package saved to Downloads. Unzip it and replace your current folder.",
+  "updateGuideMacos": "Package saved to Downloads. Unzip it and replace the old app in Applications.",
+  "updateGuideLinux": "Package saved to Downloads. Extract it over your install directory and restart the app."
 }

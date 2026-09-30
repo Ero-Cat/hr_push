@@ -523,4 +523,56 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get percentHelpWhyBody =>
       'With a min of 0, a resting rate of 60 BPM already reads 0.3, so daily variation only spans 0.3~1.0. Setting the min to your everyday resting rate (e.g. 60) lets 0.0~1.0 cover your actual range, making animations more expressive.';
+
+  @override
+  String get updateBannerTitle => 'New version available';
+
+  @override
+  String get updateNow => 'Update Now';
+
+  @override
+  String get updateCancel => 'Cancel';
+
+  @override
+  String get updateCheck => 'Check for Updates';
+
+  @override
+  String get updateUpToDate => 'Up to date';
+
+  @override
+  String get updateCheckFailed => 'Check failed';
+
+  @override
+  String get updateDownloadFailed => 'Download failed. Please retry.';
+
+  @override
+  String get updateDownloading => 'Downloading';
+
+  @override
+  String get updateInstallNow => 'Install Now';
+
+  @override
+  String get updateSkipVersion => 'Skip this version';
+
+  @override
+  String get updateOpenReleasePage => 'Open release page';
+
+  @override
+  String get updateNotesTitle => 'What\'s New';
+
+  @override
+  String get updateGuideWindowsInstaller =>
+      'The installer is starting; follow the prompts to finish updating.';
+
+  @override
+  String get updateGuideWindowsZip =>
+      'Package saved to Downloads. Unzip it and replace your current folder.';
+
+  @override
+  String get updateGuideMacos =>
+      'Package saved to Downloads. Unzip it and replace the old app in Applications.';
+
+  @override
+  String get updateGuideLinux =>
+      'Package saved to Downloads. Extract it over your install directory and restart the app.';
 }

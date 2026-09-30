@@ -508,4 +508,52 @@ class AppLocalizationsZh extends AppLocalizations {
   @override
   String get percentHelpWhyBody =>
       '下限为 0 时，静息心率 60 BPM 的百分比已达 0.3，日常波动只占用 0.3~1.0 的区间。把下限设为日常静息心率（如 60），可让 0.0~1.0 完整覆盖你的实际心率变化，动画层次更分明。';
+
+  @override
+  String get updateBannerTitle => '发现新版本';
+
+  @override
+  String get updateNow => '立即更新';
+
+  @override
+  String get updateCancel => '取消';
+
+  @override
+  String get updateCheck => '检查更新';
+
+  @override
+  String get updateUpToDate => '已是最新版本';
+
+  @override
+  String get updateCheckFailed => '检查更新失败';
+
+  @override
+  String get updateDownloadFailed => '下载失败，请重试';
+
+  @override
+  String get updateDownloading => '正在下载';
+
+  @override
+  String get updateInstallNow => '立即安装';
+
+  @override
+  String get updateSkipVersion => '忽略此版本';
+
+  @override
+  String get updateOpenReleasePage => '打开发布页';
+
+  @override
+  String get updateNotesTitle => '更新内容';
+
+  @override
+  String get updateGuideWindowsInstaller => '即将启动安装程序，请按提示完成更新。';
+
+  @override
+  String get updateGuideWindowsZip => '更新包已保存到“下载”文件夹，请解压后替换现有目录。';
+
+  @override
+  String get updateGuideMacos => '更新包已保存到“下载”文件夹，请解压后替换“应用程序”中的旧版本。';
+
+  @override
+  String get updateGuideLinux => '更新包已保存到“下载”文件夹，请解压覆盖原目录后重启应用。';
 }

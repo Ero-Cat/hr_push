@@ -25,6 +25,7 @@ A cross-platform BLE heart rate monitor and push tool built with Flutter. After 
 - **Setup UX**: First-run onboarding, inline validation, one-tap connection tests for HTTP/WS/OSC/MQTT.
 - **iOS Live Activity**: Live heart rate on the lock screen / Dynamic Island (iOS 16.1+).
 - **Android persistent notification**: Shows heart rate and connection status in the notification bar.
+- **In-app updates**: Checks GitHub Releases on launch and can update in place — Android installs the matching APK over the old one, Windows launches the installer, macOS/Linux download the package; iOS links to the release page.
 
 ## 🗺️ Use Cases
 - **Always-on push**: Run on a Mac mini or Windows PC that stays on. When your watch is in range with HR broadcasting enabled, the app connects and keeps pushing.
@@ -139,6 +140,14 @@ Heart-rate events carry both `heartRate` and `heart_rate` keys (same value): the
 - On Windows, running from non-ASCII paths may fail. Prefer an ASCII-only path.
 
 ## 🧾 Changelog
+### v1.9.0
+- **In-app updates**: checks GitHub Releases on launch (once per 24h, silent on failure) plus a manual "Check for Updates" in Settings; a dashboard banner opens the release notes dialog with one-tap update — Android downloads the ABI-matched APK (progress + cancel) and over-installs via the system installer; Windows downloads setup.exe, quits and launches the installer; macOS/Linux download the package to Downloads with replace guidance; iOS links to the release page. Per-version skip supported.
+- **Windows installer**: releases now include `hr-push-windows-vX.Y.Z-setup.exe` (Inno Setup; Program Files install, Start-menu shortcut, uninstaller, pure-ASCII install path that sidesteps the Chinese-path issue); portable zip kept.
+- **Android split APKs**: per-ABI `hr-push-android-vX.Y.Z-arm64.apk` / `-arm32.apk` (~half the size of universal); the universal `app-release-vX.Y.Z.apk` stays.
+- **Android stable signing**: CI signs with a fixed release keystore from GitHub Secrets (falls back to the old behavior when absent), enabling over-install updates. Upgrading from pre-v1.9.0 requires a one-time uninstall/reinstall.
+- **macOS sandbox fix**: added the `com.apple.security.network.client` entitlement so release builds can actually make outbound HTTP/WS/MQTT connections and update checks.
+- **Tests**: 72 → 90.
+
 ### v1.8.2
 - **Heart-rate percent conversion range**: new Min HR setting — `percent = (BPM − min) ÷ (max − min)` (0~1, clamped). The default min of 0 stays identical to `BPM ÷ 200`; setting it to your resting rate lets 0~1 cover your actual range. A new in-app percent guide covers the formula, live examples, JSON/OSC/ChatBox field reference and the two Unity 0~255 mapping conventions (0~1 and -1~1 input), in zh/en/ja.
 - **Broadcast heart rate**: HR parsed directly from Xiaomi/Redmi advertisements during scanning and fed through the unified ingestion pipeline — display and push work without a BLE connection.

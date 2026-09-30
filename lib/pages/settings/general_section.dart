@@ -1,16 +1,19 @@
 import 'dart:io' show Platform;
 
 import 'package:flutter/cupertino.dart';
+import 'package:provider/provider.dart';
 
 import '../../app_metadata.dart';
 import '../../hr_notification_service.dart';
 import '../../l10n/app_localizations.dart';
 import '../../models/models.dart';
+import '../../services/update_service.dart';
 import '../../theme/design_system.dart';
 import '../../utils/settings_validator.dart';
 import '../../widgets/settings/validated_field.dart';
 import '../hr_percent_help_page.dart';
 import '../log_detail_page.dart';
+import '../update/update_dialog.dart';
 import 'settings_section.dart';
 import 'settings_section_contract.dart';
 import 'settings_section_state.dart';
@@ -34,6 +37,7 @@ class GeneralSettingsSectionState extends State<GeneralSettingsSection>
   late final TextEditingController _minHrCtrl;
   late final TextEditingController _maxHrCtrl;
   bool _logEnabled = false;
+  _UpdateCheckState _updateCheck = _UpdateCheckState.idle;
 
   @override
   void initState() {
@@ -78,6 +82,88 @@ class GeneralSettingsSectionState extends State<GeneralSettingsSection>
           int.tryParse(_maxHrCtrl.text.trim()) ?? widget.initial.maxHeartRate,
       logEnabled: _logEnabled,
     );
+  }
+
+  Future<void> _checkForUpdates(BuildContext context) async {
+    if (_updateCheck == _UpdateCheckState.checking) return;
+    final svc = context.read<UpdateService>();
+    setState(() => _updateCheck = _UpdateCheckState.checking);
+    await svc.checkForUpdates(manual: true);
+    if (!mounted) return;
+
+    if (svc.updateAvailable) {
+      setState(() => _updateCheck = _UpdateCheckState.idle);
+      if (context.mounted) await showUpdateDialog(context);
+      return;
+    }
+    setState(() {
+      _updateCheck = svc.status == UpdateStatus.upToDate
+          ? _UpdateCheckState.upToDate
+          : _UpdateCheckState.failed;
+    });
+    // Let the inline result fade back to the plain row after a beat.
+    Future.delayed(const Duration(seconds: 4), () {
+      if (mounted && _updateCheck != _UpdateCheckState.checking) {
+        setState(() => _updateCheck = _UpdateCheckState.idle);
+      }
+    });
+  }
+
+  Widget? _updateCheckTrailing(BuildContext context, AppLocalizations l10n) {
+    switch (_updateCheck) {
+      case _UpdateCheckState.idle:
+        return null;
+      case _UpdateCheckState.checking:
+        return const SizedBox(
+          width: 18,
+          height: 18,
+          child: CupertinoActivityIndicator(radius: 9),
+        );
+      case _UpdateCheckState.upToDate:
+        return Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              CupertinoIcons.checkmark_circle_fill,
+              size: 16,
+              color: AppColors.success.resolveFrom(context),
+            ),
+            const SizedBox(width: 4),
+            Flexible(
+              child: Text(
+                l10n.updateUpToDate,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: AppTypography.caption.copyWith(
+                  color: AppColors.textSecondary.resolveFrom(context),
+                ),
+              ),
+            ),
+          ],
+        );
+      case _UpdateCheckState.failed:
+        return Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              CupertinoIcons.xmark_circle_fill,
+              size: 16,
+              color: AppColors.danger.resolveFrom(context),
+            ),
+            const SizedBox(width: 4),
+            Flexible(
+              child: Text(
+                l10n.updateCheckFailed,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: AppTypography.caption.copyWith(
+                  color: AppColors.textSecondary.resolveFrom(context),
+                ),
+              ),
+            ),
+          ],
+        );
+    }
   }
 
   @override
@@ -176,6 +262,33 @@ class GeneralSettingsSectionState extends State<GeneralSettingsSection>
               ),
             ),
           ),
+        Builder(
+          builder: (context) {
+            final trailing = _updateCheckTrailing(context, l10n);
+            return CupertinoButton(
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 6),
+              minimumSize: Size.zero,
+              onPressed: () => _checkForUpdates(context),
+              child: Align(
+                alignment: AlignmentDirectional.centerStart,
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        l10n.updateCheck,
+                        style: AppTypography.subheadline.copyWith(
+                          color: AppColors.accent.resolveFrom(context),
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ),
+                    if (trailing != null) trailing,
+                  ],
+                ),
+              ),
+            );
+          },
+        ),
         Padding(
           padding: const EdgeInsets.only(top: 8, bottom: 4),
           child: Center(
@@ -191,3 +304,5 @@ class GeneralSettingsSectionState extends State<GeneralSettingsSection>
     );
   }
 }
+
+enum _UpdateCheckState { idle, checking, upToDate, failed }

@@ -71,22 +71,44 @@ jobs:
           
       - name: Install dependencies
         run: flutter pub get
-        
+
+      # A stable release keystore keeps APK signatures consistent across
+      # releases so the in-app updater can over-install updates. When the
+      # secrets are absent we fall back to the debug signing config (the
+      # pre-existing behavior).
+      - name: Restore release keystore
+        if: ${{ secrets.ANDROID_KEYSTORE_BASE64 != '' }}
+        run: |
+          echo "${{ secrets.ANDROID_KEYSTORE_BASE64 }}" | base64 --decode > android/app/release-keystore.jks
+          {
+            echo "storePassword=${{ secrets.KEYSTORE_PASSWORD }}"
+            echo "keyPassword=${{ secrets.KEY_PASSWORD }}"
+            echo "keyAlias=${{ secrets.KEY_ALIAS }}"
+            echo "storeFile=release-keystore.jks"
+          } > android/key.properties
+
       - name: Sync version & build APK
         run: |
           chmod +x scripts/sync-version.sh && scripts/sync-version.sh
           flutter build apk --release
-          
-      - name: Rename & upload APK
+          flutter build apk --release --split-per-abi
+
+      - name: Rename APKs
         run: |
           VERSION="${{ github.ref_name }}"
-          mv build/app/outputs/flutter-apk/app-release.apk "app-release-${VERSION}.apk"
-          
-      - name: Upload APK to release
+          OUT=build/app/outputs/flutter-apk
+          mv "$OUT/app-release.apk" "app-release-${VERSION}.apk"
+          mv "$OUT/app-arm64-v8a-release.apk" "hr-push-android-${VERSION}-arm64.apk"
+          mv "$OUT/app-armeabi-v7a-release.apk" "hr-push-android-${VERSION}-arm32.apk"
+
+      - name: Upload APKs to release
         if: github.event_name == 'push' || github.event.inputs.job == 'all'
         uses: softprops/action-gh-release@v1
         with:
-          files: app-release-${{ github.ref_name }}.apk
+          files: |
+            app-release-${{ github.ref_name }}.apk
+            hr-push-android-${{ github.ref_name }}-arm64.apk
+            hr-push-android-${{ github.ref_name }}-arm32.apk
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
@@ -269,11 +291,35 @@ jobs:
           $env:VERSION="${{ github.ref_name }}"
           Compress-Archive -Path "build\windows\x64\runner\Release\*" -DestinationPath "hr-push-windows-$env:VERSION.zip"
         shell: pwsh
-        
-      - name: Upload Windows zip to release
+
+      - name: Fetch installer language file (Chinese Simplified)
+        shell: pwsh
+        run: |
+          # Not bundled with Inno Setup; #if guards in hr_push.iss tolerate
+          # a failed download by falling back to English/Japanese only.
+          try {
+            Invoke-WebRequest -Uri "https://raw.githubusercontent.com/jrsoftware/issrc/main/Files/Languages/Unofficial/ChineseSimplified.isl" -OutFile "windows\installer\ChineseSimplified.isl"
+          } catch {
+            Write-Warning "ChineseSimplified.isl download failed: $($_.Exception.Message)"
+          }
+
+      - name: Build installer (Inno Setup)
+        shell: pwsh
+        run: |
+          choco install innosetup --no-progress -y
+          $version = "${{ github.ref_name }}" -replace '^v',''
+          New-Item -ItemType Directory -Force -Path build\windows\installer | Out-Null
+          $iscc = Get-Command ISCC.exe -ErrorAction SilentlyContinue
+          if (-not $iscc) { $iscc = "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" }
+          & $iscc "/DMyAppVersion=$version" windows\installer\hr_push.iss
+          Get-Item "build\windows\installer\hr-push-windows-v$version-setup.exe"
+
+      - name: Upload Windows artifacts to release
         if: github.event_name == 'push' || github.event.inputs.job == 'all'
         uses: softprops/action-gh-release@v1
         with:
-          files: hr-push-windows-${{ github.ref_name }}.zip
+          files: |
+            hr-push-windows-${{ github.ref_name }}.zip
+            build/windows/installer/hr-push-windows-${{ github.ref_name }}-setup.exe
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

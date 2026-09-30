@@ -512,4 +512,55 @@ class AppLocalizationsJa extends AppLocalizations {
   @override
   String get percentHelpWhyBody =>
       '下限が 0 の場合、安静時 60 BPM でもすでに 0.3 となり、日常の変動は 0.3~1.0 の範囲しか使えません。下限を日常の安静時心拍数（例：60）に設定すると、0.0~1.0 が実際の心拍変動をフルにカバーし、アニメーションの表情が豊かになります。';
+
+  @override
+  String get updateBannerTitle => '新しいバージョンがあります';
+
+  @override
+  String get updateNow => '今すぐ更新';
+
+  @override
+  String get updateCancel => 'キャンセル';
+
+  @override
+  String get updateCheck => 'アップデートを確認';
+
+  @override
+  String get updateUpToDate => '最新です';
+
+  @override
+  String get updateCheckFailed => '確認に失敗しました';
+
+  @override
+  String get updateDownloadFailed => 'ダウンロードに失敗しました。再試行してください。';
+
+  @override
+  String get updateDownloading => 'ダウンロード中';
+
+  @override
+  String get updateInstallNow => '今すぐインストール';
+
+  @override
+  String get updateSkipVersion => 'このバージョンをスキップ';
+
+  @override
+  String get updateOpenReleasePage => 'リリースページを開く';
+
+  @override
+  String get updateNotesTitle => '更新内容';
+
+  @override
+  String get updateGuideWindowsInstaller => 'インストーラーを起動します。手順に従って更新を完了してください。';
+
+  @override
+  String get updateGuideWindowsZip =>
+      'パッケージを「ダウンロード」に保存しました。解凍して既存のフォルダーを置き換えてください。';
+
+  @override
+  String get updateGuideMacos =>
+      'パッケージを「ダウンロード」に保存しました。解凍して「アプリケーション」内の旧バージョンを置き換えてください。';
+
+  @override
+  String get updateGuideLinux =>
+      'パッケージを「ダウンロード」に保存しました。既存のディレクトリに上書き展開してアプリを再起動してください。';
 }

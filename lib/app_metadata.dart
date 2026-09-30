@@ -2,4 +2,4 @@
 ///
 /// Keep [appVersion] in sync with `version:` in pubspec.yaml — the test
 /// `test/app_metadata_test.dart` fails the build when they drift.
-const String appVersion = '1.8.2';
+const String appVersion = '1.9.0';

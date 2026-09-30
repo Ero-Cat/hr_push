@@ -2,6 +2,14 @@
 
 本文件记录 HR PUSH 的完整更新日志。其他语言版本见 [README_EN.md](README_EN.md) / [README_JA.md](README_JA.md)。
 
+## v1.9.0
+- **应用内更新**：启动时自动检查 GitHub Releases 新版本（每 24 小时一次，静默失败），设置页新增「检查更新」手动入口；发现新版本时首页显示横幅，对话框内查看更新说明并一键更新——Android 按设备 CPU 架构下载对应 APK（带进度、可取消）后调起系统安装器直接覆盖安装；Windows 下载 setup.exe 后自动退出并运行安装程序；macOS / Linux 下载更新包到「下载」文件夹并打开引导替换；iOS 因签名限制提供更新提醒并跳转发布页。支持「忽略此版本」。
+- **Windows 安装包**：Release 新增 `hr-push-windows-vX.Y.Z-setup.exe`（Inno Setup，安装到 Program Files、开始菜单快捷方式、可卸载，安装目录为纯 ASCII 路径，顺带规避中文路径问题）；zip 便携版保留。
+- **Android 拆分 APK**：Release 新增按 CPU 架构的 `hr-push-android-vX.Y.Z-arm64.apk` / `-arm32.apk`（体积约为通用包一半），通用包 `app-release-vX.Y.Z.apk` 保留。
+- **Android 稳定签名**：CI 使用 GitHub Secrets 中的固定发布密钥签名（Secrets 缺失时自动回退旧行为），保证跨版本覆盖安装可行。**从 v1.9.0 之前的版本升级需卸载后重装一次**（一次性迁移）。
+- **macOS 沙盒修复**：补齐 `com.apple.security.network.client` 出站网络权限，修复正式版沙盒下 HTTP/WS/MQTT 推送与更新检查可能被系统拦截的问题。
+- **测试覆盖 90 项**：新增版本比较、发布资产选择、更新检查/节流/忽略、下载与取消清理、横幅组件等用例。
+
 ## v1.8.2
 - **心率百分比换算区间**：新增「下限心率」设置，`percent = (BPM − 下限) ÷ (上限 − 下限)`（0~1，超界截断）。下限默认 0，与旧版 `BPM ÷ 200` 行为完全一致；把下限设为日常静息心率（如 60）即可让 0~1 完整覆盖实际心率波动。设置页新增「百分比换算说明」页：换算公式、按当前设置的实时换算示例、JSON / OSC / ChatBox 字段对照，以及 Unity 端 0~1→255 与 -1~1→255 两种映射约定的对照（三语）。
 - **广播心率直读**：扫描阶段直接从小米/Redmi 广播包解析心率并进入统一摄取管线，无需建立 BLE 连接即可显示与推送。

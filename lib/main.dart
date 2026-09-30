@@ -12,6 +12,7 @@ import 'app_log.dart';
 import 'window_tray_controller.dart';
 import 'heart_rate_manager.dart';
 import 'l10n/l10n_keys.dart';
+import 'services/update_service.dart';
 import 'theme/design_system.dart';
 import 'pages/heart_dashboard.dart';
 
@@ -64,8 +65,14 @@ class HrOscApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return ChangeNotifierProvider(
-      create: (_) => HeartRateManager()..start(),
+    return MultiProvider(
+      providers: [
+        ChangeNotifierProvider(create: (_) => HeartRateManager()..start()),
+        // Auto checks are throttled internally (once per 24h).
+        ChangeNotifierProvider(
+          create: (_) => UpdateService()..checkForUpdates(),
+        ),
+      ],
       child: CupertinoApp(
         debugShowCheckedModeBanner: false,
         title: 'Heart Rate',

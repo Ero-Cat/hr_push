@@ -179,5 +179,21 @@
   "percentHelpUnityNeg": "工具期望 -1~1 输入：先 value × 2 − 1 再映射 0~255（例：0.5 → 191）",
   "percentHelpUnityDirect": "Float 动画参数：0~1 可直接驱动，无需换算",
   "percentHelpWhyTitle": "为什么要设置下限",
-  "percentHelpWhyBody": "下限为 0 时，静息心率 60 BPM 的百分比已达 0.3，日常波动只占用 0.3~1.0 的区间。把下限设为日常静息心率（如 60），可让 0.0~1.0 完整覆盖你的实际心率变化，动画层次更分明。"
+  "percentHelpWhyBody": "下限为 0 时，静息心率 60 BPM 的百分比已达 0.3，日常波动只占用 0.3~1.0 的区间。把下限设为日常静息心率（如 60），可让 0.0~1.0 完整覆盖你的实际心率变化，动画层次更分明。",
+  "updateBannerTitle": "发现新版本",
+  "updateNow": "立即更新",
+  "updateCancel": "取消",
+  "updateCheck": "检查更新",
+  "updateUpToDate": "已是最新版本",
+  "updateCheckFailed": "检查更新失败",
+  "updateDownloadFailed": "下载失败，请重试",
+  "updateDownloading": "正在下载",
+  "updateInstallNow": "立即安装",
+  "updateSkipVersion": "忽略此版本",
+  "updateOpenReleasePage": "打开发布页",
+  "updateNotesTitle": "更新内容",
+  "updateGuideWindowsInstaller": "即将启动安装程序，请按提示完成更新。",
+  "updateGuideWindowsZip": "更新包已保存到“下载”文件夹，请解压后替换现有目录。",
+  "updateGuideMacos": "更新包已保存到“下载”文件夹，请解压后替换“应用程序”中的旧版本。",
+  "updateGuideLinux": "更新包已保存到“下载”文件夹，请解压覆盖原目录后重启应用。"
 }

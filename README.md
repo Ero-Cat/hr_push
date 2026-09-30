@@ -73,6 +73,7 @@ HR PUSH 想做的事很简单 —— **把心率稳定地送到你想送的任�
 - **一键测试连接**：配置页内直接验证每个端点是否可达，不用反复保存试错。
 
 ### 🪟 各平台体验
+- **应用内更新**：启动时自动检查新版本（每 24 小时一次，可手动检查），首页横幅 + 更新说明 + 一键更新：Android 直接覆盖安装、Windows 自动运行安装程序、macOS/Linux 下载更新包、iOS 跳转发布页。
 - **Android**：原生「实时活动」风格常驻通知卡片，锁屏可见实时心率。
 - **iOS**：实时活动（Live Activities）—— 锁屏与灵动岛显示实时心率（iOS 16.1+）。
 - **Windows**：关闭最小化到系统托盘，后台继续推送，悬停查看心率摘要。
@@ -108,11 +109,24 @@ HR PUSH 想做的事很简单 —— **把心率稳定地送到你想送的任�
 
 | 平台 | 下载文件 | 说明 |
 | --- | --- | --- |
-| Android | `app-release-vX.Y.Z.apk` | 直接安装；首次使用需授予蓝牙与通知权限 |
-| Windows | `hr-push-windows-vX.Y.Z.zip` | 解压后运行；需支持 BLE 的蓝牙适配器；⚠️ 暂不支持中文路径 |
+| Android | `app-release-vX.Y.Z.apk`（通用）或 `hr-push-android-vX.Y.Z-arm64.apk` / `-arm32.apk`（按 CPU 架构，体积更小） | 直接安装；首次使用需授予蓝牙与通知权限 |
+| Windows | `hr-push-windows-vX.Y.Z-setup.exe`（推荐，安装到 Program Files，顺带规避中文路径问题）或 `hr-push-windows-vX.Y.Z.zip`（便携版） | 安装版含开始菜单/卸载；便携版解压即用，⚠️ 暂不支持中文路径；需支持 BLE 的蓝牙适配器 |
 | macOS | `hr-push-macos-vX.Y.Z.zip` | 解压得到 `.app`；首次打开若提示未知开发者，请右键 → 打开 |
 | iOS | `hr-push-ios-vX.Y.Z-unsigned.ipa` | **未签名** IPA：用 [AltStore](https://altstore.io) / [Sideloadly](https://sideloadly.io) / esign 等工具自签后安装（免费 Apple ID 即可，7 天需续签；付费账号一年） |
 | Linux | `hr-push-linux-vX.Y.Z.tar.gz` | 解压后运行 `./hr_push`；需系统 `bluez`（BLE）与 `libayatana-appindicator3-1`（托盘库，Ubuntu/Debian: `sudo apt install libayatana-appindicator3-1`） |
+
+### 应用内更新
+
+应用启动后会自动检查新版本（每 24 小时一次，也可在 **设置 → 通用 → 检查更新** 手动触发）。发现新版本时，首页会显示更新横幅，点开即可查看更新说明并一键更新：
+
+| 平台 | 更新方式 |
+| --- | --- |
+| Android | 应用内下载匹配 CPU 架构的 APK（带进度、可取消）→ 调起系统安装器直接覆盖安装 |
+| Windows | 应用内下载 setup.exe → 自动退出并启动安装程序，按提示完成即更新完毕 |
+| macOS / Linux | 应用内下载更新包到「下载」文件夹并自动打开，按提示替换旧版本 |
+| iOS | 受 Apple 政策限制（IPA 需自签），提供更新提醒并跳转发布页手动下载 |
+
+> ℹ️ Android 覆盖安装要求前后版本签名一致。自 v1.9.0 起官方 APK 使用固定发布签名；从更早版本升级时需**卸载后重装一次**（仅需一次）。
 
 ### 从源码构建
 
