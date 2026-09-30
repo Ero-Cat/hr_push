@@ -44,6 +44,14 @@ class UpdateService extends ChangeNotifier {
   static const _prefsSkippedVersion = 'skipped_update_version';
   static const _abiChannel = MethodChannel('moe.iacg.hrpush/system');
 
+  /// Google Play builds pass `--dart-define=PLAY_BUILD=true`: Play policy
+  /// forbids self-updating apps, so the whole updater compiles out there.
+  /// Users on Play update through the store.
+  static const playBuild = bool.fromEnvironment(
+    'PLAY_BUILD',
+    defaultValue: false,
+  );
+
   final http.Client _client;
   final Future<Directory> Function() _downloadDir;
 
@@ -142,6 +150,7 @@ class UpdateService extends ChangeNotifier {
   /// Check GitHub for a newer release. Automatic checks are throttled to one
   /// per [_autoCheckInterval]; [manual] checks always run and surface errors.
   Future<void> checkForUpdates({bool manual = false}) async {
+    if (playBuild) return;
     if (status == UpdateStatus.checking || status == UpdateStatus.downloading) {
       return;
     }

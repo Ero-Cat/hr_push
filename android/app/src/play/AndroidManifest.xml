@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
+
+    <!-- Play policy forbids apps from downloading/installing updates outside
+         the store, so the play flavor drops the installer permission. The
+         updater UI itself is compiled out via PLAY_BUILD (see update_service).
+    -->
+    <uses-permission
+        android:name="android.permission.REQUEST_INSTALL_PACKAGES"
+        tools:node="remove" />
+</manifest>

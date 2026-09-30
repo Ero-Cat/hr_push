@@ -55,6 +55,9 @@ jobs:
       # Step-level `if` may not reference the secrets context; surface it
       # through job env instead.
       HAS_RELEASE_KEYSTORE: ${{ secrets.ANDROID_KEYSTORE_BASE64 != '' }}
+      # When absent, the Play upload step is skipped (AAB still ships to the
+      # GitHub Release) so the pipeline works before Play automation is set up.
+      HAS_PLAY_JSON: ${{ secrets.PLAY_SERVICE_ACCOUNT_JSON != '' }}
     steps:
       - uses: actions/checkout@v4
 
@@ -91,21 +94,35 @@ jobs:
             echo "storeFile=release-keystore.jks"
           } > android/key.properties
 
-      - name: Sync version & build APK
+      - name: Sync version & build APK + AAB
         run: |
           chmod +x scripts/sync-version.sh && scripts/sync-version.sh
-          flutter build apk --release
-          flutter build apk --release --split-per-abi
+          # github flavor: full build incl. in-app self-updater.
+          flutter build apk --release --flavor github
+          flutter build apk --release --flavor github --split-per-abi
+          # play flavor: installer permission stripped, updater compiled out.
+          flutter build appbundle --release --flavor play --dart-define=PLAY_BUILD=true
 
-      - name: Rename APKs
+      - name: Rename APKs & AAB
         run: |
           VERSION="${{ github.ref_name }}"
           OUT=build/app/outputs/flutter-apk
-          mv "$OUT/app-release.apk" "app-release-${VERSION}.apk"
-          mv "$OUT/app-arm64-v8a-release.apk" "hr-push-android-${VERSION}-arm64.apk"
-          mv "$OUT/app-armeabi-v7a-release.apk" "hr-push-android-${VERSION}-arm32.apk"
+          mv "$OUT/app-github-release.apk" "app-release-${VERSION}.apk"
+          mv "$OUT/app-arm64-v8a-github-release.apk" "hr-push-android-${VERSION}-arm64.apk"
+          mv "$OUT/app-armeabi-v7a-github-release.apk" "hr-push-android-${VERSION}-arm32.apk"
+          mv build/app/outputs/bundle/playRelease/app-play-release.aab "hr-push-android-${VERSION}.aab"
 
-      - name: Upload APKs to release
+      - name: Build Play release notes
+        run: |
+          mkdir -p whatsnew
+          # Latest section of each changelog, capped at Play's 500-char limit.
+          awk '/^## /{if (found) exit; found=1; next} found' CHANGELOG.md | head -c 500 > whatsnew/zh-CN.txt
+          awk '/^### /{if (found) exit; found=1; next} found' README_EN.md | head -c 500 > whatsnew/en-US.txt
+          [ -s whatsnew/zh-CN.txt ] || echo "问题修复与体验优化。" > whatsnew/zh-CN.txt
+          [ -s whatsnew/en-US.txt ] || echo "Bug fixes and improvements." > whatsnew/en-US.txt
+          cat whatsnew/*.txt
+
+      - name: Upload APKs & AAB to release
         if: github.event_name == 'push' || github.event.inputs.job == 'all'
         uses: softprops/action-gh-release@v1
         with:
@@ -113,8 +130,24 @@ jobs:
             app-release-${{ github.ref_name }}.apk
             hr-push-android-${{ github.ref_name }}-arm64.apk
             hr-push-android-${{ github.ref_name }}-arm32.apk
+            hr-push-android-${{ github.ref_name }}.aab
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      # Automatic Play upload. Goes to the internal testing track first —
+      # promote to production from Play Console, or change `track` to
+      # `production` once the pipeline is proven.
+      - name: Deploy AAB to Google Play
+        if: env.HAS_PLAY_JSON == 'true' && (github.event_name == 'push' || github.event.inputs.job == 'all' || github.event.inputs.job == 'android')
+        uses: r0adkll/upload-google-play@v1
+        with:
+          serviceAccountJson: ${{ secrets.PLAY_SERVICE_ACCOUNT_JSON }}
+          packageName: moe.iacg.hrpush
+          releaseFile: hr-push-android-${{ github.ref_name }}.aab
+          track: internal
+          releaseName: ${{ github.ref_name }}
+          status: completed
+          whatsNewDirectory: whatsnew
 
   build_ios:
     name: iOS Unsigned IPA

@@ -41,6 +41,20 @@ android {
         versionName = flutter.versionName
     }
 
+    // Distribution channels. `github` keeps the in-app self-updater used by
+    // GitHub Releases; `play` strips the installer permission via a manifest
+    // overlay (Play policy forbids self-updating apps) and the updater UI is
+    // compiled out with --dart-define=PLAY_BUILD=true.
+    flavorDimensions += "channel"
+    productFlavors {
+        create("github") {
+            dimension = "channel"
+        }
+        create("play") {
+            dimension = "channel"
+        }
+    }
+
     signingConfigs {
         create("release") {
             if (hasReleaseKeystore) {

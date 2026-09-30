@@ -262,33 +262,38 @@ class GeneralSettingsSectionState extends State<GeneralSettingsSection>
               ),
             ),
           ),
-        Builder(
-          builder: (context) {
-            final trailing = _updateCheckTrailing(context, l10n);
-            return CupertinoButton(
-              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 6),
-              minimumSize: Size.zero,
-              onPressed: () => _checkForUpdates(context),
-              child: Align(
-                alignment: AlignmentDirectional.centerStart,
-                child: Row(
-                  children: [
-                    Expanded(
-                      child: Text(
-                        l10n.updateCheck,
-                        style: AppTypography.subheadline.copyWith(
-                          color: AppColors.accent.resolveFrom(context),
-                          fontWeight: FontWeight.w600,
+        // Play builds update through the store; the updater is compiled out.
+        if (!UpdateService.playBuild)
+          Builder(
+            builder: (context) {
+              final trailing = _updateCheckTrailing(context, l10n);
+              return CupertinoButton(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 20,
+                  vertical: 6,
+                ),
+                minimumSize: Size.zero,
+                onPressed: () => _checkForUpdates(context),
+                child: Align(
+                  alignment: AlignmentDirectional.centerStart,
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          l10n.updateCheck,
+                          style: AppTypography.subheadline.copyWith(
+                            color: AppColors.accent.resolveFrom(context),
+                            fontWeight: FontWeight.w600,
+                          ),
                         ),
                       ),
-                    ),
-                    if (trailing != null) trailing,
-                  ],
+                      if (trailing != null) trailing,
+                    ],
+                  ),
                 ),
-              ),
-            );
-          },
-        ),
+              );
+            },
+          ),
         Padding(
           padding: const EdgeInsets.only(top: 8, bottom: 4),
           child: Center(
