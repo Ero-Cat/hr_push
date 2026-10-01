@@ -2,6 +2,22 @@
 cmake_minimum_required(VERSION 3.14)
 project(hr_push LANGUAGES CXX)
 
+# Flutter's shader compiler (impellerc) crashes when paths contain non-ASCII
+# characters (https://github.com/flutter/flutter/issues/193102, still open).
+# This cannot always fire before that crash, but replaces a cryptic failure
+# with actionable guidance for local builds; CI paths are always ASCII.
+foreach(_hrp_path_var CMAKE_SOURCE_DIR CMAKE_BINARY_DIR)
+  string(REGEX MATCH "[^ -~]" _hrp_non_ascii "${${_hrp_path_var}}")
+  if(NOT _hrp_non_ascii STREQUAL "")
+    message(FATAL_ERROR
+      "Paths must be ASCII-only when building on Windows: ${${_hrp_path_var}}\n"
+      "impellerc (Flutter's shader compiler) crashes on non-ASCII paths;\n"
+      "see https://github.com/flutter/flutter/issues/193102\n"
+      "Move the repo to an ASCII path such as C:\\dev\\hr_push, or map it\n"
+      "with:  subst X: <repo path>   and build from X:\\")
+  endif()
+endforeach()
+
 # The name of the executable created for the application. Change this to change
 # the on-disk name of your application.
 set(BINARY_NAME "hr_push")

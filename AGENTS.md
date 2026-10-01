@@ -209,7 +209,9 @@ flutter test test/specific_test.dart  # Single file
 ### Windows
 - Uses `universal_ble` with native WinRT API
 - C++ standard: C++20
-- Known issue: Chinese paths may cause runtime failures
+- Known issue: non-ASCII (e.g. Chinese) paths
+  - Runtime: portable builds fail to start from non-ASCII paths; `windows/runner/main.cpp` shows a trilingual warning dialog (continue/exit) before engine init, and the Inno installer warns about non-ASCII install dirs
+  - Build: `impellerc.exe` crashes when the repo path or Windows username is non-ASCII ([flutter/flutter#193102](https://github.com/flutter/flutter/issues/193102), unfixed); `windows/CMakeLists.txt` fails fast with guidance. CI paths are ASCII, releases unaffected
 
 ### Linux
 - BlueZ-based BLE via `universal_ble`

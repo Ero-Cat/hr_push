@@ -137,7 +137,8 @@ Flutter で開発されたクロスプラットフォームの BLE 心拍モニ�
 - コードスタイル：2 スペース、`dart format .`、`flutter_lints`。
 
 ## ⚠️ 既知の問題
-- Windows では非 ASCII パスで実行失敗する場合があります。英数字パス推奨。
+- Windows では非 ASCII パスから実行すると起動に失敗する場合があります。v1.9.1 以降、検出時に警告ダイアログを表示（続行または終了）し、インストーラーも非 ASCII インストール先を警告します。setup.exe 既定の Program Files は常に安全です。それでも失敗する場合は `%LOCALAPPDATA%\hr_push\logs\hr_push.log` を確認してください。
+- Windows でのローカルビルドも、リポジトリパスまたは Windows ユーザー名（ビルドキャッシュは `%LOCALAPPDATA%` 配下）に非 ASCII 文字が含まれると失敗します。Flutter のシェーダーコンパイラ `impellerc.exe` が文字化けしたパスでクラッシュする既知問題です（[flutter/flutter#193102](https://github.com/flutter/flutter/issues/193102)、未修正）。リリース成果物は CI が ASCII パス上でビルドするため影響なし。回避策：`C:\dev\hr_push` などの ASCII パスにクローンするか、`subst X: <パス>` でドライブ文字を割り当てて `X:\` からビルドしてください。
 
 ## 🧾 更新履歴
 ### v1.9.0

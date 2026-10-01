@@ -110,7 +110,7 @@ HR PUSH 想做的事很简单 —— **把心率稳定地送到你想送的任�
 | 平台 | 下载文件 | 说明 |
 | --- | --- | --- |
 | Android | `app-release-vX.Y.Z.apk`（通用）或 `hr-push-android-vX.Y.Z-arm64.apk` / `-arm32.apk`（按 CPU 架构，体积更小） | 直接安装；首次使用需授予蓝牙与通知权限 |
-| Windows | `hr-push-windows-vX.Y.Z-setup.exe`（推荐，安装到 Program Files，顺带规避中文路径问题）或 `hr-push-windows-vX.Y.Z.zip`（便携版） | 安装版含开始菜单/卸载；便携版解压即用，⚠️ 暂不支持中文路径；需支持 BLE 的蓝牙适配器 |
+| Windows | `hr-push-windows-vX.Y.Z-setup.exe`（推荐，安装到 Program Files，顺带规避中文路径问题）或 `hr-push-windows-vX.Y.Z.zip`（便携版） | 安装版含开始菜单/卸载；便携版解压即用，⚠️ 非英文路径可能导致无法启动（v1.9.1 起会先弹提示再尝试启动）；需支持 BLE 的蓝牙适配器 |
 | macOS | `hr-push-macos-vX.Y.Z.zip` | 解压得到 `.app`；首次打开若提示未知开发者，请右键 → 打开 |
 | iOS | `hr-push-ios-vX.Y.Z-unsigned.ipa` | **未签名** IPA：用 [AltStore](https://altstore.io) / [Sideloadly](https://sideloadly.io) / esign 等工具自签后安装（免费 Apple ID 即可，7 天需续签；付费账号一年） |
 | Linux | `hr-push-linux-vX.Y.Z.tar.gz` | 解压后运行 `./hr_push`；需系统 `bluez`（BLE）与 `libayatana-appindicator3-1`（托盘库，Ubuntu/Debian: `sudo apt install libayatana-appindicator3-1`） |
@@ -347,7 +347,13 @@ iOS 16.1+ 连接成功后自动开启实时活动，锁屏与灵动岛实时显�
 <details>
 <summary><b>Windows 下程序无法启动或闪退？</b></summary>
 
-已知问题：Windows 平台下中文路径可能导致运行失败，请将程序放在英文路径目录中运行。另请确认蓝牙适配器支持 BLE。
+已知问题：Windows 平台下中文（或其他非英文）路径可能导致运行失败。v1.9.1 起，从含非英文字符的路径启动时会先弹出提示，可选择继续尝试或退出；安装器在选择了非英文目录时也会警告。建议把程序放在纯英文路径（如 `C:\Tools\HR PUSH`），或直接使用安装版（默认装到 Program Files，路径恒为英文）。另请确认蓝牙适配器支持 BLE。仍无法启动时可查看日志 `%LOCALAPPDATA%\hr_push\logs\hr_push.log`。
+</details>
+
+<details>
+<summary><b>在 Windows 上本地构建失败（impellerc 报错 / 路径乱码）？</b></summary>
+
+上游已知问题：Flutter 的着色器编译器 `impellerc.exe` 在项目路径或 Windows 用户名（构建缓存位于 `%LOCALAPPDATA%`）含非英文字符时会崩溃，报错中的路径可能显示为乱码（[flutter#193102](https://github.com/flutter/flutter/issues/193102)，暂未修复，升级 Flutter 版本无效）。本仓库的发布产物由 CI 构建（纯英文路径），不受影响；本地构建请把仓库放到纯英文路径（如 `C:\dev\hr_push`），必要时用 `subst X: <仓库路径>` 映射盘符后从 `X:\` 构建，或改用纯英文用户名的 Windows 账户。
 </details>
 
 <details>
@@ -386,6 +392,10 @@ flutter gen-l10n      # 生成中/英/日本地化文件
 ## 🤝 贡献与反馈
 
 欢迎提交 Issue / PR，一起完善 BLE 兼容性与推送链路。若在特定设备或平台遇到问题，请附上日志与环境信息，便于复现。
+
+💬 **用户交流 QQ 群：315153253**
+
+加群交流使用问题、VRChat 联动与直播玩法，获取新版本动态与教程视频；设备兼容性反馈也欢迎直接在群里讨论。
 
 ## 📜 开源协议
 

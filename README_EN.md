@@ -137,7 +137,8 @@ Heart-rate events carry both `heartRate` and `heart_rate` keys (same value): the
 - Style: 2-space indent; `dart format .`; `flutter_lints`.
 
 ## ⚠️ Known Issues
-- On Windows, running from non-ASCII paths may fail. Prefer an ASCII-only path.
+- On Windows, running from non-ASCII paths may fail. Since v1.9.1 the app shows a warning dialog at startup (continue or exit) when it detects one, and the installer warns about non-ASCII install dirs. Prefer an ASCII-only path — the setup.exe default (Program Files) is always safe. If it still fails, check `%LOCALAPPDATA%\hr_push\logs\hr_push.log`.
+- Building locally on Windows also fails when the repo path or the Windows username (build cache lives in `%LOCALAPPDATA%`) contains non-ASCII characters: Flutter's shader compiler `impellerc.exe` crashes with mojibake paths ([flutter/flutter#193102](https://github.com/flutter/flutter/issues/193102), not fixed yet). Released artifacts are built by CI on ASCII paths and are unaffected. Workaround: clone into an ASCII path such as `C:\dev\hr_push`, or map a drive letter with `subst X: <path>` and build from `X:\`.
 
 ## 🧾 Changelog
 ### v1.9.0

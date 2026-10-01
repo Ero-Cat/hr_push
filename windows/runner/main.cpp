@@ -294,6 +294,68 @@ bool ActivateExistingWindow() {
   return true;
 }
 
+bool ContainsOnlyAscii(const wchar_t* text) {
+  for (const wchar_t* p = text; *p != L'\0'; ++p) {
+    if (static_cast<unsigned int>(*p) > 0x7F) {
+      return false;
+    }
+  }
+  return true;
+}
+
+// Running from a non-ASCII path is a known way to break the Flutter engine
+// on Windows; ask the user instead of failing with an unexplained crash.
+// Returns false when the user chose not to start the app.
+bool ConfirmNonAsciiExePath() {
+  wchar_t module_path[MAX_PATH] = {};
+  const DWORD length = ::GetModuleFileNameW(nullptr, module_path, MAX_PATH);
+  if (length == 0 || length >= MAX_PATH) {
+    return true;
+  }
+  if (ContainsOnlyAscii(module_path)) {
+    return true;
+  }
+
+  const LANGID language = ::GetUserDefaultUILanguage();
+  const wchar_t* title = nullptr;
+  const wchar_t* message = nullptr;
+  if (PRIMARYLANGID(language) == LANG_CHINESE) {
+    title = L"HR PUSH - 路径兼容性提醒";
+    message =
+        L"程序位于包含非英文字符的路径，可能导致无法正常运行或闪退。\n\n"
+        L"建议将程序移动到纯英文路径（例如 C:\\Tools\\HR PUSH），"
+        L"或使用安装版（setup.exe）重新安装。\n\n"
+        L"【确定】尝试继续启动    【取消】退出";
+  } else if (PRIMARYLANGID(language) == LANG_JAPANESE) {
+    title = L"HR PUSH - パス互換性の通知";
+    message =
+        L"非 ASCII 文字を含むパスから実行しているため、正常に起動しない場合が"
+        L"あります。\n\n"
+        L"英数字のみのパス（例: C:\\Tools\\HR PUSH）へ移動するか、セットアップ版"
+        L"（setup.exe）で再インストールしてください。\n\n"
+        L"［OK］起動を試みる    ［キャンセル］終了";
+  } else {
+    title = L"HR PUSH - path compatibility notice";
+    message =
+        L"The app is running from a path containing non-ASCII characters, "
+        L"which may prevent it from starting correctly.\n\n"
+        L"Move it to an ASCII-only path (for example C:\\Tools\\HR PUSH) or "
+        L"reinstall with the setup.exe installer.\n\n"
+        L"[OK] try to start anyway    [Cancel] exit";
+  }
+
+  LogLineSafe(L"[startup] non-ASCII exe path detected: %ls", module_path);
+  const int choice =
+      ::MessageBoxW(nullptr, message, title,
+                    MB_OKCANCEL | MB_ICONWARNING | MB_DEFBUTTON1 | MB_TOPMOST);
+  if (choice == IDCANCEL) {
+    LogLineSafe(L"[startup] user exited after non-ASCII path warning");
+    return false;
+  }
+  LogLineSafe(L"[startup] user continued after non-ASCII path warning");
+  return true;
+}
+
 }  // namespace
 
 int APIENTRY wWinMain(_In_ HINSTANCE instance, _In_opt_ HINSTANCE prev,
@@ -352,6 +414,12 @@ int APIENTRY wWinMain(_In_ HINSTANCE instance, _In_opt_ HINSTANCE prev,
       mutex_error == ERROR_ACCESS_DENIED) {
     LogLine(&logger, L"[single-instance] already running");
     ActivateExistingWindow();
+    ::CloseHandle(instance_mutex);
+    CleanupLogging(&logger, &log_guard);
+    return EXIT_SUCCESS;
+  }
+
+  if (!ConfirmNonAsciiExePath()) {
     ::CloseHandle(instance_mutex);
     CleanupLogging(&logger, &log_guard);
     return EXIT_SUCCESS;

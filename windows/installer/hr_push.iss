@@ -61,3 +61,32 @@ Name: "{autodesktop}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"; Tasks: de
 
 [Run]
 Filename: "{app}\{#MyAppExeName}"; Description: "{cm:LaunchProgram,{#MyAppName}}"; Flags: nowait postinstall skipifsilent
+
+[Code]
+// The default dir ({autopf}\HR PUSH) is ASCII; only a manually edited path can
+// carry non-ASCII characters, which breaks the Flutter engine at startup.
+function DirIsAsciiOnly(const Dir: string): Boolean;
+var
+  I: Integer;
+begin
+  Result := True;
+  for I := 1 to Length(Dir) do
+    if Ord(Dir[I]) > $7F then
+    begin
+      Result := False;
+      Exit;
+    end;
+end;
+
+function NextButtonClick(CurPageID: Integer): Boolean;
+begin
+  Result := True;
+  if (CurPageID = wpSelectDir) and not DirIsAsciiOnly(WizardDirValue) then
+  begin
+    if MsgBox(
+        'The selected folder contains non-English characters and may prevent the app from starting.' + #13#10#13#10 +
+        '所选目录包含非英文字符，可能导致程序无法启动。' + #13#10#13#10 +
+        'Use this folder anyway?', mbConfirmation, MB_DEFBUTTON2) = IDNO then
+      Result := False;
+  end;
+end;
